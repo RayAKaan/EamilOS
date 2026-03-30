@@ -46,3 +46,6 @@ ollama*.exe
 ollama*.zip
 ollama_extracted/
 install_ollama.ps1
+
+# Boilerplate documentation (AI-provided templates)
+*.md
