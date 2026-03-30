@@ -1,0 +1,159 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-03-31T01:56:00Z",
+  "environment": {
+    "os": "Windows (win32)",
+    "nodejs": "v22.13.0",
+    "python": "3.11.9",
+    "git": "2.47.0",
+    "provider": "Ollama",
+    "model": "phi3:mini"
+  },
+  "preValidation": {
+    "build": true,
+    "unitTests": {
+      "passed": 77,
+      "total": 77
+    },
+    "cleanState": true
+  },
+  "tests": [
+    {
+      "id": 1,
+      "name": "Multi-File Generation",
+      "result": "FAIL",
+      "duration_ms": 150000,
+      "details": {
+        "filesExpected": 5,
+        "filesCreated": 0,
+        "validationErrors": [
+          "Mixed tabs and spaces in Python",
+          "Absolute paths rejected",
+          "Wrong filenames extracted"
+        ],
+        "method": "structured"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Parser Failure Recovery",
+      "result": "FAIL",
+      "duration_ms": 75000,
+      "details": {
+        "scenario": "explanation_only",
+        "filesCreated": 1,
+        "fileType": "explanation.txt",
+        "retryTriggered": false
+      }
+    },
+    {
+      "id": 3,
+      "name": "Multi-Block Rejection",
+      "result": "FAIL",
+      "duration_ms": 65000,
+      "details": {
+        "filesExpected": 2,
+        "filesCreated": 0,
+        "wrongFilenames": ["data.json"],
+        "reason": "Parser extracted 2 files but wrote as data.json"
+      }
+    },
+    {
+      "id": 4,
+      "name": "Invalid Python Validation",
+      "result": "SKIPPED",
+      "duration_ms": 38000,
+      "details": {
+        "reason": "Model refused to write intentionally broken code",
+        "fileCreated": "placeholder.txt"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Invalid JSON Validation",
+      "result": "FAIL",
+      "duration_ms": 53000,
+      "details": {
+        "filesExpected": 1,
+        "filesCreated": 1,
+        "wrongFilename": "data.json instead of config.json",
+        "jsonValid": "N/A"
+      }
+    },
+    {
+      "id": 6,
+      "name": "Self-Correction Loop",
+      "result": "FAIL",
+      "duration_ms": 81000,
+      "details": {
+        "filesExpected": 1,
+        "filesCreated": 0,
+        "wrongFilename": "data.json instead of fibonacci.py"
+      }
+    },
+    {
+      "id": 7,
+      "name": "Tool-less Fallback",
+      "result": "FAIL",
+      "duration_ms": 54000,
+      "details": {
+        "filesExpected": 1,
+        "filesCreated": 0,
+        "validationErrors": ["Mismatched braces: 3 open, 4 close"],
+        "toolCalls": 0
+      }
+    },
+    {
+      "id": 8,
+      "name": "Large Output Stress",
+      "result": "FAIL",
+      "duration_ms": 259000,
+      "details": {
+        "filesExpected": 5,
+        "filesCreated": 0,
+        "validationErrors": ["Mismatched parentheses: 42 open, 43 close"],
+        "wrongFilename": "data.json"
+      }
+    },
+    {
+      "id": 9,
+      "name": "Infinite Loop Protection",
+      "result": "PASS",
+      "duration_ms": 2000,
+      "details": {
+        "unitTestsPassed": 77,
+        "unitTestsTotal": 77,
+        "maxIterationsEnforced": true
+      }
+    },
+    {
+      "id": 10,
+      "name": "End-to-End Reality",
+      "result": "FAIL",
+      "duration_ms": 60000,
+      "details": {
+        "filesExpected": ["calculator.py", "main.py"],
+        "filesCreated": 0,
+        "wrongFilename": "data.json (JSON structured output saved as file)",
+        "calculatorCorrect": false,
+        "mainCorrect": false
+      }
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 8,
+    "skipped": 1,
+    "totalDuration_ms": 800000,
+    "totalTokens": 500000,
+    "totalCost_usd": 0
+  },
+  "verdict": "NOT_PRODUCTION_READY",
+  "rootCause": "ResponseParser.extractFilePath() fails to extract filenames from code block context, defaulting to 'data.json'",
+  "criticalFix": "Fix ResponseParser.extractFilePath() regex patterns to match 'filename\\n```language' format",
+  "secondaryFixes": [
+    "Strengthen OUTPUT_FORMAT_INSTRUCTIONS",
+    "Add filename validation in structured JSON parsing",
+    "Handle absolute paths in JSON files array"
+  ]
+}

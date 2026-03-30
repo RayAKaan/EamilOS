@@ -2,16 +2,13 @@ import { Task, ChatMessage } from './types.js';
 import { getProviderManager } from './provider-manager.js';
 import { getToolRegistry } from './tools/registry.js';
 import { getLogger } from './logger.js';
+import { getResponseParser } from './parser/response-parser.js';
+import { OUTPUT_FORMAT_INSTRUCTIONS } from './agents/output-format-prompt.js';
 
 export interface AgentRunnerOptions {
   maxIterations?: number;
   timeout?: number;
   enableFallbackParser?: boolean;
-}
-
-interface ParsedFile {
-  filePath: string;
-  content: string;
 }
 
 export interface AgentExecutionResult {
@@ -148,10 +145,12 @@ ${context}`;
             result.success = true;
             logger.success(`Task completed with ${result.artifacts.length} artifact(s)`);
           } else if (this.options.enableFallbackParser) {
-            const parsedFiles = this.parseContentForFiles(response.content);
-            if (parsedFiles.length > 0) {
-              logger.info(`Fallback parser found ${parsedFiles.length} file(s) to write`);
-              for (const file of parsedFiles) {
+            const parser = getResponseParser();
+            const parseResult = parser.parse(response.content);
+            
+            if (parseResult.success && parseResult.files.length > 0) {
+              logger.info(`Parser (${parseResult.parseMethod}) found ${parseResult.files.length} file(s) to write`);
+              for (const file of parseResult.files) {
                 try {
                   const writeTool = toolRegistry.get('workspace_write');
                   if (writeTool) {
@@ -159,21 +158,21 @@ ${context}`;
                     await writeTool.execute(toolArgs);
                     result.artifacts.push(file.filePath);
                     result.toolCalls++;
-                    logger.success(`Fallback wrote: ${file.filePath}`);
+                    logger.success(`Parser wrote: ${file.filePath}`);
                   }
                 } catch (writeError) {
                   const errorMsg = writeError instanceof Error ? writeError.message : String(writeError);
-                  logger.error(`Fallback write failed for ${file.filePath}: ${errorMsg}`);
+                  logger.error(`Write failed for ${file.filePath}: ${errorMsg}`);
                 }
               }
               if (result.artifacts.length > 0) {
                 result.success = true;
-                logger.success(`Fallback parser created ${result.artifacts.length} artifact(s)`);
+                logger.success(`Parser created ${result.artifacts.length} artifact(s)`);
               }
             } else {
               result.success = false;
-              result.error = 'Agent completed without creating any artifacts and fallback parser found no files';
-              logger.warn('Agent did not create any files');
+              result.error = parseResult.error || 'No files found in response';
+              logger.warn(`Parser failed: ${result.error}`);
             }
           } else {
             result.success = false;
@@ -205,21 +204,9 @@ ${context}`;
   }
 
   private getDefaultSystemPrompt(): string {
-    return `You are EamilOS, an expert coding agent that produces working code.
+    return `${OUTPUT_FORMAT_INSTRUCTIONS}
 
-CRITICAL RULES:
-1. ALWAYS put code inside triple backtick code blocks with the language specified (e.g., \`\`\`python)
-2. State the FILENAME before or after the code block (e.g., "Here is hello.py:")
-3. Every file you create MUST be complete and runnable
-4. After creating code, output it in a code block
-
-Example format:
-Here is hello.py:
-\`\`\`python
-print("Hello World")
-\`\`\`
-
-The user wants you to create files. Output your code in properly formatted code blocks with filenames.`;
+The user wants you to create files. Use workspace_write tool when available, or output valid JSON with files array.`;
   }
 
   private zodToJsonSchema(schema: unknown): Record<string, unknown> {
@@ -259,130 +246,6 @@ The user wants you to create files. Output your code in properly formatted code 
     return 'string';
   }
 
-  private parseContentForFiles(content: string): ParsedFile[] {
-    const files: ParsedFile[] = [];
-    
-    const codeBlockRegex = /```(?:(\w+))?\s*\n?([\s\S]*?)```/g;
-    let match;
-    
-    while ((match = codeBlockRegex.exec(content)) !== null) {
-      const language = match[1] || '';
-      const code = match[2].trim();
-      
-      if (code && this.looksLikeCode(code)) {
-        const filePath = this.extractFilePathFromContext(content, match.index, language);
-        if (filePath && !files.some(f => f.filePath === filePath)) {
-          files.push({ filePath, content: code });
-        }
-      }
-    }
-    
-    if (files.length === 0) {
-      const directCodeBlocks = content.split(/```/);
-      for (let i = 1; i < directCodeBlocks.length; i += 2) {
-        const code = directCodeBlocks[i].replace(/^\w+\n?/, '').trim();
-        if (code && this.looksLikeCode(code)) {
-          const filePath = this.inferFilePath(content, '');
-          if (filePath && !files.some(f => f.filePath === filePath)) {
-            files.push({ filePath, content: code });
-          }
-        }
-      }
-    }
-    
-    return files;
-  }
-
-  private extractFilePathFromContext(content: string, blockIndex: number, language: string): string | null {
-    const contextBefore = content.substring(Math.max(0, blockIndex - 200), blockIndex).toLowerCase();
-    
-    const filePathPatterns = [
-      /['"`]?([\w./-]+\.(?:py|js|ts|tsx|jsx|go|rs|java|cpp|c|h|sh|yaml|json|md|txt))['"`]?/gi,
-      /(?:file|create|write|save|into)\s+['"`]?([\w./-]+\.(?:py|js|ts|tsx|jsx|go|rs|java|cpp|c|h|sh|yaml|json|md|txt))/gi,
-      /(?:named?|called?)\s+['"`]?([\w./-]+)['"`]?/gi,
-    ];
-    
-    for (const pattern of filePathPatterns) {
-      const matches = [...contextBefore.matchAll(pattern)];
-      if (matches.length > 0) {
-        const lastMatch = matches[matches.length - 1];
-        const filePath = lastMatch[1];
-        if (filePath && !filePath.includes('print') && !filePath.includes('hello')) {
-          return filePath;
-        }
-      }
-    }
-    
-    const taskMatch = content.match(/create\s+(?:a\s+)?(?:python|javascript|typescript|go|rust|java)?\s*(?:file\s+)?([\w./-]+\.\w+)/i);
-    if (taskMatch) {
-      return taskMatch[1];
-    }
-    
-    return this.inferFilePath(content, language);
-  }
-
-  private inferFilePath(content: string, language: string): string {
-    const taskMatch = content.match(/create\s+(?:a\s+)?([\w./-]+\.\w+)/i);
-    if (taskMatch) {
-      return taskMatch[1];
-    }
-    
-    const langMap: Record<string, string[]> = {
-      python: ['hello.py', 'main.py', 'script.py', 'app.py'],
-      javascript: ['hello.js', 'main.js', 'index.js', 'app.js'],
-      typescript: ['hello.ts', 'main.ts', 'index.ts', 'app.ts'],
-      jsx: ['App.jsx', 'index.jsx', 'Component.jsx'],
-      tsx: ['App.tsx', 'index.tsx', 'Component.tsx'],
-      go: ['hello.go', 'main.go'],
-      rust: ['hello.rs', 'main.rs', 'lib.rs'],
-      java: ['Hello.java', 'Main.java'],
-    };
-    
-    if (language && langMap[language]) {
-      return langMap[language][0];
-    }
-    
-    const contentLower = content.toLowerCase();
-    if (contentLower.includes('python') || contentLower.includes('def ') || contentLower.includes('import ')) {
-      return 'hello.py';
-    }
-    if (contentLower.includes('javascript') || contentLower.includes('console.log')) {
-      return 'hello.js';
-    }
-    if (contentLower.includes('typescript')) {
-      return 'hello.ts';
-    }
-    
-    return 'output.txt';
-  }
-
-  private looksLikeCode(text: string): boolean {
-    const codeIndicators = [
-      /\bfunction\b/,
-      /\bdef\b/,
-      /\bclass\b/,
-      /\bconst\b/,
-      /\blet\b/,
-      /\bvar\b/,
-      /\bimport\b/,
-      /\bexport\b/,
-      /\bprint\(/,
-      /\bconsole\.log\(/,
-      /\bSystem\.out\.print/,
-      /\bfmt\.Print/,
-      /\bprint!\(/,
-      /\bpub\s+fn\b/,
-      /\breturn\b/,
-      /\basync\b/,
-      /\bawait\b/,
-      /\{[\s\S]*\}/,
-      /def\s+\w+\s*\(/,
-      /func\s+\w+\s*\(/,
-    ];
-    
-    const matchCount = codeIndicators.filter(indicator => indicator.test(text)).length;
-    return matchCount >= 1 && text.length > 10;
-  }
 }
 
 let globalAgentRunner: AgentRunner | null = null;
