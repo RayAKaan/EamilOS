@@ -1,0 +1,266 @@
+{
+  "summary": {
+    "total": 10,
+    "passed": 4,
+    "partialPass": 4,
+    "failed": 2,
+    "date": "2026-03-30",
+    "version": "v0.2-working-execution"
+  },
+  "tests": [
+    {
+      "id": 1,
+      "name": "Baseline Execution",
+      "status": "pass",
+      "command": "eamilos run \"Create a Python file hello.py that prints Hello World\"",
+      "details": "Project created successfully. Fallback parser triggered. File created and executed correctly.",
+      "artifacts": [
+        {
+          "path": "hello.py",
+          "content": "print(\"Hello World\")",
+          "executed": true,
+          "output": "Hello World"
+        }
+      ],
+      "executionTime": "~60s"
+    },
+    {
+      "id": 2,
+      "name": "Multi-Task Flow",
+      "status": "fail",
+      "command": "eamilos run \"Create two Python files: a.py prints A, b.py prints B\"",
+      "details": "Only 1 file created with wrong filename 'of'. Fallback parser misidentified filename from code context.",
+      "artifacts": [
+        {
+          "path": "of",
+          "content": "Python script content (not actual files)",
+          "executed": false,
+          "error": "Incorrect filename extracted"
+        }
+      ],
+      "executionTime": "~45s",
+      "failureReason": "Fallback parser misidentified 'of' from 'with open()' statement"
+    },
+    {
+      "id": 3,
+      "name": "Dependency Simulation",
+      "status": "partial",
+      "command": "eamilos run \"Create a Python module utils.py with a function greet(), then create main.py that imports and uses it\"",
+      "details": "Both files created but main.py has wrong content. LLM ignored import instruction.",
+      "artifacts": [
+        {
+          "path": "utils.py",
+          "content": "def greet(name): print(f\"Hello, {name}!\")",
+          "executed": false,
+          "correct": true
+        },
+        {
+          "path": "main.py",
+          "content": "philosophical_thoughts = [...]",
+          "executed": true,
+          "correct": false,
+          "error": "Wrong content - not importing utils"
+        }
+      ],
+      "executionTime": "~85s"
+    },
+    {
+      "id": 4,
+      "name": "Invalid/Ambiguous Input",
+      "status": "partial",
+      "command": "eamilos run \"Make something useful in Python\"",
+      "details": "System made reasonable assumption (todo app). Generated code has syntax errors.",
+      "artifacts": [
+        {
+          "path": "todoapp.py",
+          "content": "ToDoItem class with main() function",
+          "executed": false,
+          "correct": false,
+          "error": "IndentationError: unindent does not match any outer indentation level"
+        }
+      ],
+      "executionTime": "~93s"
+    },
+    {
+      "id": 5,
+      "name": "No Tool Response (Force Fallback)",
+      "status": "pass",
+      "command": "eamilos run \"Create a file test.py that prints Testing\"",
+      "details": "Tools confirmed disabled. Fallback parser triggered successfully. File created correctly.",
+      "artifacts": [
+        {
+          "path": "test.py",
+          "content": "print(\"Testing\")",
+          "executed": true,
+          "output": "Testing"
+        }
+      ],
+      "executionTime": "~52s",
+      "metadata": {
+        "toolsEnabled": false,
+        "fallbackTriggered": true
+      }
+    },
+    {
+      "id": 6,
+      "name": "Large Output",
+      "status": "partial",
+      "command": "eamilos run \"Create a Python script with 100 print statements\"",
+      "details": "File created with loop for 100 prints. Not truncated. Filename incorrectly derived from project ID.",
+      "artifacts": [
+        {
+          "path": "trpscjsju2nut6ge3psy3.py",
+          "content": "for i in range(1, 101): print(f\"Statement {i}...\")",
+          "executed": true,
+          "correct": true,
+          "lineCount": 3
+        }
+      ],
+      "executionTime": "~45s",
+      "metadata": {
+        "usesLoop": true,
+        "filenameIssue": "Derived from project ID instead of meaningful name"
+      }
+    },
+    {
+      "id": 7,
+      "name": "Invalid Code Generation",
+      "status": "partial",
+      "command": "eamilos run \"Create a Python file with intentional syntax error\"",
+      "details": "LLM refused to create bad code (good behavior). No file created.",
+      "artifacts": [],
+      "executionTime": "~37s",
+      "metadata": {
+        "llmRefused": true,
+        "systemCodeValidation": false
+      }
+    },
+    {
+      "id": 8,
+      "name": "Repeat Execution (Idempotency)",
+      "status": "pass",
+      "command": "eamilos run \"Create hello.py that prints Hello World\" (twice)",
+      "details": "Each run creates new project. No collision. Content preserved correctly.",
+      "artifacts": [
+        {
+          "run": 1,
+          "projectId": "SqBkrF6rAOOXtvMN79QUc",
+          "path": "hello.py",
+          "content": "print(\"Hello World\")"
+        },
+        {
+          "run": 2,
+          "projectId": "xJ01fcgmokU5jjg6rYdE4",
+          "path": "hello.py",
+          "content": "print(\"Hello, World!\")"
+        }
+      ],
+      "executionTime": "~45s (each)",
+      "metadata": {
+        "isolationCorrect": true,
+        "noCorruption": true
+      }
+    },
+    {
+      "id": 9,
+      "name": "Resource/Limit Test",
+      "status": "fail",
+      "command": "eamilos run \"Generate 10 Python files each printing a number\"",
+      "details": "No files created. LLM returned script instead of individual files. Fallback parser couldn't extract 10 files.",
+      "artifacts": [],
+      "executionTime": "~44s",
+      "failureReason": "Fallback parser limitation - can't extract multiple files from single response"
+    },
+    {
+      "id": 10,
+      "name": "Failure Recovery",
+      "status": "pass",
+      "command": "timeout 5 eamilos run \"Create a Python file complex.py\"",
+      "details": "Process interrupted. Recovery mechanism triggered. Task marked as 'interrupted'. No corrupted state.",
+      "artifacts": [],
+      "executionTime": "~5s",
+      "metadata": {
+        "interruptedCleanly": true,
+        "recoveryTriggered": true,
+        "taskStatus": "interrupted",
+        "readyForRetry": true
+      }
+    }
+  ],
+  "issues": [
+    {
+      "severity": "high",
+      "category": "parser",
+      "title": "Multi-file extraction fails",
+      "description": "Fallback parser can't extract multiple files from single code block or scripts that create files",
+      "affectedTests": [2, 9],
+      "fix": "Implement tool calling for stronger models or improve parser to handle file creation scripts"
+    },
+    {
+      "severity": "high",
+      "category": "validation",
+      "title": "No code validation",
+      "description": "Generated code not syntax-checked before commit to workspace",
+      "affectedTests": [4],
+      "fix": "Add syntax validation step in artifact creation pipeline"
+    },
+    {
+      "severity": "medium",
+      "category": "parser",
+      "title": "Filename inference uses project ID",
+      "description": "When no filename detected, fallback parser uses project ID as filename",
+      "affectedTests": [6],
+      "fix": "Add better default naming convention"
+    },
+    {
+      "severity": "medium",
+      "category": "llm",
+      "title": "phi3:mini ignores complex instructions",
+      "description": "LLM doesn't reliably follow multi-step instructions or import requirements",
+      "affectedTests": [3],
+      "fix": "Use stronger model (qwen2.5, mixtral) or improve system prompt"
+    },
+    {
+      "severity": "low",
+      "category": "performance",
+      "title": "Slow LLM response times",
+      "description": "Ollama phi3:mini takes 30-90 seconds per request",
+      "affectedTests": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "fix": "Use faster model or implement streaming with progress indicator"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "recommendation": "Enable tool calling for stronger Ollama models (qwen2.5, mixtral)",
+      "rationale": "Tool calling enables reliable multi-file creation and artifact management"
+    },
+    {
+      "priority": "high",
+      "recommendation": "Add code validation pipeline",
+      "rationale": "Prevent invalid code from being committed as artifacts"
+    },
+    {
+      "priority": "high",
+      "recommendation": "Improve fallback parser for multi-file scenarios",
+      "rationale": "Current parser fails for complex requests with multiple files"
+    },
+    {
+      "priority": "medium",
+      "recommendation": "Implement timeout progress indicator",
+      "rationale": "Users need feedback during slow LLM responses"
+    },
+    {
+      "priority": "medium",
+      "recommendation": "Add better default filename handling",
+      "rationale": "Project ID as filename is confusing and unhelpful"
+    }
+  ],
+  "systemInfo": {
+    "provider": "Ollama",
+    "model": "phi3:mini",
+    "endpoint": "http://localhost:11434",
+    "toolSupport": false,
+    "fallbackParserUsed": true
+  }
+}
