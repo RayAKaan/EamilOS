@@ -1,0 +1,27 @@
+{
+  "name": "@eamilos/cli",
+  "version": "1.0.0",
+  "description": "EamilOS CLI",
+  "type": "module",
+  "bin": {
+    "eamilos": "./bin/eamilos"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@eamilos/core": "file:../core",
+    "commander": "^13.1.0",
+    "chalk": "^5.4.0",
+    "ora": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

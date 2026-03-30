@@ -1,0 +1,29 @@
+{
+  "name": "eamilos",
+  "version": "1.0.0",
+  "description": "Agentic Operating Ground - Multi-agent coordination platform",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @eamilos/core && npm run build -w @eamilos/cli",
+    "dev": "npm run dev --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "agent",
+    "ai",
+    "multi-agent",
+    "orchestration",
+    "coordination"
+  ],
+  "author": "",
+  "license": "MIT"
+}
