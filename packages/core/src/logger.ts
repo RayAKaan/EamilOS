@@ -147,7 +147,7 @@ export class Logger {
     }
   }
 
-  private log(
+  log(
     level: LogLevel,
     message: string,
     options: Partial<LogEntry> = {}

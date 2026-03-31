@@ -1,0 +1,202 @@
+{
+  "generatedAt": "2026-03-31T13:07:10.339Z",
+  "totalTests": 10,
+  "testsRun": 10,
+  "testsPassed": 10,
+  "testsFailed": 0,
+  "testsPartial": 0,
+  "testsSkipped": 0,
+  "testsErrored": 0,
+  "totalDurationMs": 5,
+  "results": [
+    {
+      "testId": "O-STRESS-1",
+      "testName": "Orchestrator initialization",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {
+        "maxParallel": 5,
+        "maxRetries": 3
+      },
+      "expectedBehavior": "Orchestrator should initialize with custom options",
+      "actualBehavior": "Orchestrator created. Running: false",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "isRunning": false
+      },
+      "timestamp": "2026-03-31T13:07:10.334Z"
+    },
+    {
+      "testId": "O-STRESS-2",
+      "testName": "Response validation - valid JSON",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {
+        "validJson": "{\"files\":[{\"path\":\"test.py\",\"content\":\"print(1)\"}]}"
+      },
+      "expectedBehavior": "Should validate valid JSON response",
+      "actualBehavior": "Valid: true",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "result": {
+          "valid": true
+        }
+      },
+      "timestamp": "2026-03-31T13:07:10.335Z"
+    },
+    {
+      "testId": "O-STRESS-3",
+      "testName": "Response validation - invalid JSON",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {
+        "invalidJson": "Not valid JSON at all"
+      },
+      "expectedBehavior": "Should reject invalid JSON response",
+      "actualBehavior": "Valid: false, Reason: NO_JSON_FOUND",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "result": {
+          "valid": false,
+          "reason": "NO_JSON_FOUND"
+        }
+      },
+      "timestamp": "2026-03-31T13:07:10.336Z"
+    },
+    {
+      "testId": "O-STRESS-4",
+      "testName": "Response validation - empty files",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {
+        "emptyFiles": "{\"files\":[]}"
+      },
+      "expectedBehavior": "Should reject response with empty files array",
+      "actualBehavior": "Valid: false, Reason: NO_VALID_FILES",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "result": {
+          "valid": false,
+          "reason": "NO_VALID_FILES"
+        }
+      },
+      "timestamp": "2026-03-31T13:07:10.337Z"
+    },
+    {
+      "testId": "O-STRESS-5",
+      "testName": "Response validation - blocked filename",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {
+        "blockedFile": "{\"files\":[{\"path\":\"data.json\",\"content\":\"{}\"}]}"
+      },
+      "expectedBehavior": "Should filter blocked filenames",
+      "actualBehavior": "Valid: false, Reason: NO_VALID_FILES",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "result": {
+          "valid": false,
+          "reason": "NO_VALID_FILES"
+        }
+      },
+      "timestamp": "2026-03-31T13:07:10.337Z"
+    },
+    {
+      "testId": "O-STRESS-6",
+      "testName": "Stop orchestrator",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Should stop orchestrator cleanly",
+      "actualBehavior": "Running: false",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "isRunning": false
+      },
+      "timestamp": "2026-03-31T13:07:10.337Z"
+    },
+    {
+      "testId": "O-STRESS-7",
+      "testName": "Attempt counting",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Should return 0 for non-existent task attempts",
+      "actualBehavior": "Attempt count: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "attemptCount": 0
+      },
+      "timestamp": "2026-03-31T13:07:10.337Z"
+    },
+    {
+      "testId": "O-STRESS-8",
+      "testName": "Execution context retrieval",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Should return undefined for non-existent execution context",
+      "actualBehavior": "Context: undefined",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {},
+      "timestamp": "2026-03-31T13:07:10.337Z"
+    },
+    {
+      "testId": "O-STRESS-9",
+      "testName": "Response validation - multiple valid files",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {
+        "multiFile": "{\"files\":[{\"path\":\"a.py\",\"content\":\"x=1\"},{\"path\":\"b.py\",\"content\":\"y=2\"},{\"path\":\"c.ts\",\"content\":\"z=3\"}]}"
+      },
+      "expectedBehavior": "Should accept multiple valid files",
+      "actualBehavior": "Valid: true",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "result": {
+          "valid": true
+        }
+      },
+      "timestamp": "2026-03-31T13:07:10.338Z"
+    },
+    {
+      "testId": "O-STRESS-10",
+      "testName": "Response validation - description content",
+      "category": "orchestrator",
+      "status": "PASS",
+      "input": {
+        "descContent": "{\"files\":[{\"path\":\"desc.py\",\"content\":\"This file implements a calculator\"}]}"
+      },
+      "expectedBehavior": "Should reject file with description content instead of code",
+      "actualBehavior": "Valid: false, Reason: NO_VALID_FILES",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "result": {
+          "valid": false,
+          "reason": "NO_VALID_FILES"
+        }
+      },
+      "timestamp": "2026-03-31T13:07:10.339Z"
+    }
+  ]
+}

@@ -1,0 +1,284 @@
+{
+  "generatedAt": "2026-03-31T13:09:48.716Z",
+  "totalTests": 7,
+  "testsRun": 7,
+  "testsPassed": 7,
+  "testsFailed": 0,
+  "testsPartial": 0,
+  "testsSkipped": 0,
+  "testsErrored": 0,
+  "totalDurationMs": 5,
+  "results": [
+    {
+      "testId": "C-STRESS-1",
+      "testName": "Rapid parser calls (interruption simulation)",
+      "category": "chaos",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "System handles rapid consecutive calls without state leakage",
+      "actualBehavior": "Results: [{\"index\":0,\"success\":true,\"fileCount\":1},{\"index\":1,\"success\":true,\"fileCount\":1},{\"index\":2,\"success\":false,\"fileCount\":0},{\"index\":3,\"success\":true,\"fileCount\":1},{\"index\":4,\"success\":false,\"fileCount\":0}]",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 2,
+      "telemetry": {
+        "results": [
+          {
+            "index": 0,
+            "success": true,
+            "fileCount": 1
+          },
+          {
+            "index": 1,
+            "success": true,
+            "fileCount": 1
+          },
+          {
+            "index": 2,
+            "success": false,
+            "fileCount": 0
+          },
+          {
+            "index": 3,
+            "success": true,
+            "fileCount": 1
+          },
+          {
+            "index": 4,
+            "success": false,
+            "fileCount": 0
+          }
+        ]
+      },
+      "timestamp": "2026-03-31T13:09:48.713Z"
+    },
+    {
+      "testId": "C-STRESS-2",
+      "testName": "State recovery after failure",
+      "category": "chaos",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "New orchestrator instance starts fresh after failure",
+      "actualBehavior": "Orch1 valid: true, Orch2 valid: true",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "orch1Valid": true,
+        "orch2Valid": true
+      },
+      "timestamp": "2026-03-31T13:09:48.713Z"
+    },
+    {
+      "testId": "C-STRESS-3",
+      "testName": "Corrupt intermediate state handling",
+      "category": "chaos",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Parser handles corrupt/empty input gracefully",
+      "actualBehavior": "5/5 handled without crash",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "results": [
+          {
+            "input": "",
+            "success": false
+          },
+          {
+            "input": "   ",
+            "success": false
+          },
+          {
+            "input": "\n\n\n",
+            "success": false
+          },
+          {
+            "input": "{",
+            "success": false
+          },
+          {
+            "input": "}",
+            "success": false
+          }
+        ]
+      },
+      "timestamp": "2026-03-31T13:09:48.714Z"
+    },
+    {
+      "testId": "C-STRESS-4",
+      "testName": "Partial artifact followed by valid",
+      "category": "chaos",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Sequential valid then invalid then valid responses handled correctly",
+      "actualBehavior": "Results: [{\"index\":0,\"success\":true,\"files\":1},{\"index\":1,\"success\":false,\"files\":0},{\"index\":2,\"success\":true,\"files\":1},{\"index\":3,\"success\":false,\"files\":0},{\"index\":4,\"success\":true,\"files\":1}]",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "results": [
+          {
+            "index": 0,
+            "success": true,
+            "files": 1
+          },
+          {
+            "index": 1,
+            "success": false,
+            "files": 0
+          },
+          {
+            "index": 2,
+            "success": true,
+            "files": 1
+          },
+          {
+            "index": 3,
+            "success": false,
+            "files": 0
+          },
+          {
+            "index": 4,
+            "success": true,
+            "files": 1
+          }
+        ],
+        "expected": [
+          true,
+          false,
+          true,
+          false,
+          true
+        ]
+      },
+      "timestamp": "2026-03-31T13:09:48.714Z"
+    },
+    {
+      "testId": "C-STRESS-5",
+      "testName": "Timeout/error recovery",
+      "category": "chaos",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Budget guard recovers from rapid error states",
+      "actualBehavior": "Total spent: 0.9999999999999999, Exceeded: false",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "status": {
+          "exceeded": false,
+          "warning": false,
+          "totalSpent": 0.9999999999999999,
+          "budgetLimit": 5,
+          "percentageUsed": 0.19999999999999998,
+          "taskSpent": 0,
+          "taskLimit": 0.5
+        }
+      },
+      "timestamp": "2026-03-31T13:09:48.714Z"
+    },
+    {
+      "testId": "C-STRESS-6",
+      "testName": "Garbage data handling",
+      "category": "chaos",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Parser handles garbage/non-text data without crash",
+      "actualBehavior": "5/5 handled without crash",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 2,
+      "telemetry": {
+        "results": [
+          {
+            "index": 0,
+            "crashed": false,
+            "result": {
+              "success": false
+            }
+          },
+          {
+            "index": 1,
+            "crashed": false,
+            "result": {
+              "success": false
+            }
+          },
+          {
+            "index": 2,
+            "crashed": false,
+            "result": {
+              "success": false
+            }
+          },
+          {
+            "index": 3,
+            "crashed": false,
+            "result": {
+              "success": false
+            }
+          },
+          {
+            "index": 4,
+            "crashed": false,
+            "result": {
+              "success": false
+            }
+          }
+        ]
+      },
+      "timestamp": "2026-03-31T13:09:48.716Z"
+    },
+    {
+      "testId": "C-STRESS-7",
+      "testName": "Mixed success/failure sequence",
+      "category": "chaos",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "System handles alternating success/failure correctly",
+      "actualBehavior": "Total spent: 3 (expected: 3), Successes: 4, Failures: 2",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "status": {
+          "exceeded": false,
+          "warning": false,
+          "totalSpent": 3,
+          "budgetLimit": 10,
+          "percentageUsed": 0.3,
+          "taskSpent": 0,
+          "taskLimit": 2
+        },
+        "sequence": [
+          {
+            "type": "success",
+            "cost": 0.5
+          },
+          {
+            "type": "success",
+            "cost": 0.5
+          },
+          {
+            "type": "failure",
+            "cost": 0.5
+          },
+          {
+            "type": "success",
+            "cost": 0.5
+          },
+          {
+            "type": "failure",
+            "cost": 0.5
+          },
+          {
+            "type": "success",
+            "cost": 0.5
+          }
+        ]
+      },
+      "timestamp": "2026-03-31T13:09:48.716Z"
+    }
+  ]
+}

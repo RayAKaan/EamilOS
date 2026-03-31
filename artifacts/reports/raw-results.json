@@ -1,0 +1,141 @@
+{
+  "generatedAt": "2026-03-31T13:12:00.000Z",
+  "directive": "EamilOS Stress Test Directive",
+  "categories": {
+    "parser": {
+      "file": "parser/parser-results.json",
+      "totalTests": 19,
+      "testsRun": 19,
+      "testsPassed": 14,
+      "testsFailed": 4,
+      "testsPartial": 1,
+      "testsSkipped": 0,
+      "testsErrored": 0,
+      "passRate": 73.68,
+      "status": "NEEDS_ATTENTION"
+    },
+    "budget": {
+      "file": "budget/budget-results.json",
+      "totalTests": 8,
+      "testsRun": 8,
+      "testsPassed": 8,
+      "testsFailed": 0,
+      "testsPartial": 0,
+      "testsSkipped": 0,
+      "testsErrored": 0,
+      "passRate": 100.0,
+      "status": "PRODUCTION_READY"
+    },
+    "orchestrator": {
+      "file": "orchestrator/orchestrator-results.json",
+      "totalTests": 10,
+      "testsRun": 10,
+      "testsPassed": 10,
+      "testsFailed": 0,
+      "testsPartial": 0,
+      "testsSkipped": 0,
+      "testsErrored": 0,
+      "passRate": 100.0,
+      "status": "PRODUCTION_READY"
+    },
+    "workspace": {
+      "file": "workspace/workspace-results.json",
+      "totalTests": 8,
+      "testsRun": 8,
+      "testsPassed": 8,
+      "testsFailed": 0,
+      "testsPartial": 0,
+      "testsSkipped": 0,
+      "testsErrored": 0,
+      "passRate": 100.0,
+      "status": "PRODUCTION_READY"
+    },
+    "chaos": {
+      "file": "chaos/chaos-results.json",
+      "totalTests": 7,
+      "testsRun": 7,
+      "testsPassed": 7,
+      "testsFailed": 0,
+      "testsPartial": 0,
+      "testsSkipped": 0,
+      "testsErrored": 0,
+      "passRate": 100.0,
+      "status": "PRODUCTION_READY"
+    },
+    "model": {
+      "file": "model/model-results.json",
+      "totalTests": 24,
+      "testsRun": 24,
+      "testsPassed": 24,
+      "testsFailed": 0,
+      "testsPartial": 0,
+      "testsSkipped": 0,
+      "testsErrored": 0,
+      "passRate": 100.0,
+      "note": "All tests simulated - no live LLM used",
+      "status": "SIMULATED"
+    }
+  },
+  "totals": {
+    "totalTests": 76,
+    "testsRun": 76,
+    "testsPassed": 71,
+    "testsFailed": 4,
+    "testsPartial": 1,
+    "testsSkipped": 0,
+    "testsErrored": 0,
+    "overallPassRate": 93.42
+  },
+  "failures": [
+    {
+      "testId": "P-STRESS-8",
+      "testName": "Path traversal injection attempts",
+      "category": "parser",
+      "status": "FAIL",
+      "issue": "Absolute paths not blocked",
+      "extractedFiles": ["/absolute/path/file.py", "normal/nested/file.py", "./relative/file.py"],
+      "securityIssue": "absolute path accepted"
+    },
+    {
+      "testId": "P-STRESS-9",
+      "testName": "All blocked filenames",
+      "category": "parser",
+      "status": "FAIL",
+      "issue": "Blocked filenames not rejected",
+      "extractedFiles": ["DATA.JSON", "real_calculator.py"],
+      "securityIssue": "case-insensitive blocked filename matching not working"
+    },
+    {
+      "testId": "P-STRESS-12",
+      "testName": "JSON with unicode and special characters",
+      "category": "parser",
+      "status": "FAIL",
+      "issue": "Unicode handling failed",
+      "expectedBehavior": "Unicode preserved",
+      "actualBehavior": "Parse failed: NO_JSON_FOUND"
+    },
+    {
+      "testId": "P-STRESS-15",
+      "testName": "Files with no extension",
+      "category": "parser",
+      "status": "FAIL",
+      "issue": "Valid JSON but all files rejected",
+      "expectedBehavior": "script.py with .py extension should be accepted",
+      "actualBehavior": "Parse failed: NO_JSON_FOUND"
+    }
+  ],
+  "partialResults": [
+    {
+      "testId": "P-STRESS-7",
+      "testName": "Files array with mixed valid + invalid entries",
+      "category": "parser",
+      "status": "PARTIAL",
+      "issue": "File validation not working correctly",
+      "expected": ["good.py", "also_good.js", "fine.rb"],
+      "actual": ["good.py", "also_good.js", "../hack.py"],
+      "missing": ["fine.rb"],
+      "extra": ["../hack.py (traversal not blocked)"]
+    }
+  ],
+  "modelTestsNote": "Model tests were simulated with predefined responses. No live LLM access was used. Tests passed because they verified expected simulated behavior rather than actual model responses."
+}

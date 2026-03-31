@@ -1,0 +1,244 @@
+{
+  "generatedAt": "2026-03-31T13:06:19.265Z",
+  "totalTests": 8,
+  "testsRun": 8,
+  "testsPassed": 8,
+  "testsFailed": 0,
+  "testsPartial": 0,
+  "testsSkipped": 0,
+  "testsErrored": 0,
+  "totalDurationMs": 12,
+  "results": [
+    {
+      "testId": "B-STRESS-1",
+      "testName": "Task cost overflow",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Budget should block task when project budget would be exceeded",
+      "actualBehavior": "3 tasks allowed, 2 blocked. Final state: [{\"step\":4,\"action\":\"canStartTask with cost 0.3\",\"allowed\":false,\"reason\":\"PROJECT_BUDGET_EXCEEDED\",\"totalSpent\":0.8999999999999999},{\"step\":5,\"action\":\"canStartTask with cost 0.3\",\"allowed\":false,\"reason\":\"PROJECT_BUDGET_EXCEEDED\",\"totalSpent\":0.8999999999999999}]",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "steps": [
+          {
+            "step": 1,
+            "action": "canStartTask with cost 0.3",
+            "allowed": true,
+            "totalSpent": 0
+          },
+          {
+            "step": 2,
+            "action": "canStartTask with cost 0.3",
+            "allowed": true,
+            "totalSpent": 0.3
+          },
+          {
+            "step": 3,
+            "action": "canStartTask with cost 0.3",
+            "allowed": true,
+            "totalSpent": 0.6
+          },
+          {
+            "step": 4,
+            "action": "canStartTask with cost 0.3",
+            "allowed": false,
+            "reason": "PROJECT_BUDGET_EXCEEDED",
+            "totalSpent": 0.8999999999999999
+          },
+          {
+            "step": 5,
+            "action": "canStartTask with cost 0.3",
+            "allowed": false,
+            "reason": "PROJECT_BUDGET_EXCEEDED",
+            "totalSpent": 0.8999999999999999
+          }
+        ],
+        "finalSpent": 0.8999999999999999,
+        "exceeded": false
+      },
+      "timestamp": "2026-03-31T13:06:19.255Z"
+    },
+    {
+      "testId": "B-STRESS-2",
+      "testName": "Task budget limit",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Should block task when individual task budget is exceeded",
+      "actualBehavior": "Task spent: 1.2, canStartTask allowed: false, reason: TASK_BUDGET_EXCEEDED",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "taskSpent": 1.2,
+        "taskBudget": 1,
+        "check": {
+          "allowed": false,
+          "reason": "TASK_BUDGET_EXCEEDED",
+          "status": {
+            "exceeded": false,
+            "warning": false,
+            "totalSpent": 1.2,
+            "budgetLimit": 10,
+            "percentageUsed": 0.12,
+            "taskSpent": 0,
+            "taskLimit": 1
+          }
+        }
+      },
+      "timestamp": "2026-03-31T13:06:19.257Z"
+    },
+    {
+      "testId": "B-STRESS-3",
+      "testName": "Budget warning threshold",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Should warn when approaching project budget (>=80% threshold)",
+      "actualBehavior": "Warning: true, Percentage: 85.0%",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 3,
+      "telemetry": {
+        "status": {
+          "exceeded": false,
+          "warning": true,
+          "totalSpent": 0.85,
+          "budgetLimit": 1,
+          "percentageUsed": 0.85,
+          "taskSpent": 0,
+          "taskLimit": 0.5
+        }
+      },
+      "timestamp": "2026-03-31T13:06:19.260Z"
+    },
+    {
+      "testId": "B-STRESS-4",
+      "testName": "Budget exceeded detection",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "Should correctly report when project budget is exceeded",
+      "actualBehavior": "Status exceeded: true, isProjectBudgetExceeded: true, Total spent: 1.5",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "status": {
+          "exceeded": true,
+          "warning": false,
+          "totalSpent": 1.5,
+          "budgetLimit": 1,
+          "percentageUsed": 1.5,
+          "taskSpent": 0,
+          "taskLimit": 0.5
+        }
+      },
+      "timestamp": "2026-03-31T13:06:19.260Z"
+    },
+    {
+      "testId": "B-STRESS-5",
+      "testName": "Budget reset",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "After reset(), all state should be cleared",
+      "actualBehavior": "Before reset: {\"total\":3.5,\"task1\":2,\"task2\":1.5}, After reset: {\"total\":0,\"task1\":0,\"task2\":0}",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 2,
+      "telemetry": {
+        "before": {
+          "total": 3.5,
+          "task1": 2,
+          "task2": 1.5
+        },
+        "after": {
+          "total": 0,
+          "task1": 0,
+          "task2": 0
+        }
+      },
+      "timestamp": "2026-03-31T13:06:19.262Z"
+    },
+    {
+      "testId": "B-STRESS-6",
+      "testName": "Rapid small request accumulation",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "No precision loss from many small increments",
+      "actualBehavior": "Expected: 10, Actual: 9.99999999999998, Diff: 1.9539925233402755e-14",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 2,
+      "telemetry": {
+        "expected": 10,
+        "actual": 9.99999999999998,
+        "increments": 100,
+        "incrementAmount": 0.1
+      },
+      "timestamp": "2026-03-31T13:06:19.264Z"
+    },
+    {
+      "testId": "B-STRESS-7",
+      "testName": "Individual task reset",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "resetTask() should clear only specified task costs",
+      "actualBehavior": "Project spent: 1, task-1: 0, task-2: 1",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "projectSpent": 1,
+        "task1Spent": 0,
+        "task2Spent": 1
+      },
+      "timestamp": "2026-03-31T13:06:19.264Z"
+    },
+    {
+      "testId": "B-STRESS-8",
+      "testName": "checkTaskBudget method",
+      "category": "budget",
+      "status": "PASS",
+      "input": {},
+      "expectedBehavior": "checkTaskBudget should verify both project and task limits",
+      "actualBehavior": "task-1 check: allowed=false, reason=TASK_BUDGET_EXCEEDED. task-2 check: allowed=true",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "check1": {
+          "allowed": false,
+          "reason": "TASK_BUDGET_EXCEEDED",
+          "status": {
+            "exceeded": false,
+            "warning": false,
+            "totalSpent": 1,
+            "budgetLimit": 5,
+            "percentageUsed": 0.2,
+            "taskSpent": 0,
+            "taskLimit": 2
+          }
+        },
+        "check2": {
+          "allowed": true,
+          "status": {
+            "exceeded": false,
+            "warning": false,
+            "totalSpent": 1,
+            "budgetLimit": 5,
+            "percentageUsed": 0.2,
+            "taskSpent": 0,
+            "taskLimit": 2
+          }
+        }
+      },
+      "timestamp": "2026-03-31T13:06:19.265Z"
+    }
+  ]
+}

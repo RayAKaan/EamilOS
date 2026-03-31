@@ -23,9 +23,15 @@ export const ConfigSchema = z.object({
   version: z.number().int().min(1).default(1),
   providers: z.array(ProviderConfigSchema).min(1),
   routing: z.object({
+    mode: z.enum(['auto', 'manual', 'hybrid']).default('auto'),
     default_tier: z.enum(['cheap', 'strong']).default('cheap'),
     task_routing: z.record(z.enum(['cheap', 'strong'])).default({}),
     fallback_order: z.array(z.string()).min(1),
+    exploration_rate: z.number().min(0).max(1).default(0.1),
+    minimum_data_points: z.number().int().min(1).default(5),
+    overrides: z.record(z.string()).default({}),
+    default_model: z.string().default('phi3:mini'),
+    default_provider: z.string().default('ollama'),
   }),
   workspace: z.object({
     base_dir: z.string().default('./data/projects'),

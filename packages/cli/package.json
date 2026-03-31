@@ -1,27 +1,34 @@
 {
   "name": "@eamilos/cli",
   "version": "1.0.0",
-  "description": "EamilOS CLI",
+  "description": "EamilOS CLI — AI Execution Kernel",
   "type": "module",
   "bin": {
     "eamilos": "./bin/eamilos"
   },
+  "files": [
+    "dist/**/*",
+    "bin/**/*",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "postinstall": "node dist/postinstall.js 2>/dev/null || true"
   },
   "dependencies": {
     "@eamilos/core": "file:../core",
     "commander": "^13.1.0",
     "chalk": "^5.4.0",
-    "ora": "^8.2.0"
+    "ora": "^8.2.0",
+    "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   }
 }

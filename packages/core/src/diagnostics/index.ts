@@ -1,0 +1,8 @@
+export { ErrorClassifier, ErrorCategory, ErrorSeverity } from './ErrorClassifier.js';
+export type { ClassifiedError } from './ErrorClassifier.js';
+export { ErrorMemory } from './ErrorMemory.js';
+export type { ErrorRecord, ErrorMemoryStats } from './ErrorMemory.js';
+export { DiagnosticReporter } from './DiagnosticReporter.js';
+export type { DiagnosticReport, DiagnosticPattern } from './DiagnosticReporter.js';
+export { ExplainableError, explainError, formatErrorForUser } from './ExplainableError.js';
+export type { ErrorExplanation, ExplainableErrorOptions } from './ExplainableError.js';

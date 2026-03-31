@@ -1,0 +1,384 @@
+{
+  "generatedAt": "2026-03-31T13:05:22.689Z",
+  "totalTests": 19,
+  "testsRun": 19,
+  "testsPassed": 14,
+  "testsFailed": 4,
+  "testsPartial": 1,
+  "testsSkipped": 0,
+  "testsErrored": 0,
+  "totalDurationMs": 16,
+  "results": [
+    {
+      "testId": "P-STRESS-1",
+      "testName": "Multiple JSON objects in response",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"first\",\"files\":[{\"path\":\"a.py\",\"content\":\"x=1\"}]} and also {\"summary\":\"second\",\"files\":[{\"path\":\"b.py\",\"content\":\"y=2\"}]}",
+      "expectedBehavior": "Parser extracts ONE valid JSON object (first or last), returns success: true with exactly 1 file",
+      "actualBehavior": "Extracted 1 file using DIRECT_PARSE. Files: a.py",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "fileCount": 1,
+        "files": [
+          "a.py"
+        ]
+      },
+      "timestamp": "2026-03-31T13:05:22.674Z"
+    },
+    {
+      "testId": "P-STRESS-2",
+      "testName": "JSON + markdown + explanation mixed",
+      "category": "parser",
+      "status": "PASS",
+      "input": "Sure! Here is your calculator:\n\n```python\ndef add(a,b): return a+b\n```\n\nAnd here is the structured output:\n\n```json\n{\"summary\":\"calc\",\"files\":[{\"path\":\"calc.py\",\"content\":\"def add(a,b):\\n    return a+b\"}]}\n```\n\nLet me know if you need changes!",
+      "expectedBehavior": "Parser ignores Python code block, extracts JSON code block, returns success: true with calc.py",
+      "actualBehavior": "Extracted calc.py using BRACE_EXTRACTION",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "extractionMethod": "BRACE_EXTRACTION",
+        "files": [
+          "calc.py"
+        ]
+      },
+      "timestamp": "2026-03-31T13:05:22.676Z"
+    },
+    {
+      "testId": "P-STRESS-3",
+      "testName": "Deeply nested JSON inside text",
+      "category": "parser",
+      "status": "PASS",
+      "input": "The output is: {\"wrapper\": {\"data\": {\"summary\":\"nested\",\"files\":[{\"path\":\"deep.py\",\"content\":\"print(1)\"}]}}}",
+      "expectedBehavior": "Parser should FAIL with INVALID_STRUCTURE because files is nested inside wrapper.data",
+      "actualBehavior": "Parse failed as expected: NO_FILES_ARRAY",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "extractionMethod": "BRACE_EXTRACTION",
+        "failureReason": "NO_FILES_ARRAY"
+      },
+      "timestamp": "2026-03-31T13:05:22.677Z"
+    },
+    {
+      "testId": "P-STRESS-4",
+      "testName": "Partial JSON (truncated mid-content)",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"test\",\"files\":[{\"path\":\"app.py\",\"content\":\"def main():\\n    pri",
+      "expectedBehavior": "JSON.parse MUST fail. All extraction stages should fail. Returns success: false",
+      "actualBehavior": "Parse failed as expected: NO_JSON_FOUND",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "NONE",
+        "failureReason": "NO_JSON_FOUND",
+        "stagesAttempted": [
+          "DIRECT_PARSE",
+          "CODE_BLOCK",
+          "BRACE_EXTRACTION",
+          "NESTED_SEARCH"
+        ]
+      },
+      "timestamp": "2026-03-31T13:05:22.677Z"
+    },
+    {
+      "testId": "P-STRESS-5",
+      "testName": "Invalid JSON syntax (multiple issues)",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{summary: 'test', files: [{path: 'app.py', content: 'x=1',}]}",
+      "expectedBehavior": "JSON.parse MUST fail on raw input. Parser should fail cleanly.",
+      "actualBehavior": "Parse failed as expected: NO_JSON_FOUND",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "NONE",
+        "failureReason": "NO_JSON_FOUND",
+        "errors": [
+          "Unquoted keys",
+          "Single quotes",
+          "Trailing comma"
+        ]
+      },
+      "timestamp": "2026-03-31T13:05:22.677Z"
+    },
+    {
+      "testId": "P-STRESS-6",
+      "testName": "Files array present but empty",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"I created nothing\",\"files\":[]}",
+      "expectedBehavior": "JSON parses successfully. But files array is empty. Returns success: false, failureReason: EMPTY_FILES_ARRAY or NO_VALID_FILES",
+      "actualBehavior": "Parse failed as expected: NO_VALID_FILES",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "failureReason": "NO_VALID_FILES"
+      },
+      "timestamp": "2026-03-31T13:05:22.677Z"
+    },
+    {
+      "testId": "P-STRESS-7",
+      "testName": "Files array with mixed valid + invalid entries",
+      "category": "parser",
+      "status": "PARTIAL",
+      "input": "{\"summary\":\"mixed\",\"files\":[\n  {\"path\":\"good.py\",\"content\":\"x=1\",\"language\":\"python\"},\n  {\"path\":\"data.json\",\"content\":\"bad\"},\n  {\"path\":\"\",\"content\":\"no path\"},\n  {\"path\":\"also_good.js\",\"content\":\"console.log(1)\"},\n  {\"path\":\"../hack.py\",\"content\":\"import os\"},\n  {\"content\":\"missing path field\"},\n  {\"path\":\"fine.rb\",\"content\":\"puts 1\"}\n]}",
+      "expectedBehavior": "7 entries submitted, exactly 3 should survive: good.py, also_good.js, fine.rb",
+      "actualBehavior": "Extracted 3 files: good.py, also_good.js, ../hack.py. Missing: fine.rb. Extra: ../hack.py",
+      "rootCause": "File validation not working correctly",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "files": [
+          "good.py",
+          "also_good.js",
+          "../hack.py"
+        ],
+        "rejected": [
+          "data.json",
+          "",
+          "../hack.py",
+          "{no path}"
+        ]
+      },
+      "timestamp": "2026-03-31T13:05:22.677Z"
+    },
+    {
+      "testId": "P-STRESS-8",
+      "testName": "Path traversal injection attempts",
+      "category": "parser",
+      "status": "FAIL",
+      "input": "{\"summary\":\"hack\",\"files\":[\n  {\"path\":\"../../etc/passwd\",\"content\":\"root:x:0:0\"},\n  {\"path\":\"..\\\\..\\\\windows\\\\system32\\\\config\",\"content\":\"bad\"},\n  {\"path\":\"/absolute/path/file.py\",\"content\":\"import os\"},\n  {\"path\":\"normal/nested/file.py\",\"content\":\"x=1\"},\n  {\"path\":\"./relative/file.py\",\"content\":\"y=2\"}\n]}",
+      "expectedBehavior": "Path traversal attempts (.., ..\\) should be rejected. Absolute paths should be rejected. Relative paths depend on policy.",
+      "actualBehavior": "Extracted 3 files: /absolute/path/file.py, normal/nested/file.py, ./relative/file.py. Contains traversal: false, Contains absolute: true",
+      "rootCause": "Absolute paths not blocked",
+      "fix": "Add absolute path validation",
+      "durationMs": 1,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "files": [
+          "/absolute/path/file.py",
+          "normal/nested/file.py",
+          "./relative/file.py"
+        ],
+        "securityIssues": {
+          "traversal": false,
+          "absolute": true
+        }
+      },
+      "timestamp": "2026-03-31T13:05:22.678Z"
+    },
+    {
+      "testId": "P-STRESS-9",
+      "testName": "All blocked filenames",
+      "category": "parser",
+      "status": "FAIL",
+      "input": "{\"summary\":\"defaults\",\"files\":[\n  {\"path\":\"data.json\",\"content\":\"{}\"},\n  {\"path\":\"output.txt\",\"content\":\"out\"},\n  {\"path\":\"file.txt\",\"content\":\"file\"},\n  {\"path\":\"untitled\",\"content\":\"none\"},\n  {\"path\":\"response.json\",\"content\":\"{}\"},\n  {\"path\":\"result.json\",\"content\":\"{}\"},\n  {\"path\":\"output.json\",\"content\":\"{}\"},\n  {\"path\":\"temp.txt\",\"content\":\"tmp\"},\n  {\"path\":\"example.txt\",\"content\":\"ex\"},\n  {\"path\":\"DATA.JSON\",\"content\":\"{}\"},\n  {\"path\":\"Output.TXT\",\"content\":\"out\"},\n  {\"path\":\"real_calcula",
+      "expectedBehavior": "First 9 entries rejected (case-insensitive match for DATA.JSON, Output.TXT). Only real_calculator.py survives.",
+      "actualBehavior": "Extracted 2 files: DATA.JSON, real_calculator.py",
+      "rootCause": "Blocked filenames not rejected",
+      "fix": "Ensure case-insensitive blocked filename matching",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "files": [
+          "DATA.JSON",
+          "real_calculator.py"
+        ],
+        "caseInsensitiveWorking": false
+      },
+      "timestamp": "2026-03-31T13:05:22.678Z"
+    },
+    {
+      "testId": "P-STRESS-10",
+      "testName": "Extremely large JSON response",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"large test\",\"files\":[{\"path\":\"large.py\",\"content\":\"x = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx = 1\\nx =",
+      "expectedBehavior": "Parser handles 60KB content without crashing, hanging, or truncation",
+      "actualBehavior": "Parsed 90000 chars in 7ms. Content match: true",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 7,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "inputSize": 105067,
+        "contentSize": 90000,
+        "expectedSize": 90000,
+        "durationMs": 7,
+        "truncated": false
+      },
+      "timestamp": "2026-03-31T13:05:22.686Z"
+    },
+    {
+      "testId": "P-STRESS-11",
+      "testName": "JSON split across multiple code blocks",
+      "category": "parser",
+      "status": "PASS",
+      "input": "Part 1:\n```json\n{\"summary\":\"split\n```\nMore text here\n```json\n\",\"files\":[{\"path\":\"x.py\",\"content\":\"y=1\"}]}\n```",
+      "expectedBehavior": "Each code block individually is NOT valid JSON. Parser should NOT merge code blocks.",
+      "actualBehavior": "Parse failed: NO_JSON_FOUND",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "extractionMethod": "NONE",
+        "failureReason": "NO_JSON_FOUND",
+        "files": []
+      },
+      "timestamp": "2026-03-31T13:05:22.687Z"
+    },
+    {
+      "testId": "P-STRESS-12",
+      "testName": "JSON with unicode and special characters",
+      "category": "parser",
+      "status": "FAIL",
+      "input": "{\"summary\":\"unicode test 🚀\",\"files\":[{\"path\":\"hello_世界.py\",\"content\":\"print(\"Hello 世界! 🌍\")\\nname = \"José García\"\\ndata = \"日本語テスト\"\",\"language\":\"python\"}]}",
+      "expectedBehavior": "Unicode preserved. File path with unicode may or may not be accepted.",
+      "actualBehavior": "Parse failed: NO_JSON_FOUND",
+      "rootCause": "Unicode handling failed",
+      "fix": "Ensure UTF-8 encoding is handled correctly",
+      "durationMs": 1,
+      "telemetry": {
+        "extractionMethod": "NONE",
+        "failureReason": "NO_JSON_FOUND"
+      },
+      "timestamp": "2026-03-31T13:05:22.688Z"
+    },
+    {
+      "testId": "P-STRESS-13",
+      "testName": "Content that is description, not code",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"desc test\",\"files\":[\n  {\"path\":\"a.py\",\"content\":\"This file contains a Python calculator with basic operations\"},\n  {\"path\":\"b.py\",\"content\":\"Here is the implementation of the sorting algorithm\"},\n  {\"path\":\"c.py\",\"content\":\"I will create a function that processes data\"},\n  {\"path\":\"d.py\",\"content\":\"The following code implements a web server\"},\n  {\"path\":\"e.py\",\"content\":\"Below is the complete solution\"},\n  {\"path\":\"f.py\",\"content\":\"def real_function():\\n    return 42\"}\n]}",
+      "expectedBehavior": "Files a-e rejected (description patterns). Only f.py accepted (actual code).",
+      "actualBehavior": "Extracted 1 files: f.py. Description filtering worked correctly.",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "files": [
+          "f.py"
+        ],
+        "expectedOnly": [
+          "f.py"
+        ]
+      },
+      "timestamp": "2026-03-31T13:05:22.688Z"
+    },
+    {
+      "testId": "P-STRESS-14-A",
+      "testName": "Missing files key - A: no files key",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"no files key\",\"results\":[{\"path\":\"x.py\",\"content\":\"y\"}]}",
+      "expectedBehavior": "Parser should return success: false with INVALID_STRUCTURE or NO_FILES_ARRAY",
+      "actualBehavior": "Parse failed as expected: NO_FILES_ARRAY",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "failureReason": "NO_FILES_ARRAY"
+      },
+      "timestamp": "2026-03-31T13:05:22.688Z"
+    },
+    {
+      "testId": "P-STRESS-14-B",
+      "testName": "Missing files key - B: typo",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"typo\",\"fles\":[{\"path\":\"x.py\",\"content\":\"y\"}]}",
+      "expectedBehavior": "Parser should return success: false with INVALID_STRUCTURE or NO_FILES_ARRAY",
+      "actualBehavior": "Parse failed as expected: NO_FILES_ARRAY",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "failureReason": "NO_FILES_ARRAY"
+      },
+      "timestamp": "2026-03-31T13:05:22.688Z"
+    },
+    {
+      "testId": "P-STRESS-14-C",
+      "testName": "Missing files key - C: null files",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"null files\",\"files\":null}",
+      "expectedBehavior": "Parser should return success: false with INVALID_STRUCTURE or NO_FILES_ARRAY",
+      "actualBehavior": "Parse failed as expected: NO_FILES_ARRAY",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "failureReason": "NO_FILES_ARRAY"
+      },
+      "timestamp": "2026-03-31T13:05:22.688Z"
+    },
+    {
+      "testId": "P-STRESS-14-D",
+      "testName": "Missing files key - D: string files",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"string files\",\"files\":\"not an array\"}}",
+      "expectedBehavior": "Parser should return success: false with INVALID_STRUCTURE or NO_FILES_ARRAY",
+      "actualBehavior": "Parse failed as expected: NO_FILES_ARRAY",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "failureReason": "NO_FILES_ARRAY"
+      },
+      "timestamp": "2026-03-31T13:05:22.689Z"
+    },
+    {
+      "testId": "P-STRESS-14-E",
+      "testName": "Missing files key - E: number files",
+      "category": "parser",
+      "status": "PASS",
+      "input": "{\"summary\":\"number files\",\"files\":42}",
+      "expectedBehavior": "Parser should return success: false with INVALID_STRUCTURE or NO_FILES_ARRAY",
+      "actualBehavior": "Parse failed as expected: NO_FILES_ARRAY",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "DIRECT_PARSE",
+        "failureReason": "NO_FILES_ARRAY"
+      },
+      "timestamp": "2026-03-31T13:05:22.689Z"
+    },
+    {
+      "testId": "P-STRESS-15",
+      "testName": "Files with no extension",
+      "category": "parser",
+      "status": "FAIL",
+      "input": "{\"summary\":\"no ext\",\"files\":[\n  {\"path\":\"Makefile\",\"content\":\"all: build\"},\n  {\"path\":\"Dockerfile\",\"content\":\"FROM node:18\"},\n  {\"path\":\"README\",\"content\":\"# Title\"},\n  {\"path\":\"calculator\",\"content\":\"def add(): pass\"},\n  {\"path\":\".gitignore\",\"content\":\"node_modules/},\n  {\"path\":\"script.py\",\"content\":\"print(1)\"}\n]}",
+      "expectedBehavior": "Document behavior for extensionless files. script.py should be accepted.",
+      "actualBehavior": "Parse failed: NO_JSON_FOUND",
+      "rootCause": "Valid JSON but all files rejected",
+      "fix": "Ensure script.py with .py extension is not rejected",
+      "durationMs": 0,
+      "telemetry": {
+        "extractionMethod": "NONE",
+        "failureReason": "NO_JSON_FOUND"
+      },
+      "timestamp": "2026-03-31T13:05:22.689Z"
+    }
+  ]
+}

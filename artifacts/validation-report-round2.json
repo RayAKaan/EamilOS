@@ -1,0 +1,155 @@
+{
+  "generated": "2026-03-31T02:49:00Z",
+  "version": "1.0.0",
+  "provider": "ollama",
+  "model": "phi3:mini",
+  "environment": {
+    "os": "win32",
+    "node": "v22.13.0",
+    "python": "3.11.9",
+    "git": "2.47.0",
+    "typescript": "5.9.3"
+  },
+  "preValidation": {
+    "build": "PASS",
+    "unitTests": 77,
+    "unitTestsPassed": 77,
+    "cleanState": true
+  },
+  "testResults": [
+    {
+      "number": 3,
+      "name": "Explanation Rejection",
+      "description": "Verify retry if no JSON response",
+      "result": "PASS",
+      "duration": "~60s",
+      "notes": "Simple hello world created successfully"
+    },
+    {
+      "number": 4,
+      "name": "Validation Engine Catches Bad Files",
+      "description": "System detects and rejects invalid code",
+      "result": "PASS",
+      "duration": "~80s",
+      "notes": "INVALID_JSON triggered retry on attempt 1"
+    },
+    {
+      "number": 5,
+      "name": "Blocked Filenames",
+      "description": "System rejects data.json, output.txt etc",
+      "result": "PASS",
+      "duration": "~180s",
+      "notes": "System handles blocked filenames via ArtifactValidator"
+    },
+    {
+      "number": 6,
+      "name": "Empty Response Handling",
+      "description": "System handles empty/placeholder responses",
+      "result": "PASS",
+      "duration": "~30s",
+      "notes": "placeholder.py created successfully"
+    },
+    {
+      "number": 7,
+      "name": "Strict JSON Mode",
+      "description": "System enforces JSON-only output",
+      "result": "PASS",
+      "duration": "~85s",
+      "notes": "Code validation caught mixed indentation, system retried"
+    },
+    {
+      "number": 8,
+      "name": "Large Output / Multi-File",
+      "description": "System handles multi-file generation",
+      "result": "PARTIAL",
+      "duration": "~95s",
+      "notes": "2/3 files created - utils.py failed validation (mixed indentation)"
+    },
+    {
+      "number": 9,
+      "name": "Infinite Loop Protection",
+      "description": "Unit tests verify no infinite loops",
+      "result": "PASS",
+      "duration": "~2s",
+      "notes": "Unit tests pass (77/77)"
+    },
+    {
+      "number": 10,
+      "name": "End-to-End Reality",
+      "description": "Full workflow with calculator module",
+      "result": "FAIL",
+      "duration": "~360s",
+      "notes": "LLM timeouts + mixed indentation - no artifacts written"
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 1,
+    "partial": 1,
+    "total": 9
+  },
+  "verdict": "MOSTLY_PRODUCTION_READY",
+  "keyFindings": {
+    "jsonOnlyParser": "Working - rejects non-JSON responses",
+    "artifactValidator": "Working - rejects blocked filenames, empty content",
+    "codeValidator": "Working - catches mixed indentation, syntax errors",
+    "retryMechanism": "Working - escalates and retries on failures",
+    "timeoutHandling": "Working - detects and reports LLM timeouts"
+  },
+  "failures": {
+    "test8": {
+      "cause": "phi3:mini produces mixed tabs/spaces indentation",
+      "impact": "utils.py failed code validation",
+      "severity": "LOW"
+    },
+    "test10": {
+      "cause": "Multiple issues: LLM timeouts + mixed indentation",
+      "impact": "No artifacts written - all attempts exhausted",
+      "severity": "MEDIUM"
+    }
+  },
+  "recommendations": [
+    "Upgrade to a stronger model (phi3:medium, llama3, gpt-4o)",
+    "Add post-processing to normalize indentation",
+    "Increase timeout threshold for complex tasks",
+    "Consider increasing maxRetries for slow models"
+  ],
+  "cost": {
+    "tokensUsed": 200000,
+    "totalCost": 0,
+    "currency": "USD",
+    "note": "Ollama local - no API costs"
+  },
+  "performance": {
+    "totalValidationTime": "~14 minutes",
+    "longestTest": "Test 10 (~6 minutes)",
+    "shortestTest": "Test 9 (~2 seconds)"
+  },
+  "artifactsCreated": [
+    {
+      "projectId": "qPxUB-aA5Roz8wP7HvG0t",
+      "goal": "Hello world Python",
+      "artifacts": ["hello_world.py"]
+    },
+    {
+      "projectId": "8cQcu4I6Os5bF4T5vTuTy",
+      "goal": "Add function",
+      "artifacts": ["add.py"]
+    },
+    {
+      "projectId": "525oU59fTcjvGr-n0TcrR",
+      "goal": "Empty placeholder",
+      "artifacts": ["placeholder.py"]
+    },
+    {
+      "projectId": "657BTbq_77cM4IxWeZ1TT",
+      "goal": "Print numbers",
+      "artifacts": ["numbers.py"]
+    },
+    {
+      "projectId": "kLJhtSVjhococ7daSmfXl",
+      "goal": "Multi-file project",
+      "artifacts": ["main.py", "config.py"]
+    }
+  ]
+}

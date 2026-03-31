@@ -1,0 +1,46 @@
+[
+  {
+    "testId": "W-STRESS-2",
+    "inputHash": "5a78f44c1b85c2e947af3d03aea485b5b853ae77d65f1d2e993a0c3733e3b4f0",
+    "outputHash": "5a78f44c1b85c2e947af3d03aea485b5b853ae77d65f1d2e993a0c3733e3b4f0",
+    "match": true,
+    "inputSize": 150000,
+    "outputSize": 150000
+  },
+  {
+    "testId": "W-STRESS-8",
+    "path": "emoji.py",
+    "inputHash": "9121e87f4148f73cc45dc2cfa7610e423b81b0e34945608fea2bcda938108559",
+    "outputHash": "9121e87f4148f73cc45dc2cfa7610e423b81b0e34945608fea2bcda938108559",
+    "match": true,
+    "inputSize": 30,
+    "outputSize": 30
+  },
+  {
+    "testId": "W-STRESS-8",
+    "path": "cjk.py",
+    "inputHash": "63fab842268438b9a70bc4f67d93e60f5dde901a96836661398acc9bcd639cfc",
+    "outputHash": "63fab842268438b9a70bc4f67d93e60f5dde901a96836661398acc9bcd639cfc",
+    "match": true,
+    "inputSize": 21,
+    "outputSize": 21
+  },
+  {
+    "testId": "W-STRESS-8",
+    "path": "windows_eol.py",
+    "inputHash": "5bfee2d980860c58e9fe987d5845afaef0c892b330fdffce44eaa775d78d8e95",
+    "outputHash": "5bfee2d980860c58e9fe987d5845afaef0c892b330fdffce44eaa775d78d8e95",
+    "match": true,
+    "inputSize": 14,
+    "outputSize": 14
+  },
+  {
+    "testId": "W-STRESS-8",
+    "path": "mixed_eol.py",
+    "inputHash": "06894b2ad44b44b5f86ade365849990e7ac65890a5a093f86331c337f02b9991",
+    "outputHash": "06894b2ad44b44b5f86ade365849990e7ac65890a5a093f86331c337f02b9991",
+    "match": true,
+    "inputSize": 20,
+    "outputSize": 20
+  }
+]

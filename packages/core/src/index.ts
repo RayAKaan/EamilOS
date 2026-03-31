@@ -9,8 +9,9 @@ import { initProviderManager } from './provider-manager.js';
 import { initAgentRegistry } from './agent-registry.js';
 import { initModelRouter } from './model-router.js';
 import { initContextBuilder } from './context-builder.js';
-import { initAgentRunner, getAgentRunner } from './agent-runner.js';
+import { initAgentRunner } from './agent-runner.js';
 import type { AgentExecutionResult } from './agent-runner.js';
+import { initOrchestrator, getOrchestrator } from './orchestrator/StrictOrchestrator.js';
 
 export class EamilOS {
   private db: DatabaseManager;
@@ -39,6 +40,7 @@ export class EamilOS {
     initModelRouter();
     initContextBuilder();
     initAgentRunner();
+    initOrchestrator({ maxRetries: 3 });
 
     await this.recoverCrashedProjects();
 
@@ -60,10 +62,17 @@ export class EamilOS {
     this.logger.info(`Executing task: ${task.title}`);
     this.taskManager.updateTaskStatus(taskId, 'in_progress');
 
-    const agentRunner = getAgentRunner();
-    const context = this.buildTaskContext(project, task);
+    const orchestrator = getOrchestrator();
+    const orchestratorResult = await orchestrator.execute(project.goal, project.id);
 
-    const result = await agentRunner.run(task, project.id, context);
+    const result: AgentExecutionResult = {
+      success: orchestratorResult.success,
+      taskId: taskId,
+      artifacts: orchestratorResult.artifacts,
+      output: orchestratorResult.files?.map(f => `${f.path}: ${f.content.length} chars`).join(', ') || '',
+      toolCalls: orchestratorResult.attempts,
+      error: orchestratorResult.success ? undefined : orchestratorResult.failureReasons.join('; '),
+    };
 
     if (result.success) {
       this.taskManager.updateTaskStatus(taskId, 'completed');
@@ -93,29 +102,6 @@ export class EamilOS {
     });
 
     return result;
-  }
-
-  private buildTaskContext(project: Project, task: Task): string {
-    const lines: string[] = [
-      `Project: ${project.name}`,
-      `Goal: ${project.goal}`,
-      `Task: ${task.title}`,
-      `Description: ${task.description}`,
-      `Type: ${task.type}`,
-      `Priority: ${task.priority}`,
-    ];
-
-    if (project.constraints && project.constraints.length > 0) {
-      lines.push(`Constraints: ${project.constraints.join(', ')}`);
-    }
-
-    if (task.inputContext) {
-      lines.push(`Input Context: ${task.inputContext}`);
-    }
-
-    lines.push(`\nWorkspace: ${this.workspace.getProjectPath(project.id)}`);
-
-    return lines.join('\n');
   }
 
   private async recoverCrashedProjects(): Promise<void> {
@@ -293,3 +279,12 @@ export * from './utils/index.js';
 export * from './errors.js';
 export * from './error-handler.js';
 export { initAgentRegistry, getAgentRegistry } from './agent-registry.js';
+export * from './models/ModelDiscovery.js';
+export * from './diagnostics/ExplainableError.js';
+export * from './security/SecurityAudit.js';
+export * from './security/index.js';
+export * from './config.js';
+export * from './plugins/index.js';
+export * from './cli/index.js';
+export * from './features/index.js';
+export { Logger, initLogger, getLogger } from './logger.js';

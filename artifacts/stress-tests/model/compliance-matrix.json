@@ -1,0 +1,58 @@
+{
+  "matrix": {
+    "TASK-A": {
+      "MODE-1": false,
+      "MODE-2": false,
+      "MODE-3": false,
+      "MODE-4": false
+    },
+    "TASK-B": {
+      "MODE-1": false,
+      "MODE-2": false,
+      "MODE-3": false,
+      "MODE-4": false
+    },
+    "TASK-C": {
+      "MODE-1": false,
+      "MODE-2": false,
+      "MODE-3": false,
+      "MODE-4": false
+    },
+    "TASK-D": {
+      "MODE-1": false,
+      "MODE-2": false,
+      "MODE-3": false,
+      "MODE-4": false
+    },
+    "TASK-E": {
+      "MODE-1": false,
+      "MODE-2": false,
+      "MODE-3": false,
+      "MODE-4": false
+    },
+    "TASK-F": {
+      "MODE-1": false,
+      "MODE-2": false,
+      "MODE-3": false,
+      "MODE-4": false
+    }
+  },
+  "modeSuccessRates": {
+    "MODE-1": 0,
+    "MODE-2": 0,
+    "MODE-3": 0,
+    "MODE-4": 0
+  },
+  "taskSuccessRates": {
+    "TASK-A": 0,
+    "TASK-B": 0,
+    "TASK-C": 0,
+    "TASK-D": 0,
+    "TASK-E": 0,
+    "TASK-F": 0
+  },
+  "overallComplianceRate": 0,
+  "contentQualityRate": 0,
+  "mostEffectiveMode": "MODE-1",
+  "hardestTask": "TASK-A"
+}

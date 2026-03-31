@@ -65,6 +65,7 @@ export interface TaskResult {
   completedAt: Date;
   modelCalls: number;
   costUsd: number;
+  error?: string;
 }
 
 export interface ChatMessage {

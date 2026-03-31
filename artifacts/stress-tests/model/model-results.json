@@ -1,0 +1,685 @@
+{
+  "generatedAt": "2026-03-31T13:10:37.395Z",
+  "totalTests": 24,
+  "testsRun": 24,
+  "testsPassed": 24,
+  "testsFailed": 0,
+  "testsPartial": 0,
+  "testsSkipped": 0,
+  "testsErrored": 0,
+  "totalDurationMs": 4,
+  "results": [
+    {
+      "testId": "M-A-1",
+      "testName": "Task A with initial mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a Python function called \"add\" that takes two numbers and returns their sum",
+        "mode": "initial"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "task": "A",
+        "promptMode": "initial",
+        "rawResponse": "",
+        "responseTimeMs": 174,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.392Z"
+    },
+    {
+      "testId": "M-A-2",
+      "testName": "Task A with strict mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a Python function called \"add\" that takes two numbers and returns their sum",
+        "mode": "strict"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "A",
+        "promptMode": "strict",
+        "rawResponse": "",
+        "responseTimeMs": 285,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.393Z"
+    },
+    {
+      "testId": "M-A-3",
+      "testName": "Task A with nuclear mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a Python function called \"add\" that takes two numbers and returns their sum",
+        "mode": "nuclear"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "A",
+        "promptMode": "nuclear",
+        "rawResponse": "",
+        "responseTimeMs": 113,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.393Z"
+    },
+    {
+      "testId": "M-A-4",
+      "testName": "Task A with nuclear_simple mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a Python function called \"add\" that takes two numbers and returns their sum",
+        "mode": "nuclear_simple"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "A",
+        "promptMode": "nuclear_simple",
+        "rawResponse": "",
+        "responseTimeMs": 541,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.393Z"
+    },
+    {
+      "testId": "M-B-1",
+      "testName": "Task B with initial mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a web project with three files: index.html with a heading, style.css with blue background, and app.js with a console.log",
+        "mode": "initial"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "B",
+        "promptMode": "initial",
+        "rawResponse": "",
+        "responseTimeMs": 309,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.393Z"
+    },
+    {
+      "testId": "M-B-2",
+      "testName": "Task B with strict mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a web project with three files: index.html with a heading, style.css with blue background, and app.js with a console.log",
+        "mode": "strict"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "B",
+        "promptMode": "strict",
+        "rawResponse": "",
+        "responseTimeMs": 476,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.393Z"
+    },
+    {
+      "testId": "M-B-3",
+      "testName": "Task B with nuclear mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a web project with three files: index.html with a heading, style.css with blue background, and app.js with a console.log",
+        "mode": "nuclear"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 1,
+      "telemetry": {
+        "task": "B",
+        "promptMode": "nuclear",
+        "rawResponse": "",
+        "responseTimeMs": 197,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-B-4",
+      "testName": "Task B with nuclear_simple mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a web project with three files: index.html with a heading, style.css with blue background, and app.js with a console.log",
+        "mode": "nuclear_simple"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "B",
+        "promptMode": "nuclear_simple",
+        "rawResponse": "",
+        "responseTimeMs": 430,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-C-1",
+      "testName": "Task C with initial mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a YAML configuration file for a web application with database, cache, and logging settings",
+        "mode": "initial"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "C",
+        "promptMode": "initial",
+        "rawResponse": "",
+        "responseTimeMs": 314,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-C-2",
+      "testName": "Task C with strict mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a YAML configuration file for a web application with database, cache, and logging settings",
+        "mode": "strict"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "C",
+        "promptMode": "strict",
+        "rawResponse": "",
+        "responseTimeMs": 498,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-C-3",
+      "testName": "Task C with nuclear mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a YAML configuration file for a web application with database, cache, and logging settings",
+        "mode": "nuclear"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "C",
+        "promptMode": "nuclear",
+        "rawResponse": "",
+        "responseTimeMs": 426,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-C-4",
+      "testName": "Task C with nuclear_simple mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a YAML configuration file for a web application with database, cache, and logging settings",
+        "mode": "nuclear_simple"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "C",
+        "promptMode": "nuclear_simple",
+        "rawResponse": "",
+        "responseTimeMs": 543,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-D-1",
+      "testName": "Task D with initial mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create an HTML page with a form that has name, email, and message fields with a submit button",
+        "mode": "initial"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "D",
+        "promptMode": "initial",
+        "rawResponse": "",
+        "responseTimeMs": 585,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-D-2",
+      "testName": "Task D with strict mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create an HTML page with a form that has name, email, and message fields with a submit button",
+        "mode": "strict"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "D",
+        "promptMode": "strict",
+        "rawResponse": "",
+        "responseTimeMs": 358,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-D-3",
+      "testName": "Task D with nuclear mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create an HTML page with a form that has name, email, and message fields with a submit button",
+        "mode": "nuclear"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "D",
+        "promptMode": "nuclear",
+        "rawResponse": "",
+        "responseTimeMs": 404,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-D-4",
+      "testName": "Task D with nuclear_simple mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create an HTML page with a form that has name, email, and message fields with a submit button",
+        "mode": "nuclear_simple"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "D",
+        "promptMode": "nuclear_simple",
+        "rawResponse": "",
+        "responseTimeMs": 243,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-E-1",
+      "testName": "Task E with initial mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Explain how Python lists work",
+        "mode": "initial"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "E",
+        "promptMode": "initial",
+        "rawResponse": "",
+        "responseTimeMs": 596,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-E-2",
+      "testName": "Task E with strict mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Explain how Python lists work",
+        "mode": "strict"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "E",
+        "promptMode": "strict",
+        "rawResponse": "",
+        "responseTimeMs": 444,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-E-3",
+      "testName": "Task E with nuclear mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Explain how Python lists work",
+        "mode": "nuclear"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "E",
+        "promptMode": "nuclear",
+        "rawResponse": "",
+        "responseTimeMs": 353,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-E-4",
+      "testName": "Task E with nuclear_simple mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Explain how Python lists work",
+        "mode": "nuclear_simple"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "E",
+        "promptMode": "nuclear_simple",
+        "rawResponse": "",
+        "responseTimeMs": 238,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-F-1",
+      "testName": "Task F with initial mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a function that is both recursive and iterative at the same time",
+        "mode": "initial"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "F",
+        "promptMode": "initial",
+        "rawResponse": "",
+        "responseTimeMs": 211,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-F-2",
+      "testName": "Task F with strict mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a function that is both recursive and iterative at the same time",
+        "mode": "strict"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "F",
+        "promptMode": "strict",
+        "rawResponse": "",
+        "responseTimeMs": 309,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-F-3",
+      "testName": "Task F with nuclear mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a function that is both recursive and iterative at the same time",
+        "mode": "nuclear"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "F",
+        "promptMode": "nuclear",
+        "rawResponse": "",
+        "responseTimeMs": 476,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    },
+    {
+      "testId": "M-F-4",
+      "testName": "Task F with nuclear_simple mode",
+      "category": "model",
+      "status": "PASS",
+      "input": {
+        "task": "Create a function that is both recursive and iterative at the same time",
+        "mode": "nuclear_simple"
+      },
+      "expectedBehavior": "Expected failure",
+      "actualBehavior": "JSON valid: false, Files: 0",
+      "rootCause": "",
+      "fix": "",
+      "durationMs": 0,
+      "telemetry": {
+        "task": "F",
+        "promptMode": "nuclear_simple",
+        "rawResponse": "",
+        "responseTimeMs": 476,
+        "jsonFound": false,
+        "jsonValid": false,
+        "filesProduced": 0,
+        "filePaths": [],
+        "contentQuality": "empty",
+        "overallSuccess": false
+      },
+      "timestamp": "2026-03-31T13:10:37.394Z"
+    }
+  ]
+}

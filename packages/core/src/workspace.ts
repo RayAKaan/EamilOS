@@ -12,6 +12,7 @@ import { createHash } from 'crypto';
 import { join, resolve, dirname, relative } from 'path';
 import { simpleGit } from 'simple-git';
 import { validateAndResolvePath, validateFileSize } from './security.js';
+import { PathValidator, PathSecurityError } from './security/index.js';
 import { getConfig } from './config.js';
 import { ArtifactInfo } from './types.js';
 
@@ -64,7 +65,17 @@ export class Workspace {
     filePath: string,
     content: string
   ): void {
-    const resolvedPath = validateAndResolvePath(this.baseDir, projectId, filePath);
+    const projectPath = join(this.baseDir, projectId);
+    const pathValidator = new PathValidator(projectPath);
+    const validation = pathValidator.validate(filePath);
+
+    if (!validation.safe) {
+      throw new PathSecurityError(
+        `PATH_REJECTED: ${validation.rejectionReason}`
+      );
+    }
+
+    const resolvedPath = join(projectPath, validation.normalizedPath);
 
     const size = Buffer.byteLength(content, 'utf-8');
     validateFileSize(size, this.maxFileSizeMb);

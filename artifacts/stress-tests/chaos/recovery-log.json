@@ -1,0 +1,10 @@
+[
+  {
+    "testId": "C-STRESS-7",
+    "disruptionType": "mixed_success_failure",
+    "systemRecovered": true,
+    "recoveryMethod": "stateless_processing",
+    "dataIntegrityMaintained": true,
+    "stateConsistent": true
+  }
+]
