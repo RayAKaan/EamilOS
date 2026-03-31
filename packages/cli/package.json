@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "EamilOS CLI — AI Execution Kernel",
   "type": "module",
+  "main": "dist/index.js",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "eamilos": "./bin/eamilos"
   },
@@ -14,9 +18,22 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "npx rimraf dist",
-    "postinstall": "node dist/postinstall.js 2>/dev/null || true"
+    "clean": "rimraf dist",
+    "postinstall": "node dist/postinstall.js || true"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RayAKaan/EamilOS.git"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "agents",
+    "automation",
+    "ollama",
+    "llm",
+    "developer-tools"
+  ],
   "dependencies": {
     "@eamilos/core": "^1.0.0",
     "commander": "^13.1.0",
@@ -26,7 +43,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "rimraf": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

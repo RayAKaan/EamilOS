@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/core",
   "version": "1.0.0",
-  "description": "EamilOS core library",
+  "description": "EamilOS core library — AI execution kernel for validated, working code",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,10 +15,26 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RayAKaan/EamilOS.git"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "agents",
+    "automation",
+    "ollama",
+    "llm",
+    "developer-tools"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "npx rimraf dist",
+    "clean": "rimraf dist",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -36,6 +52,7 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^4.1.2",
+    "rimraf": "^5.0.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.2"
   },
