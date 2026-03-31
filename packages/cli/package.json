@@ -8,17 +8,17 @@
   },
   "files": [
     "dist/**/*",
-    "bin/**/*",
+    "bin/eamilos",
     "README.md"
   ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist",
+    "clean": "npx rimraf dist",
     "postinstall": "node dist/postinstall.js 2>/dev/null || true"
   },
   "dependencies": {
-    "@eamilos/core": "file:../core",
+    "@eamilos/core": "^1.0.0",
     "commander": "^13.1.0",
     "chalk": "^5.4.0",
     "ora": "^8.2.0",
