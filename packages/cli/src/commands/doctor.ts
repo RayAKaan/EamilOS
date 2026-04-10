@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { parse } from 'yaml';
-import { PathValidator, LeakDetector } from '@eamilos/core';
+import { PathValidator, LeakDetector, OllamaDetector, ConfigNormalizer } from '@eamilos/core';
 
 export interface DoctorCheck {
   name: string;
@@ -26,6 +26,8 @@ export async function doctorCommand(options: {
 
   checks.push(checkNodeVersion());
   checks.push(await checkConfiguration(options.fix));
+  checks.push(await checkConfigNormalization());
+  checks.push(await checkProviderInitialization());
   checks.push(await checkOllamaConnectivity(options.verbose));
   checks.push(checkOpenAIConfiguration());
   checks.push(checkAnthropicConfiguration());
@@ -166,50 +168,162 @@ async function checkConfiguration(_canFix: boolean): Promise<DoctorCheck> {
   }
 }
 
-async function checkOllamaConnectivity(_verbose: boolean): Promise<DoctorCheck> {
+async function checkConfigNormalization(): Promise<DoctorCheck> {
+  const configPaths = ['eamilos.yaml', '.eamilos.yaml', 'eamilos.config.yaml', '.eamilos.config.yaml'];
+  let configPath = null;
+  
+  for (const p of configPaths) {
+    if (fs.existsSync(p)) {
+      configPath = p;
+      break;
+    }
+  }
+
+  if (!configPath) {
+    return {
+      name: 'Config normalization',
+      status: 'warn',
+      message: 'No config file — will be auto-created on first run',
+      autoFixable: false,
+    };
+  }
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const raw = parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    const normalizer = new ConfigNormalizer();
+    const config = normalizer.normalize(raw);
 
-    const response = await fetch('http://localhost:11434/api/tags', {
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
+    return {
+      name: 'Config normalization',
+      status: 'pass',
+      message: `Normalized: ${config.providers.length} provider(s), default: ${config.defaultModel}`,
+      autoFixable: false,
+    };
+  } catch (e) {
+    return {
+      name: 'Config normalization',
+      status: 'fail',
+      message: `Failed: ${e instanceof Error ? e.message : String(e)}`,
+      autoFixable: true,
+      fixInstruction: 'Run: eamilos doctor --fix',
+      fix: async () => {
+        const healer = await import('@eamilos/core');
+        await healer.ConfigHealer.heal(configPath!);
+      }
+    };
+  }
+}
 
-    if (response.ok) {
-      const data = await response.json() as { models?: Array<{ name: string }> };
-      const modelCount = data.models?.length || 0;
-      const modelNames = data.models?.map(m => m.name).slice(0, 5).join(', ') || 'none';
+async function checkProviderInitialization(): Promise<DoctorCheck> {
+  const configPaths = ['eamilos.yaml', '.eamilos.yaml', 'eamilos.config.yaml', '.eamilos.config.yaml'];
+  let configPath = null;
+  
+  for (const p of configPaths) {
+    if (fs.existsSync(p)) {
+      configPath = p;
+      break;
+    }
+  }
 
+  if (!configPath) {
+    return { 
+      name: 'Provider initialization', 
+      status: 'skip',
+      message: 'No config — skipping', 
+      autoFixable: false 
+    };
+  }
+
+  try {
+    const raw = parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    const normalizer = new ConfigNormalizer();
+    normalizer.normalize(raw);
+
+    const detector = new OllamaDetector();
+    const status = await detector.detect();
+
+    if (status.running && status.models.length > 0) {
       return {
-        name: 'Ollama provider',
-        status: modelCount > 0 ? 'pass' : 'warn',
-        message: modelCount > 0
-          ? `Connected. ${modelCount} model(s): ${modelNames}`
-          : 'Connected but no models installed',
+        name: 'Provider initialization',
+        status: 'pass',
+        message: `Ollama ready with ${status.models.length} model(s)`,
         autoFixable: false,
-        fixInstruction: modelCount === 0
-          ? 'Install a model: ollama pull phi3:mini'
-          : undefined
+      };
+    } else if (process.env.OPENAI_API_KEY) {
+      return {
+        name: 'Provider initialization',
+        status: 'pass',
+        message: 'OpenAI API key available',
+        autoFixable: false,
       };
     } else {
       return {
-        name: 'Ollama provider',
-        status: 'warn',
-        message: `Ollama responded with HTTP ${response.status}`,
+        name: 'Provider initialization',
+        status: 'fail',
+        message: 'No providers available',
         autoFixable: false,
-        fixInstruction: 'Check Ollama is running: ollama serve'
+        fixInstruction: 'Start Ollama: ollama serve  or  export OPENAI_API_KEY',
       };
     }
-  } catch {
+  } catch (e) {
     return {
-      name: 'Ollama provider',
-      status: 'warn',
-      message: 'Ollama not reachable at localhost:11434',
+      name: 'Provider initialization',
+      status: 'fail',
+      message: `Error: ${e instanceof Error ? e.message : String(e)}`,
       autoFixable: false,
-      fixInstruction: 'Install Ollama: https://ollama.ai  then run: ollama serve'
     };
   }
+}
+
+async function checkOllamaConnectivity(verbose: boolean): Promise<DoctorCheck> {
+  const detector = new OllamaDetector();
+  const status = await detector.detect();
+
+  if (!status.installed) {
+    return {
+      name: 'Ollama',
+      status: 'fail',
+      message: 'Ollama is not installed',
+      autoFixable: false,
+      fixInstruction: 'Install from: https://ollama.ai/download'
+    };
+  }
+
+  if (!status.running) {
+    return {
+      name: 'Ollama',
+      status: 'warn',
+      message: 'Ollama is installed but not running',
+      autoFixable: false,
+      fixInstruction: 'Start with: ollama serve'
+    };
+  }
+
+  if (status.models.length === 0) {
+    return {
+      name: 'Ollama',
+      status: 'warn',
+      message: `Ollama ${status.version || ''} is running but has no models`,
+      autoFixable: false,
+      fixInstruction: 'Install a model: ollama pull phi3:mini'
+    };
+  }
+
+  const modelCount = status.models.length;
+  const modelNames = verbose
+    ? status.models.map(m => m.name).join(', ')
+    : status.models.slice(0, 5).map(m => m.name).join(', ');
+
+  const message = modelCount > 5 && !verbose
+    ? `${modelCount} models installed (${modelNames}, ...)`
+    : `${modelCount} model(s): ${modelNames}`;
+
+  return {
+    name: 'Ollama',
+    status: 'pass',
+    message: message.trim(),
+    autoFixable: false
+  };
 }
 
 function checkOpenAIConfiguration(): DoctorCheck {

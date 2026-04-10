@@ -1,0 +1,45 @@
+version: 1
+
+providers:
+  - id: ollama
+    type: ollama
+    endpoint: http://localhost:11434
+    models:
+      - id: phi3:mini
+        tier: cheap
+        context_window: 4096
+
+routing:
+  default_tier: cheap
+  task_routing:
+    research: cheap
+    coding: strong
+    planning: strong
+    qa: cheap
+  fallback_order:
+    - openai
+
+workspace:
+  base_dir: ./data/projects
+  git_enabled: true
+  max_file_size_mb: 10
+  max_workspace_size_mb: 500
+
+budget:
+  max_tokens_per_task: 50000
+  max_cost_per_project_usd: 5.00
+  warn_at_percentage: 80
+
+settings:
+  max_parallel_tasks: 3
+  task_timeout_seconds: 600
+  model_call_timeout_seconds: 300
+  preview_mode: true
+  auto_retry: true
+
+logging:
+  level: info
+  console: true
+  file: ./data/logs/eamilos.log
+  max_file_size_mb: 50
+  max_files: 5

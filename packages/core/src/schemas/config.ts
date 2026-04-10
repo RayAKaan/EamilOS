@@ -10,9 +10,17 @@ export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
 export const ProviderConfigSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(['openai', 'ollama', 'anthropic', 'google', 'custom']),
+  type: z.enum(['local', 'api', 'openai-compatible', 'custom', 'openai', 'ollama', 'anthropic', 'google', 'mistral', 'groq', 'together', 'deepseek']),
+  engine: z.string().optional(),
+  base_url: z.string().optional(),
   api_key: z.string().optional(),
   endpoint: z.string().optional(),
+  credentials: z.object({
+    api_key: z.string().optional(),
+    token: z.string().optional(),
+    headers: z.record(z.string()).optional(),
+    organization: z.string().optional(),
+  }).optional(),
   models: z.array(ModelConfigSchema).min(1),
   rate_limit_rpm: z.number().int().optional(),
 });

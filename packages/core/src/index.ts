@@ -12,6 +12,7 @@ import { initContextBuilder } from './context-builder.js';
 import { initAgentRunner } from './agent-runner.js';
 import type { AgentExecutionResult } from './agent-runner.js';
 import { initOrchestrator, getOrchestrator } from './orchestrator/StrictOrchestrator.js';
+import { loadConfig as loadConfigFromFile } from './config.js';
 
 export class EamilOS {
   private db: DatabaseManager;
@@ -261,6 +262,7 @@ export async function initEamilOS(): Promise<EamilOS> {
   if (globalInstance) {
     return globalInstance;
   }
+  await loadConfigFromFile();
   globalInstance = new EamilOS();
   await globalInstance.initialize();
   return globalInstance;
@@ -280,11 +282,35 @@ export * from './errors.js';
 export * from './error-handler.js';
 export { initAgentRegistry, getAgentRegistry } from './agent-registry.js';
 export * from './models/ModelDiscovery.js';
+export * from './models/SmartModelSelector.js';
 export * from './diagnostics/ExplainableError.js';
+export { ErrorHumanizer, humanizeError, formatError } from './diagnostics/ErrorHumanizer.js';
+export * from './diagnostics/index.js';
 export * from './security/SecurityAudit.js';
 export * from './security/index.js';
 export * from './config.js';
+export { loadConfig as loadConfigFromFile } from './config.js';
+export * from './config/ConfigNormalizer.js';
+export * from './config/ConfigWriter.js';
+export * from './config/ProviderRegistry.js';
+export * from './config/AutoInit.js';
+export * from './config/ConfigHealer.js';
+export * from './providers/OllamaDetector.js';
+export * from './providers/ProviderReadiness.js';
+export * from './providers/ExecutionGuarantee.js';
 export * from './plugins/index.js';
 export * from './cli/index.js';
 export * from './features/index.js';
 export { Logger, initLogger, getLogger } from './logger.js';
+export { formatError as formatEamilOSError } from './error-handler.js';
+export * from './distributed/index.js';
+export { FeedbackLoop, type FeedbackLoopConfig, type LearningInsights, type LearningConfigState } from './learning/FeedbackLoop.js';
+export { AutoTuner, type AutoTunerConfig } from './learning/AutoTuner.js';
+export { ExecutionMemory } from './learning/ExecutionMemory.js';
+export { ModelPerformance } from './learning/ModelPerformance.js';
+export { SmartModelRouter, type RouterConfig } from './learning/SmartModelRouter.js';
+export { StrategyOptimizer, type StrategyConfig } from './learning/StrategyOptimizer.js';
+export { PromptOptimizer, type PromptOptimizerConfig } from './learning/PromptOptimizer.js';
+export { FailureAnalyzer, type FailureAnalyzerConfig } from './learning/FailureAnalyzer.js';
+export { EnrichmentLibrary } from './learning/EnrichmentLibrary.js';
+export * from './learning/statistics.js';

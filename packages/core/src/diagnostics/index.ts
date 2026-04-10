@@ -6,3 +6,5 @@ export { DiagnosticReporter } from './DiagnosticReporter.js';
 export type { DiagnosticReport, DiagnosticPattern } from './DiagnosticReporter.js';
 export { ExplainableError, explainError, formatErrorForUser } from './ExplainableError.js';
 export type { ErrorExplanation, ExplainableErrorOptions } from './ExplainableError.js';
+export { ErrorHumanizer, humanizeError, formatError as formatHumanizedError } from './ErrorHumanizer.js';
+export type { HumanizedError } from './ErrorHumanizer.js';

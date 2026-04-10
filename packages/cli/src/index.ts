@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { initEamilOS } from '@eamilos/core';
+import { initEamilOS, formatError as humanizeError } from '@eamilos/core';
 import { init } from './commands/init.js';
 import { run } from './commands/run.js';
 import { status } from './commands/status.js';
@@ -9,8 +9,13 @@ import { list } from './commands/list.js';
 import { helpCommand } from './commands/help.js';
 import { versionCommand } from './commands/version.js';
 import { doctorCommand } from './commands/doctor.js';
+import { validateCommand } from './commands/validate.js';
+import { welcomeCommand, markFirstRunComplete } from './commands/welcome.js';
 import { setupCommand } from './commands/setup.js';
 import { pluginsCommand } from './commands/plugins.js';
+import { insightsCommand } from './commands/insights.js';
+import { explainRoutingCommand } from './commands/explain-routing.js';
+import { learningConfigCommand } from './commands/learning-config.js';
 
 const EAMILOS_VERSION = '1.0.0';
 
@@ -27,6 +32,21 @@ program
   .action(async () => {
     try {
       await init();
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+program
+  .command('welcome')
+  .description('Show welcome message and auto-setup')
+  .option('--skip', 'Skip auto-setup', false)
+  .action(async (options) => {
+    try {
+      await welcomeCommand({ skip: options.skip });
+      if (!options.skip) {
+        await markFirstRunComplete();
+      }
     } catch (error) {
       handleFatalError(error);
     }
@@ -64,6 +84,19 @@ program
   });
 
 program
+  .command('validate')
+  .description('Validate configuration file')
+  .option('--config <path>', 'Path to config file')
+  .option('--verbose', 'Show detailed output', false)
+  .action(async (options) => {
+    try {
+      await validateCommand({ config: options.config, verbose: options.verbose });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+program
   .command('run <goal>')
   .description('Run a new project with the given goal')
   .option('-t, --template <template>', 'Project template to use')
@@ -73,6 +106,7 @@ program
   .option('--provider <name>', 'Override provider')
   .option('--output <dir>', 'Output directory')
   .option('--debug', 'Show detailed output')
+  .option('--ephemeral', 'Run without writing config to disk')
   .action(async (goal: string, options) => {
     try {
       const eamilos = await initEamilOS();
@@ -250,25 +284,127 @@ program
     versionCommand(EAMILOS_VERSION);
   });
 
+program
+  .command('insights')
+  .description('View learning system insights')
+  .option('--model <name>', 'Show insights for specific model')
+  .option('--failures', 'Show failure patterns')
+  .option('--tuning', 'Show auto-tuning state')
+  .option('--prompts', 'Show prompt evolution')
+  .option('--export <path>', 'Export insights to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (options) => {
+    try {
+      await insightsCommand({
+        model: options.model,
+        failures: options.failures,
+        tuning: options.tuning,
+        prompts: options.prompts,
+        export: options.export,
+        json: options.json,
+      });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+program
+  .command('explain-routing')
+  .description('Explain why a model/strategy was chosen')
+  .option('--role <role>', 'Agent role')
+  .option('--task-type <type>', 'Task type')
+  .option('--complexity <level>', 'Task complexity')
+  .option('--model <name>', 'Specific model to explain')
+  .action(async (options) => {
+    try {
+      await explainRoutingCommand({
+        role: options.role,
+        taskType: options.taskType,
+        complexity: options.complexity,
+        model: options.model,
+      });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+const learningCmd = program
+  .command('learning-config')
+  .description('Configure learning system parameters');
+
+learningCmd
+  .command('list')
+  .description('List current settings')
+  .action(async () => {
+    try {
+      await learningConfigCommand({ list: true });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+learningCmd
+  .command('get <key>')
+  .description('Get specific setting')
+  .action(async (key: string) => {
+    try {
+      await learningConfigCommand({ get: key });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+learningCmd
+  .command('set <key>=<value>')
+  .description('Set a setting')
+  .action(async (keyValue: string) => {
+    try {
+      await learningConfigCommand({ set: keyValue });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+learningCmd
+  .command('reset')
+  .description('Reset to defaults')
+  .action(async () => {
+    try {
+      await learningConfigCommand({ reset: true });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+learningCmd
+  .command('export <path>')
+  .description('Export configuration')
+  .action(async (path: string) => {
+    try {
+      await learningConfigCommand({ export: path });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+learningCmd
+  .command('import <path>')
+  .description('Import configuration')
+  .action(async (path: string) => {
+    try {
+      await learningConfigCommand({ import: path });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
 program.parse(process.argv);
 
 function handleFatalError(error: unknown, debug = false): void {
-  console.log('\n  EamilOS encountered an unexpected error.\n');
-
-  if (error instanceof Error) {
-    console.log(`  Error: ${error.message}`);
-
-    if (debug) {
-      console.log('\n  Stack trace:');
-      console.log(`  ${error.stack}`);
-    } else {
-      console.log('\n  Run with --debug for full error details.');
-    }
+  if (debug) {
+    console.error(error);
   } else {
-    console.log(`  Error: ${String(error)}`);
+    console.log(humanizeError(error));
   }
-
-  console.log(`\n  If this persists, run: eamilos doctor`);
-  console.log(`  Or report at: https://github.com/eamilos/eamilos/issues\n`);
   process.exit(1);
 }

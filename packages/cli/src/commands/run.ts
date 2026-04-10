@@ -5,6 +5,7 @@ interface RunOptions {
   template?: string;
   constraints?: string[];
   budget?: number;
+  forceInit?: boolean;
 }
 
 export async function run(

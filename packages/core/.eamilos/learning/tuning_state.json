@@ -1,0 +1,2781 @@
+{
+  "params": {
+    "agentTimeoutMs": {
+      "min": 5000,
+      "max": 120000,
+      "stepSize": 5000,
+      "currentValue": 30000,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    },
+    "maxRetriesPerAgent": {
+      "min": 1,
+      "max": 10,
+      "stepSize": 1,
+      "currentValue": 3,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    },
+    "maxParallelInferences": {
+      "min": 1,
+      "max": 16,
+      "stepSize": 1,
+      "currentValue": 4,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    },
+    "maxParallelAgents": {
+      "min": 1,
+      "max": 16,
+      "stepSize": 1,
+      "currentValue": 8,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    },
+    "contextWindowUtilization": {
+      "min": 0.3,
+      "max": 0.95,
+      "stepSize": 0.05,
+      "currentValue": 0.75,
+      "direction": "increase",
+      "confidenceInDirection": 1
+    },
+    "checkpointIntervalTicks": {
+      "min": 3,
+      "max": 50,
+      "stepSize": 2,
+      "currentValue": 10,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    },
+    "tickIntervalMs": {
+      "min": 50,
+      "max": 500,
+      "stepSize": 50,
+      "currentValue": 100,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    },
+    "heartbeatIntervalMs": {
+      "min": 1000,
+      "max": 60000,
+      "stepSize": 1000,
+      "currentValue": 10000,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    },
+    "retryBackoffMultiplier": {
+      "min": 1.1,
+      "max": 4,
+      "stepSize": 0.1,
+      "currentValue": 1.5,
+      "direction": "hold",
+      "confidenceInDirection": 0
+    }
+  },
+  "observations": [
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019721
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019755
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019761
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019798
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019799
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019805
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019806
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019807
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019808
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019857
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019859
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019908
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019918
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086019960
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020002
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020044
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020075
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020076
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020077
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020078
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020079
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020080
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020081
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020082
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020083
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020084
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020085
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020086
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020089
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020090
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020091
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020092
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020093
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020094
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020095
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020096
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020097
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020098
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 30000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.7,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020158
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 35000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.75,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020159
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 30000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.7,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086020175
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 30000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.7,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 3000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 0,
+      "timestamp": 1775086055275
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 30000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.7,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055312
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 35000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.75,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055327
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 40000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.8,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055342
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 45000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.8500000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055441
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055520
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 30000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.7,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055719
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 35000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.75,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055723
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 40000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.8,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055725
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 45000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.8500000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055756
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055798
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055874
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055875
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055876
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055878
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055879
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055881
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055931
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055977
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086055993
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056009
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056050
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056090
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056381
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056383
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056384
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056385
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056386
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056388
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056393
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056394
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056407
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056453
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056497
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056510
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056511
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056512
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056513
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056515
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056517
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056519
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056524
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056525
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056526
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056527
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056528
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056529
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056530
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056531
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056533
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056534
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056537
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056539
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056541
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056543
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 50000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.9000000000000001,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056563
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 30000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.7,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056690
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 35000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.75,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056691
+    },
+    {
+      "params": {
+        "agentTimeoutMs": 30000,
+        "tickIntervalMs": 100,
+        "heartbeatIntervalMs": 10000,
+        "maxRetriesPerAgent": 3,
+        "retryBackoffMultiplier": 1.5,
+        "maxParallelInferences": 4,
+        "maxParallelAgents": 8,
+        "contextWindowUtilization": 0.7,
+        "checkpointIntervalTicks": 10
+      },
+      "success": true,
+      "latencyMs": 5000,
+      "retries": 0,
+      "cost": 0.01,
+      "timeoutCount": 1,
+      "timestamp": 1775086056747
+    }
+  ],
+  "history": [
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865447
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865448
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865555
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865555
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865581
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865581
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865599
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865599
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865633
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865633
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865745
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865745
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865746
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865746
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865748
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865748
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085865880
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085865880
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775085868182
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085868182
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775085868193
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085868193
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775085868238
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085868238
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 30000,
+      "direction": "hold",
+      "reason": "Parameter reset to default",
+      "timestamp": 1775085868241
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085907900
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085907901
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085907927
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085907927
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085907931
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085907931
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085907960
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085907960
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085907962
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085907962
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085908045
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085908045
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085908046
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085908046
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085908048
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085908048
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775085908050
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085908050
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775085908913
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085908913
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775085908915
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085908915
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775085908949
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775085908949
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 30000,
+      "direction": "hold",
+      "reason": "Parameter reset to default",
+      "timestamp": 1775085908951
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019091
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019092
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019110
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019110
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019112
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019112
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019114
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019114
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019156
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019156
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019282
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019282
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019286
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019286
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019292
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019293
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086019294
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086019294
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775086020158
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086020158
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775086020159
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086020159
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775086020176
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086020176
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 30000,
+      "direction": "hold",
+      "reason": "Parameter reset to default",
+      "timestamp": 1775086020191
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055275
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055276
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055312
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055312
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055327
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055328
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055342
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055343
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055441
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055441
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055719
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055719
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055723
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055724
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 40000,
+      "newValue": 45000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055725
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8,
+      "newValue": 0.8500000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055725
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 45000,
+      "newValue": 50000,
+      "direction": "increase",
+      "reason": "95% timeout rate",
+      "timestamp": 1775086055756
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.8500000000000001,
+      "newValue": 0.9000000000000001,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086055756
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775086056690
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086056690
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 35000,
+      "newValue": 40000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775086056691
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.75,
+      "newValue": 0.8,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086056691
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 35000,
+      "direction": "increase",
+      "reason": "100% timeout rate",
+      "timestamp": 1775086056747
+    },
+    {
+      "param": "contextWindowUtilization",
+      "oldValue": 0.7,
+      "newValue": 0.75,
+      "direction": "increase",
+      "reason": "High success rate, low latency - can use more context",
+      "timestamp": 1775086056747
+    },
+    {
+      "param": "agentTimeoutMs",
+      "oldValue": 30000,
+      "newValue": 30000,
+      "direction": "hold",
+      "reason": "Parameter reset to default",
+      "timestamp": 1775086056751
+    }
+  ],
+  "timestamp": 1775086056751
+}
