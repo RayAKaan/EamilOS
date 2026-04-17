@@ -30,24 +30,29 @@ const program = new Command();
 async function launchUI(args: string[]) {
   const { spawn } = await import('child_process');
   const path = await import('path');
+  const { createRequire } = await import('module');
   const { existsSync } = await import('fs');
-  const { fileURLToPath } = await import('url');
   
-  const cliDir = path.dirname(fileURLToPath(import.meta.url));
+  const cliDir = path.dirname(path.join(import.meta.url));
   const cliPkgDir = path.join(cliDir, '..');
   
-  const possiblePaths = [
-    path.join(cliPkgDir, 'cli-ui', 'bin', 'eamilos-ui'),
-    path.join(cliPkgDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
-    path.join(cliDir, '..', '..', 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
-    path.join(process.env.LOCALAPPDATA || '', 'npm', 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
-    path.join(process.env.APPDATA || '', 'npm', 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
-  ];
+  let cliUiPath: string | undefined;
   
-  let cliUiPath = possiblePaths.find(p => existsSync(p));
+  // Method 1: Try using createRequire to resolve @eamilos/cli-ui (works both locally and globally)
+  const require = createRequire(import.meta.url);
+  try {
+    cliUiPath = require.resolve('@eamilos/cli-ui/bin/eamilos-ui');
+  } catch {
+    // Fallback: try relative paths for local development
+    const possiblePaths = [
+      path.join(cliPkgDir, 'cli-ui', 'bin', 'eamilos-ui'),
+      path.join(cliPkgDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
+    ];
+    cliUiPath = possiblePaths.find(p => existsSync(p));
+  }
   
   if (!cliUiPath) {
-    console.error('CLI UI not found. Install @eamilos/cli-ui globally: npm install -g @eamilos/cli-ui');
+    console.error('CLI UI not found. Install @eamilos/cli-ui: npm install -g @eamilos/cli-ui');
     process.exit(1);
   }
   

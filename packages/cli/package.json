@@ -1,6 +1,6 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.2.3",
+  "version": "1.2.5",
   "description": "EamilOS CLI — AI Execution Kernel",
   "type": "module",
   "main": "dist/index.js",
@@ -35,7 +35,8 @@
     "developer-tools"
   ],
   "dependencies": {
-    "@eamilos/core": "^1.2.0",
+    "@eamilos/cli-ui": "^1.2.3",
+    "@eamilos/core": "^1.2.3",
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
     "ora": "^8.2.0",
