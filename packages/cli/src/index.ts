@@ -30,8 +30,19 @@ const program = new Command();
 async function launchUI(args: string[]) {
   const { spawn } = await import('child_process');
   const path = await import('path');
-  const rootDir = path.join(process.cwd());
-  const cliUiPath = path.join(rootDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui');
+  const { existsSync } = await import('fs');
+  const rootDir = process.cwd();
+  
+  let cliUiPath = path.join(rootDir, 'packages', 'cli-ui', 'bin', 'eamilos-ui');
+  if (!existsSync(cliUiPath)) {
+    cliUiPath = path.join(rootDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui');
+  }
+  
+  if (!existsSync(cliUiPath)) {
+    console.error('CLI UI not found. Install @eamilos/cli-ui or run from workspace root.');
+    process.exit(1);
+  }
+  
   spawn('node', [cliUiPath, ...args], { stdio: 'inherit', shell: true, cwd: rootDir });
 }
 
