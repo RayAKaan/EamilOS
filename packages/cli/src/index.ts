@@ -31,18 +31,27 @@ async function launchUI(args: string[]) {
   const { spawn } = await import('child_process');
   const path = await import('path');
   const { existsSync } = await import('fs');
-  const rootDir = process.cwd();
+  const { fileURLToPath } = await import('url');
   
-  let cliUiPath = path.join(rootDir, 'packages', 'cli-ui', 'bin', 'eamilos-ui');
-  if (!existsSync(cliUiPath)) {
-    cliUiPath = path.join(rootDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui');
-  }
+  const cliDir = path.dirname(fileURLToPath(import.meta.url));
+  const cliPkgDir = path.join(cliDir, '..');
   
-  if (!existsSync(cliUiPath)) {
-    console.error('CLI UI not found. Install @eamilos/cli-ui or run from workspace root.');
+  const possiblePaths = [
+    path.join(cliPkgDir, 'cli-ui', 'bin', 'eamilos-ui'),
+    path.join(cliPkgDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
+    path.join(cliDir, '..', '..', 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
+    path.join(process.env.LOCALAPPDATA || '', 'npm', 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
+    path.join(process.env.APPDATA || '', 'npm', 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
+  ];
+  
+  let cliUiPath = possiblePaths.find(p => existsSync(p));
+  
+  if (!cliUiPath) {
+    console.error('CLI UI not found. Install @eamilos/cli-ui globally: npm install -g @eamilos/cli-ui');
     process.exit(1);
   }
   
+  const rootDir = process.cwd();
   spawn('node', [cliUiPath, ...args], { stdio: 'inherit', shell: true, cwd: rootDir });
 }
 
