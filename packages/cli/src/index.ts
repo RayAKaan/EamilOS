@@ -16,6 +16,7 @@ import { pluginsCommand } from './commands/plugins.js';
 import { insightsCommand } from './commands/insights.js';
 import { explainRoutingCommand } from './commands/explain-routing.js';
 import { learningConfigCommand } from './commands/learning-config.js';
+import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -27,11 +28,52 @@ const EAMILOS_VERSION = pkg.version || '1.0.0';
 
 const program = new Command();
 
+async function detectAndShowProviders(): Promise<void> {
+  const { default: chalk } = await import('chalk');
+  
+  try {
+    const providers = await detectAllProviders();
+    const best = selectBestProvider(providers);
+    
+    // Show detection results
+    console.log('\n' + chalk.cyan('Detected providers:'));
+    console.log('');
+    
+    for (const p of providers) {
+      if (p.available) {
+        console.log(chalk.green('✅') + ` ${p.name}`);
+      } else {
+        console.log(chalk.red('❌') + ` ${p.name} (${p.reason})`);
+      }
+    }
+    
+    console.log('');
+    
+    if (best) {
+      console.log(chalk.green('✔') + ` Using ${best.name}`);
+      console.log(chalk.dim('Run: eamilos run "your task"'));
+    } else {
+      console.log(chalk.yellow('⚠') + ' No AI providers found.');
+      console.log(chalk.dim('\nTo get started:'));
+      console.log('  npm install -g @anthropic-ai/claude-cli');
+      console.log('  OR');
+      console.log('  https://ollama.ai');
+    }
+    
+    console.log('');
+  } catch {
+    // Silent fail - don't block UI launch
+  }
+}
+
 async function launchUI(args: string[]) {
   const { spawn } = await import('child_process');
   const path = await import('path');
   const { createRequire } = await import('module');
   const { existsSync } = await import('fs');
+  
+  // Run provider detection in background
+  detectAndShowProviders();
   
   const cliDir = path.dirname(path.join(import.meta.url));
   const cliPkgDir = path.join(cliDir, '..');
@@ -52,7 +94,15 @@ async function launchUI(args: string[]) {
   }
   
   if (!cliUiPath) {
-    console.error('CLI UI not found. Install @eamilos/cli-ui: npm install -g @eamilos/cli-ui');
+    const { default: chalk } = await import('chalk');
+    console.error('');
+    console.error(chalk.red('❌') + ' CLI UI not found.');
+    console.error('');
+    console.error(chalk.dim('Fix:'));
+    console.error('  npm install -g @eamilos/cli-ui');
+    console.error('');
+    console.error(chalk.dim('Then run:'));
+    console.error('  eamilos');
     process.exit(1);
   }
   

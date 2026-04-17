@@ -1,6 +1,6 @@
 {
   "name": "@eamilos/cli-ui",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "EamilOS TUI — Interactive Terminal UI",
   "type": "module",
   "main": "dist/index.js",
