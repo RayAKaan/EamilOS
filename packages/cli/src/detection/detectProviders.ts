@@ -12,9 +12,14 @@ export interface ProviderStatus {
 function commandExists(command: string): boolean {
   try {
     const isWindows = process.platform === 'win32';
-    const cmd = isWindows ? `cmd /c "${command} --version"` : `${command} --version`;
-    execSync(cmd, { stdio: 'pipe', shell: true } as any);
-    return true;
+    let result: Buffer;
+    
+    if (isWindows) {
+      result = execSync(`where ${command}`, { stdio: 'pipe' });
+    } else {
+      result = execSync(`which ${command}`, { stdio: 'pipe' });
+    }
+    return result.length > 0;
   } catch {
     return false;
   }
