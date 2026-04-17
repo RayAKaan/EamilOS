@@ -16,15 +16,32 @@ import { pluginsCommand } from './commands/plugins.js';
 import { insightsCommand } from './commands/insights.js';
 import { explainRoutingCommand } from './commands/explain-routing.js';
 import { learningConfigCommand } from './commands/learning-config.js';
+import { readFile } from 'fs/promises';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const EAMILOS_VERSION = '1.0.0';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkgPath = resolve(__dirname, '../package.json');
+const pkg = JSON.parse(await readFile(pkgPath, 'utf-8'));
+const EAMILOS_VERSION = pkg.version || '1.0.0';
 
 const program = new Command();
+
+async function launchUI(args: string[]) {
+  const { spawn } = await import('child_process');
+  const path = await import('path');
+  const rootDir = path.join(process.cwd());
+  const cliUiPath = path.join(rootDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui');
+  spawn('node', [cliUiPath, ...args], { stdio: 'inherit', shell: true, cwd: rootDir });
+}
 
 program
   .name('eamilos')
   .description('EamilOS — AI Execution Kernel')
-  .version(EAMILOS_VERSION);
+  .version(EAMILOS_VERSION)
+  .action(async () => {
+    await launchUI(process.argv.slice(2));
+  });
 
 program
   .command('init')
@@ -78,6 +95,25 @@ program
   .action(async (options) => {
     try {
       await doctorCommand({ fix: options.fix, verbose: options.verbose });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+program
+  .command('ui')
+  .description('Launch interactive TUI (or --cli for text mode)')
+  .option('--cli', 'Use text CLI instead of rich TUI', false)
+  .action(async (options) => {
+    try {
+      if (options.cli) {
+        console.log('Use "eamilos run <goal>" for CLI mode');
+        return;
+      }
+      const { spawn } = await import('child_process');
+      const path = await import('path');
+      const cliUiPath = path.join(process.cwd(), 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui');
+      spawn(cliUiPath, [], { stdio: 'inherit', shell: true });
     } catch (error) {
       handleFatalError(error);
     }

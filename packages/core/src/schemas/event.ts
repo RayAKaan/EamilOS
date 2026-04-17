@@ -35,6 +35,8 @@ export const EventTypeEnum = z.enum([
   'system.started',
   'system.shutdown',
   'system.recovery',
+  'agent.question',
+  'agent.answered',
 ]);
 
 export type EventType = z.infer<typeof EventTypeEnum>;

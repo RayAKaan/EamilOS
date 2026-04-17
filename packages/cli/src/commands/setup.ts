@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as os from 'os';
+import yaml from 'yaml';
 
 interface ModelProfile {
   name: string;
@@ -284,31 +285,8 @@ function buildConfig(provider: string, model: string, installedModels: string[])
   return config;
 }
 
-function configToYaml(config: object, indent: number = 0): string {
-  const spaces = '  '.repeat(indent);
-  let yaml = '';
-
-  for (const [key, value] of Object.entries(config)) {
-    if (value === null || value === undefined) continue;
-
-    if (Array.isArray(value)) {
-      yaml += `${spaces}${key}:\n`;
-      for (const item of value) {
-        if (typeof item === 'object' && item !== null) {
-          yaml += `${spaces}  - ${configToYaml(item, indent + 1).trim()}`;
-        } else {
-          yaml += `${spaces}  - ${item}\n`;
-        }
-      }
-    } else if (typeof value === 'object') {
-      yaml += `${spaces}${key}:\n${configToYaml(value, indent + 1)}`;
-    } else {
-      const valStr = typeof value === 'string' ? `'${value}'` : String(value);
-      yaml += `${spaces}${key}: ${valStr}\n`;
-    }
-  }
-
-  return yaml;
+function configToYaml(config: object): string {
+  return yaml.stringify(config);
 }
 
 export { setupCommand };

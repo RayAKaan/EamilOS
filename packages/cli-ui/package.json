@@ -1,0 +1,38 @@
+{
+  "name": "@eamilos/cli-ui",
+  "version": "1.2.1",
+  "description": "EamilOS TUI — Interactive Terminal UI",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "eamilos-ui": "./bin/eamilos-ui"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "bundle": "node bundle.js",
+    "start": "node bin/eamilos-ui"
+  },
+  "dependencies": {
+    "@eamilos/core": "^1.1.0",
+    "chalk": "^5.4.0",
+    "ink": "^4.4.1",
+    "react": "^18.3.1",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.0",
+    "esbuild": "^0.27.7",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

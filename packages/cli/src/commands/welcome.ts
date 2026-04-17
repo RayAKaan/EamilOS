@@ -17,7 +17,7 @@ export async function welcomeCommand(_options: WelcomeOptions): Promise<void> {
   ║     ██║     ███████╗██║ ╚═╝ ██║██║███████║██║  ██║╚██████╔╝ ║
   ║     ╚═╝     ╚══════╝╚═╝     ╚═╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝  ║
   ║                                                              ║
-  ║     AI Execution Kernel v1.0.0                              ║
+  ║     AI Execution Kernel v1.1.1                              ║
   ║     Zero-Friction Local AI Development                       ║
   ║                                                              ║
   ╚══════════════════════════════════════════════════════════════╝

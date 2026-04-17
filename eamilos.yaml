@@ -1,0 +1,47 @@
+# EamilOS Configuration
+# Generated: 2026-04-17T18:51:12.643Z
+#
+# Edit this file or run: eamilos setup
+provider: ollama
+model: phi3:mini
+mode: auto
+debug: false
+routing:
+  mode: auto
+  default_tier: cheap
+  task_routing: {}
+  fallback_order:
+    - ollama
+  exploration_rate: 0.1
+  minimum_data_points: 5
+  overrides: {}
+  default_model: phi3:mini
+  default_provider: ollama
+features:
+  self_healing_routing:
+    enabled: true
+    failure_threshold: 3
+    cooldown_minutes: 30
+  adaptive_prompting:
+    enabled: true
+    strategy: per_model
+workspace:
+  base_dir: ./data/projects
+  git_enabled: true
+  max_file_size_mb: 10
+  max_workspace_size_mb: 500
+budget:
+  max_tokens_per_task: 50000
+  max_cost_per_project_usd: 5
+  warn_at_percentage: 80
+settings:
+  max_parallel_tasks: 3
+  task_timeout_seconds: 300
+  model_call_timeout_seconds: 120
+  preview_mode: true
+  auto_retry: true
+logging:
+  level: info
+  console: true
+  live: true
+models: []
