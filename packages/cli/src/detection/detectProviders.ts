@@ -13,7 +13,7 @@ function commandExists(command: string): boolean {
   try {
     const isWindows = process.platform === 'win32';
     const cmd = isWindows ? `cmd /c "${command} --version"` : `${command} --version`;
-    execSync(cmd, { stdio: 'ignore', shell: true as any });
+    execSync(cmd, { stdio: 'pipe', shell: true } as any);
     return true;
   } catch {
     return false;

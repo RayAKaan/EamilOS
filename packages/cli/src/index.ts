@@ -72,8 +72,8 @@ async function launchUI(args: string[]) {
   const { createRequire } = await import('module');
   const { existsSync } = await import('fs');
   
-  // Run provider detection in background
-  detectAndShowProviders();
+  // Run provider detection before launching UI
+  await detectAndShowProviders();
   
   const cliDir = path.dirname(path.join(import.meta.url));
   const cliPkgDir = path.join(cliDir, '..');
