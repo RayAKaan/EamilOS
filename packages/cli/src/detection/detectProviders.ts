@@ -11,7 +11,9 @@ export interface ProviderStatus {
 
 function commandExists(command: string): boolean {
   try {
-    execSync(`${command} --version`, { stdio: 'ignore' });
+    const isWindows = process.platform === 'win32';
+    const cmd = isWindows ? `cmd /c "${command} --version"` : `${command} --version`;
+    execSync(cmd, { stdio: 'ignore', shell: true as any });
     return true;
   } catch {
     return false;
