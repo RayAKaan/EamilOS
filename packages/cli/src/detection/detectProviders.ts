@@ -41,7 +41,7 @@ function isPortOpen(port: number, host = 'localhost'): Promise<boolean> {
   });
 }
 
-export async function installProvider(providerId: string): Promise<boolean> {
+export async function installProvider(providerId: string): Promise<{ success: boolean; alreadyWorking: boolean }> {
   const installCommands: Record<string, string> = {
     'claude-cli': 'npm install -g @anthropic-ai/claude-code',
     'opencode-cli': 'npm install -g opencode-ai',
@@ -58,19 +58,24 @@ export async function installProvider(providerId: string): Promise<boolean> {
   const binaryCmd = installCmds[providerId];
   
   if (!cmd || !binaryCmd) {
-    return false;
+    return { success: false, alreadyWorking: false };
   }
   
   try {
     execSync(`${binaryCmd} --version`, { stdio: 'pipe', shell: true } as any);
-    return true;
+    return { success: true, alreadyWorking: true };
   } catch {
     console.log(`Installing ${providerId}...`);
     try {
       execSync(cmd, { stdio: 'inherit', shell: true } as any);
-      return true;
-    } catch {
-      return false;
+      return { success: true, alreadyWorking: false };
+    } catch (e: any) {
+      const errMsg = e.message || '';
+      if (errMsg.includes('EBUSY') || errMsg.includes('locked') || errMsg.includes('busy')) {
+        console.log(`⚠️ ${providerId} is in use, assuming working...`);
+        return { success: true, alreadyWorking: true };
+      }
+      return { success: false, alreadyWorking: false };
     }
   }
 }
@@ -150,12 +155,15 @@ export async function detectAndAutoInstall(): Promise<ProviderStatus[]> {
   
   for (const provider of missing) {
     if (provider.installCommand) {
-      console.log(`\n${provider.name} not found. Installing...`);
-      const success = await installProvider(provider.id);
-      if (success) {
+      const result = await installProvider(provider.id);
+      if (result.success) {
         provider.available = true;
         provider.reason = undefined;
-        console.log(`✅ ${provider.name} installed successfully!`);
+        if (result.alreadyWorking) {
+          console.log(`✅ ${provider.name} is already available!`);
+        } else {
+          console.log(`✅ ${provider.name} installed successfully!`);
+        }
       } else {
         console.log(`❌ Failed to install ${provider.name}`);
       }

@@ -1,6 +1,6 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "EamilOS CLI — AI Execution Kernel",
   "type": "module",
   "main": "dist/index.js",

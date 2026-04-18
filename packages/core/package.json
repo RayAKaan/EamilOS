@@ -1,6 +1,6 @@
 {
   "name": "@eamilos/core",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "EamilOS core library — AI execution kernel for validated, working code",
   "type": "module",
   "main": "./dist/index.js",
