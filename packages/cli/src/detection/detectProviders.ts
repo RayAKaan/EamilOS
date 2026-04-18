@@ -7,6 +7,7 @@ export interface ProviderStatus {
   available: boolean;
   reason?: string;
   priority: number;
+  installCommand?: string;
 }
 
 function commandExists(command: string): boolean {
@@ -39,6 +40,27 @@ function isPortOpen(port: number, host = 'localhost'): Promise<boolean> {
   });
 }
 
+export async function installProvider(providerId: string): Promise<boolean> {
+  const installCommands: Record<string, string> = {
+    'claude-cli': 'npm install -g @anthropic-ai/claude-code',
+    'opencode-cli': 'npm install -g opencode-ai',
+    'codex-cli': 'npm install -g @openai/codex',
+  };
+  
+  const cmd = installCommands[providerId];
+  if (!cmd) {
+    return false;
+  }
+  
+  try {
+    console.log(`Installing ${providerId}...`);
+    execSync(cmd, { stdio: 'inherit', shell: true } as any);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function detectAllProviders(): Promise<ProviderStatus[]> {
   const providers: ProviderStatus[] = [];
 
@@ -50,6 +72,7 @@ export async function detectAllProviders(): Promise<ProviderStatus[]> {
     available: claudeExists,
     reason: claudeExists ? undefined : 'not installed',
     priority: 2,
+    installCommand: 'npm install -g @anthropic-ai/claude-cli',
   });
 
   // 1b. OpenCode CLI (highest priority)
@@ -60,6 +83,7 @@ export async function detectAllProviders(): Promise<ProviderStatus[]> {
     available: opencodeExists,
     reason: opencodeExists ? undefined : 'not installed',
     priority: 1,
+    installCommand: 'npm install -g opencode-ai',
   });
 
   // 2. Codex CLI  
@@ -70,6 +94,7 @@ export async function detectAllProviders(): Promise<ProviderStatus[]> {
     available: codexExists,
     reason: codexExists ? undefined : 'not installed',
     priority: 4,
+    installCommand: 'npm install -g @anthropic-ai/codex-cli',
   });
 
   // 3. Ollama (local)
@@ -102,6 +127,27 @@ export async function detectAllProviders(): Promise<ProviderStatus[]> {
     priority: 3,
   });
 
+  return providers;
+}
+
+export async function detectAndAutoInstall(): Promise<ProviderStatus[]> {
+  const providers = await detectAllProviders();
+  const missing = providers.filter(p => !p.available && p.installCommand);
+  
+  for (const provider of missing) {
+    if (provider.installCommand) {
+      console.log(`\n${provider.name} not found. Installing...`);
+      const success = await installProvider(provider.id);
+      if (success) {
+        provider.available = true;
+        provider.reason = undefined;
+        console.log(`✅ ${provider.name} installed successfully!`);
+      } else {
+        console.log(`❌ Failed to install ${provider.name}`);
+      }
+    }
+  }
+  
   return providers;
 }
 

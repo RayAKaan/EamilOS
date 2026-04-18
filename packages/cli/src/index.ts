@@ -16,7 +16,7 @@ import { pluginsCommand } from './commands/plugins.js';
 import { insightsCommand } from './commands/insights.js';
 import { explainRoutingCommand } from './commands/explain-routing.js';
 import { learningConfigCommand } from './commands/learning-config.js';
-import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
+import { detectAndAutoInstall, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -32,7 +32,7 @@ async function detectAndShowProviders(): Promise<void> {
   const { default: chalk } = await import('chalk');
   
   try {
-    const providers = await detectAllProviders();
+    const providers = await detectAndAutoInstall();
     const best = selectBestProvider(providers);
     
     // Show detection results
