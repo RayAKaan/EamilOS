@@ -37,12 +37,7 @@ export const useSessionPersistence = () => {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getRepo = useCallback((): SessionRepository | null => {
-    try {
-      const { getSessionRepository } = require('../../core/dist/db/index.js');
-      return getSessionRepository();
-    } catch {
-      return null;
-    }
+    return null;
   }, []);
 
   const saveSession = useCallback((session: Session) => {

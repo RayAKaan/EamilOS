@@ -9,7 +9,7 @@
     "eamilos-ui": "./bin/eamilos-ui"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node bundle.js",
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "bundle": "node bundle.js",

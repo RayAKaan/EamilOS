@@ -13,14 +13,15 @@ export interface ProviderStatus {
 function commandExists(command: string): boolean {
   try {
     const isWindows = process.platform === 'win32';
-    let result: Buffer;
     
     if (isWindows) {
-      result = execSync(`where ${command}`, { stdio: 'pipe' });
+      execSync(`where ${command}`, { stdio: 'pipe' });
+      execSync(`${command} --version`, { stdio: 'pipe', shell: true } as any);
     } else {
-      result = execSync(`which ${command}`, { stdio: 'pipe' });
+      execSync(`which ${command}`, { stdio: 'pipe' });
+      execSync(`${command} --version`, { stdio: 'pipe' });
     }
-    return result.length > 0;
+    return true;
   } catch {
     return false;
   }
@@ -47,17 +48,30 @@ export async function installProvider(providerId: string): Promise<boolean> {
     'codex-cli': 'npm install -g @openai/codex',
   };
   
+  const installCmds: Record<string, string> = {
+    'claude-cli': 'claude',
+    'opencode-cli': 'opencode',
+    'codex-cli': 'codex',
+  };
+  
   const cmd = installCommands[providerId];
-  if (!cmd) {
+  const binaryCmd = installCmds[providerId];
+  
+  if (!cmd || !binaryCmd) {
     return false;
   }
   
   try {
-    console.log(`Installing ${providerId}...`);
-    execSync(cmd, { stdio: 'inherit', shell: true } as any);
+    execSync(`${binaryCmd} --version`, { stdio: 'pipe', shell: true } as any);
     return true;
   } catch {
-    return false;
+    console.log(`Installing ${providerId}...`);
+    try {
+      execSync(cmd, { stdio: 'inherit', shell: true } as any);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
