@@ -5,7 +5,7 @@ import { TaskRunner } from './views/TaskRunner';
 import { AgentDetail } from './views/AgentDetail';
 import { ConfigView } from './views/ConfigView';
 import { HelpOverlay, CommandPalette } from './components/HelpOverlay';
-import { useKeyboard } from '../hooks/useKeyboard';
+import { useGlobalKeyboard, useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../state/store';
 import type { UIBridge } from '../bridge';
 import { loadWorkspace, saveWorkspace, createWorkspace } from '../state/workspace';
@@ -19,20 +19,23 @@ export interface RouterProps {
 export const Router: React.FC<RouterProps> = ({ bridge }) => {
   const { currentView, setCurrentView } = useStore();
   const [viewData, setViewData] = React.useState<any>({});
+  const [initialized, setInitialized] = React.useState(false);
 
   useEffect(() => {
     const saved = loadWorkspace();
     if (saved) {
       setCurrentView(saved.view as View);
     }
+    setInitialized(true);
   }, []);
 
   useEffect(() => {
+    if (!initialized) return;
     const workspace = createWorkspace(currentView as View);
     saveWorkspace(workspace);
-  }, [currentView]);
+  }, [currentView, initialized]);
 
-  useKeyboard((keyId) => {
+  useGlobalKeyboard((keyId) => {
     const key = keyId.toLowerCase();
 
     if (key === 'd') {
@@ -43,14 +46,14 @@ export const Router: React.FC<RouterProps> = ({ bridge }) => {
       setCurrentView('agent-detail');
     } else if (key === 'c') {
       setCurrentView('config');
-    } else if (key === 'ctrl+p') {
+    } else if (key === 'ctrl+p' || key === 'p') {
       setViewData((prev: any) => ({ ...prev, showPalette: true }));
     } else if (key === '/') {
       setViewData((prev: any) => ({ ...prev, showSearch: true }));
     } else if (key === '?') {
       setViewData((prev: any) => ({ ...prev, showHelp: true }));
     } else if (key === 'escape') {
-      setViewData({});
+      setViewData((prev: any) => ({}));
     } else if (key === 'q') {
       bridge.shutdown().then(() => process.exit(0));
     }

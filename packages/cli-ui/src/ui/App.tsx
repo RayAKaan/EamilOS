@@ -4,10 +4,13 @@ import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { Sidebar } from './components/layout/Sidebar';
 import { Router } from './Router';
-import { useStore } from '../state/store';
-import type { UIBridge } from '../bridge';
+import { setupKeyboard } from '../hooks/useKeyboard';
 
-export const App = ({ bridge }: { bridge: UIBridge }) => {
+export const App = ({ bridge }: { bridge: any }) => {
+  React.useEffect(() => {
+    setupKeyboard();
+  }, []);
+
   return (
     <Box flexDirection="column" width="100%" height="100%">
       <Header />
