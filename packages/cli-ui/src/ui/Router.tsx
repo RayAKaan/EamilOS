@@ -5,8 +5,11 @@ import { TaskRunner } from './views/TaskRunner';
 import { AgentDetail } from './views/AgentDetail';
 import { ConfigView } from './views/ConfigView';
 import { HelpOverlay, CommandPalette } from './components/HelpOverlay';
+import { SearchBar } from './components/SearchBar';
+import { SplitView } from './components/SplitView';
 import { useKeyboard } from '../hooks/useKeyboard';
 import type { UIBridge } from '../bridge';
+import { loadWorkspace, saveWorkspace, createWorkspace } from '../state/workspace';
 
 export type View = 'dashboard' | 'task-runner' | 'agent-detail' | 'config';
 
@@ -17,6 +20,18 @@ export interface RouterProps {
 export const Router: React.FC<RouterProps> = ({ bridge }) => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [viewData, setViewData] = useState<any>({});
+
+  useEffect(() => {
+    const saved = loadWorkspace();
+    if (saved) {
+      setCurrentView(saved.view as View);
+    }
+  }, []);
+
+  useEffect(() => {
+    const workspace = createWorkspace(currentView);
+    saveWorkspace(workspace);
+  }, [currentView]);
 
   useKeyboard((keyId) => {
     const key = keyId.toLowerCase();
@@ -31,6 +46,10 @@ export const Router: React.FC<RouterProps> = ({ bridge }) => {
       setCurrentView('config');
     } else if (key === 'ctrl+p') {
       setViewData((prev: any) => ({ ...prev, showPalette: true }));
+    } else if (key === 'ctrl+\\') {
+      setViewData((prev: any) => ({ ...prev, splitView: !prev.splitView }));
+    } else if (key === '/') {
+      setViewData((prev: any) => ({ ...prev, showSearch: true }));
     } else if (key === '?') {
       setViewData((prev: any) => ({ ...prev, showHelp: true }));
     } else if (key === 'escape') {
