@@ -8,7 +8,6 @@ import { createBridge } from './bridge.js';
 async function main() {
   if (!process.stdin.isTTY) {
     console.error('❌ EamilOS UI requires an interactive terminal');
-    console.error('   Try: node packages/cli-ui/bin/eamilos-ui');
     process.exit(1);
   }
 
@@ -20,10 +19,8 @@ async function main() {
   const debugMode = process.env.DEBUG === 'true';
   
   if (debugMode) {
-    console.error('[EamilOS] Debug mode enabled');
-  }
-  if (mockMode) {
-    console.error('[EamilOS] Mock mode enabled');
+    console.error('[Debug] Starting EamilOS UI');
+    console.error('[Debug] Mock mode:', mockMode);
   }
 
   const bridge = createBridge({ mockMode });
@@ -44,12 +41,10 @@ async function main() {
 
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
-
-  process.stdin.on('data', (chunk) => {
-    if (debugMode) {
-      process.stderr.write(`[Input] ${JSON.stringify(chunk)}\n`);
-    }
-  });
+  
+  if (debugMode) {
+    process.stderr.write('[Debug] Ready, waiting for input...\n');
+  }
 
   await waitUntilExit();
 }

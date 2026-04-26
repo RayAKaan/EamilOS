@@ -4,13 +4,8 @@ import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { Sidebar } from './components/layout/Sidebar';
 import { Router } from './Router';
-import { setupKeyboard } from '../hooks/useKeyboard';
 
 export const App = ({ bridge }: { bridge: any }) => {
-  React.useEffect(() => {
-    setupKeyboard();
-  }, []);
-
   return (
     <Box flexDirection="column" width="100%" height="100%">
       <Header />
