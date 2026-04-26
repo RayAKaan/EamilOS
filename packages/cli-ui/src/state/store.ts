@@ -50,7 +50,14 @@ interface LogsState {
   setLogs: (logs: LogEntry[]) => void;
 }
 
-export type AppState = ExecutionState & SessionState & DialogueState & LogsState;
+interface AgentsState {
+  agents: any[];
+  tasks: any[];
+  setAgents: (agents: any[]) => void;
+  setTasks: (tasks: any[]) => void;
+}
+
+export type AppState = ExecutionState & SessionState & DialogueState & LogsState & AgentsState;
 
 const updateNodeRecursive = (
   node: ExecutionNode,
@@ -189,6 +196,11 @@ export const useStore = create<AppState>()((set, get) => ({
 
   clearLogs: () => set({ logs: [] }),
   setLogs: (logs: LogEntry[]) => set({ logs }),
+
+  agents: [],
+  tasks: [],
+  setAgents: (agents: any[]) => set({ agents }),
+  setTasks: (tasks: any[]) => set({ tasks }),
 }));
 
 export const useExecutionTree = () => useStore((state) => state.tree);
