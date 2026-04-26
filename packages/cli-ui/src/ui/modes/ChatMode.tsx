@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
+import { useInput } from 'ink';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   agent?: string;
   duration?: string;
-  timestamp: number;
 }
 
 interface ChatModeProps {
@@ -19,6 +19,19 @@ export const ChatMode = ({ bridge, onSwitchMode }: ChatModeProps) => {
   const [input, setInput] = useState('');
   const [isAgentTyping, setIsAgentTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useInput((input, key) => {
+    if (key.return) {
+      if (input.trim()) {
+        sendMessage(input);
+      }
+    } else if (key.tab) {
+      onSwitchMode('dashboard');
+    } else if (key.escape) {
+      // Do nothing on escape in chat
+    }
+  });
 
   useEffect(() => {
     if (messages.length > 0) setShowSuggestions(false);
@@ -30,7 +43,6 @@ export const ChatMode = ({ bridge, onSwitchMode }: ChatModeProps) => {
     setMessages(prev => [...prev, { 
       role: 'user', 
       content: text, 
-      timestamp: Date.now() 
     }]);
     setInput('');
     setShowSuggestions(false);
@@ -43,13 +55,11 @@ export const ChatMode = ({ bridge, onSwitchMode }: ChatModeProps) => {
         content: `Task created: ${result.taskId}`,
         agent: 'claude-main',
         duration: '1s',
-        timestamp: Date.now()
       }]);
-    } catch (e) {
+    } catch (e: any) {
       setMessages(prev => [...prev, {
         role: 'system',
-        content: `Error: ${e}`,
-        timestamp: Date.now()
+        content: `Error: ${e?.message || e}`,
       }]);
     }
     
@@ -81,7 +91,12 @@ export const ChatMode = ({ bridge, onSwitchMode }: ChatModeProps) => {
       )}
 
       <Box borderStyle="double" borderColor="green" padding={1} marginTop={1}>
-        <ChatInput value={input} onChange={setInput} onSubmit={sendMessage} />
+        <ChatInput 
+          value={input} 
+          onChange={setInput} 
+          onSubmit={sendMessage} 
+          disabled={isAgentTyping}
+        />
       </Box>
 
       <Box borderStyle="round" borderColor="gray" paddingX={1} height={1}>
@@ -154,11 +169,11 @@ const TypingIndicator = ({ agentName }: { agentName: string }) => {
   );
 };
 
-const ChatInput = ({ value, onChange, onSubmit }: any) => (
+const ChatInput = ({ value, onChange, onSubmit, disabled }: any) => (
   <Box flexDirection="column" width="100%">
     <Box>
       <Text color="green">❯ </Text>
-      <Text>{value || '_'}</Text>
+      <Text>{disabled ? '(thinking...)' : (value || '_')}</Text>
     </Box>
   </Box>
 );

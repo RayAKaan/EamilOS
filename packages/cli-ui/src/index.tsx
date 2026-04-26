@@ -1,9 +1,53 @@
 #!/usr/bin/env node
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { render } from 'ink';
 import { App } from './ui/App';
 import { createBridge } from './bridge.js';
+import { useInput } from 'ink';
+
+function InputHandler({ onKey }: { onKey: (key: string) => void }) {
+  useInput((input) => {
+    onKey(input);
+  });
+  return null;
+}
+
+function Main() {
+  const [bridge, setBridge] = useState<any>(null);
+  const [lastKey, setLastKey] = useState('');
+  const [mode, setMode] = useState<'chat' | 'dashboard'>('chat');
+
+  useEffect(() => {
+    const init = async () => {
+      const b = createBridge({ mockMode: true });
+      await b.initialize();
+      setBridge(b);
+    };
+    init();
+  }, []);
+
+  const handleKey = (key: string) => {
+    setLastKey(key);
+    
+    if (key === '\t') {
+      setMode(m => m === 'chat' ? 'dashboard' : 'chat');
+    } else if (key === 'q') {
+      process.exit(0);
+    }
+  };
+
+  if (!bridge) {
+    return <InputHandler onKey={() => {}} />;
+  }
+
+  return (
+    <>
+      <InputHandler onKey={handleKey} />
+      <App bridge={bridge} mode={mode} onModeChange={setMode} lastKey={lastKey} />
+    </>
+  );
+}
 
 async function main() {
   if (!process.stdin.isTTY) {
@@ -13,39 +57,14 @@ async function main() {
 
   process.stdin.setRawMode(true);
   process.stdin.resume();
-  process.stdin.setEncoding('utf8');
 
-  const mockMode = process.env.MOCK === 'true' || process.env.NODE_ENV === 'development';
-  const debugMode = process.env.DEBUG === 'true';
-  
-  if (debugMode) {
-    console.error('[Debug] Starting EamilOS UI');
-    console.error('[Debug] Mock mode:', mockMode);
-  }
-
-  const bridge = createBridge({ mockMode });
-  await bridge.initialize();
-
-  const { waitUntilExit } = render(React.createElement(App, { bridge }), {
+  const { waitUntilExit } = render(React.createElement(Main), {
     stdout: process.stdout,
     stdin: process.stdin,
-    debug: debugMode,
     exitOnCtrlC: false
   });
 
-  const cleanup = async () => {
-    process.stdin.setRawMode(false);
-    await bridge.shutdown();
-    process.exit(0);
-  };
-
-  process.on('SIGINT', cleanup);
-  process.on('SIGTERM', cleanup);
-  
-  if (debugMode) {
-    process.stderr.write('[Debug] Ready, waiting for input...\n');
-  }
-
+  process.stdin.setRawMode(false);
   await waitUntilExit();
 }
 
