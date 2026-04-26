@@ -14,7 +14,7 @@ export const Footer = () => {
   
   return (
     <Box height={1}>
-      <Text dimColor>{currentView ? shortcuts[currentView] || shortcuts.dashboard : shortcuts.dashboard} | h Help | p Palette | \\ Sidebar | q Quit</Text>
+      <Text dimColor>{currentView ? shortcuts[currentView] || shortcuts.dashboard : shortcuts.dashboard} | h Help | p Palette | \ Sidebar | q Quit</Text>
     </Box>
   );
 };

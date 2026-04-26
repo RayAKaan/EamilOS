@@ -1,20 +1,13 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { useStore } from '../../../state/store';
-import { useKeyboard } from '../../../hooks/useKeyboard';
 
 export const Sidebar = () => {
-  const { sidebarCollapsed, toggleSidebar, nodes, agents } = useStore();
-
-  useKeyboard((keyId) => {
-    if (keyId.toLowerCase() === '\\') {
-      toggleSidebar();
-    }
-  });
+  const { sidebarCollapsed, nodes, agents } = useStore();
 
   if (sidebarCollapsed) {
     return (
-      <Box width={3}>
+      <Box width={3} borderStyle="single">
         <Box flexDirection="column" alignItems="center">
           <Text>🖧</Text>
           <Text>🤖</Text>
@@ -25,10 +18,16 @@ export const Sidebar = () => {
   }
 
   return (
-    <Box width={40}>
+    <Box width={40} borderStyle="round">
       <Box flexDirection="column">
-        <NodeSection nodes={nodes} />
-        <AgentSection agents={agents} />
+        <Box borderStyle="single" borderBottom paddingX={1}>
+          <NodeSection nodes={nodes} />
+        </Box>
+        
+        <Box borderStyle="single" borderBottom paddingX={1}>
+          <AgentSection agents={agents} />
+        </Box>
+        
         <QuickActions />
       </Box>
     </Box>
@@ -36,8 +35,8 @@ export const Sidebar = () => {
 };
 
 const NodeSection = ({ nodes }: { nodes: any[] }) => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text bold underline>Nodes ({nodes.length})</Text>
+  <Box flexDirection="column" paddingY={1}>
+    <Text bold color="cyan">Nodes ({nodes.length})</Text>
     {nodes.length === 0 ? (
       <Text dimColor>No nodes connected</Text>
     ) : (
@@ -51,8 +50,8 @@ const NodeSection = ({ nodes }: { nodes: any[] }) => (
 );
 
 const AgentSection = ({ agents }: { agents: any[] }) => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text bold underline>Agents ({agents.length})</Text>
+  <Box flexDirection="column" paddingY={1}>
+    <Text bold color="cyan">Agents ({agents.length})</Text>
     {agents.length === 0 ? (
       <Text dimColor>No agents running</Text>
     ) : (
@@ -66,8 +65,8 @@ const AgentSection = ({ agents }: { agents: any[] }) => (
 );
 
 const QuickActions = () => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text bold underline>Actions</Text>
+  <Box flexDirection="column" paddingX={1} paddingY={1}>
+    <Text bold color="cyan">Actions</Text>
     <Text dimColor>n: New Task</Text>
     <Text dimColor>s: Save</Text>
   </Box>
