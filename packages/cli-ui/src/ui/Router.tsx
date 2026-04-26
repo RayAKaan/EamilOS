@@ -33,14 +33,22 @@ export const Router: React.FC<RouterProps> = ({ bridge }) => {
       setCurrentView('config');
     } else if (k === 'p') {
       setViewData((prev: any) => ({ ...prev, showPalette: true }));
-    } else if (k === '/') {
-      setViewData((prev: any) => ({ ...prev, showSearch: true }));
-    } else if (k === '?') {
+    } else if (k === 'h') {
       setViewData((prev: any) => ({ ...prev, showHelp: true }));
+    } else if (k === '\\') {
+      useStore.getState().toggleSidebar();
     } else if (k === 'escape') {
       setViewData({});
     } else if (k === 'q') {
       bridge.shutdown().then(() => process.exit(0));
+    } else if (k === '1') {
+      setCurrentView('dashboard');
+    } else if (k === '2') {
+      setCurrentView('task-runner');
+    } else if (k === '3') {
+      setCurrentView('agent-detail');
+    } else if (k === '4') {
+      setCurrentView('config');
     }
   });
 
