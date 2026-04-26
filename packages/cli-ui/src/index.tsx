@@ -1,17 +1,9 @@
 #!/usr/bin/env node
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { render } from 'ink';
 import { Box, Text } from 'ink';
 import { createBridge } from './bridge.js';
-
-// Layout constants
-const LAYOUT = {
-  headerHeight: 1,
-  footerHeight: 1,
-  sidebarWidth: 35,
-  minWidthForSidebar: 80,
-};
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -20,21 +12,35 @@ interface Message {
   duration?: string;
 }
 
-// Initialize bridge ONCE
+// Initialize bridge once
 const bridge = createBridge({ mockMode: true });
 bridge.initialize().catch(e => console.error('[Bridge] Init error:', e));
+
+// Constants for layout
+const HEADER_HEIGHT = 2;
+const FOOTER_HEIGHT = 1;
+const MODE_INDICATOR_HEIGHT = 1;
 
 function EamilOS() {
   const [mode, setMode] = useState<'chat' | 'dashboard'>('chat');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [renderCount, setRenderCount] = useState(0);
+  
+  const inputRef = useRef('');
+  const isFirstRender = useRef(true);
 
+  // Clear screen on first render
   useEffect(() => {
-    process.stdin?.setRawMode(true);
-    process.stdin?.resume();
+    if (isFirstRender.current) {
+      process.stdout.write('\x1Bc');
+      isFirstRender.current = false;
+    }
+    setRenderCount(c => c + 1);
   }, []);
 
+  // Keyboard handler - SINGLE useEffect
   useEffect(() => {
     if (!process.stdin) return;
     
@@ -46,14 +52,17 @@ function EamilOS() {
       } else if (key === 'q' || key === '\x03') {
         process.exit(0);
       } else if (key === '\r' || key === '\n') {
-        if (input.trim()) {
-          doSend(input);
+        if (inputRef.current.trim()) {
+          doSend(inputRef.current);
+          inputRef.current = '';
           setInput('');
         }
       } else if (key === '\x7f' || key === '\b') {
-        setInput(s => s.slice(0, -1));
+        inputRef.current = inputRef.current.slice(0, -1);
+        setInput(inputRef.current);
       } else if (key.length === 1 && key.charCodeAt(0) >= 32) {
-        setInput(s => s + key);
+        inputRef.current += key;
+        setInput(inputRef.current);
       }
     };
 
@@ -61,7 +70,7 @@ function EamilOS() {
     return () => {
       try { process.stdin?.off('data', onData); } catch {}
     };
-  }, [input]);
+  }, []);
 
   const doSend = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
@@ -85,31 +94,31 @@ function EamilOS() {
     setIsTyping(false);
   };
 
-  // Memoize layout calculations
-  const layout = useMemo(() => ({
-    canShowSidebar: mode === 'dashboard' && false, // Always false for now
-  }), [mode]);
-
   return (
     <Box flexDirection="column" width="100%" height="100%">
-      {/* HEADER - single line */}
-      <Box height={LAYOUT.headerHeight}>
-        <Box borderStyle="single" borderColor="gray" paddingX={1} height={1}>
-          <Box justifyContent="space-between" width="100%">
-            <Text color="cyan" bold>⚡ EamilOS v1.0</Text>
-            <Text dimColor>Mode: {mode}</Text>
-            <Text dimColor>Tab: switch | q: quit</Text>
-          </Box>
+      {/* HEADER - border bottom ONLY */}
+      <Box width="100%" height={HEADER_HEIGHT} borderStyle="single" borderColor="gray" borderBottom={false}>
+        <Box justifyContent="space-between" width="100%" paddingX={1}>
+          <Text color="cyan" bold>⚡ EamilOS v1.0</Text>
+          <Text dimColor>Mode: {mode}</Text>
+          <Text dimColor>R{renderCount}</Text>
         </Box>
       </Box>
 
-      {/* MAIN CONTENT */}
-      <Box flexGrow={1} flexDirection="column">
+      {/* MODE INDICATOR - thin line */}
+      <Box width="100%" height={MODE_INDICATOR_HEIGHT} borderStyle="single" borderColor="magenta">
+        <Box paddingX={1}>
+          <Text color="magenta" bold>{mode === 'chat' ? '💬 Chat' : '🔧 Power'}</Text>
+          <Text> | Tab to switch</Text>
+        </Box>
+      </Box>
+
+      {/* MAIN CONTENT - NO borders, just padding */}
+      <Box flexGrow={1} flexDirection="column" padding={1}>
         {mode === 'chat' ? (
-          // CHAT MODE
-          <Box flexDirection="column" flexGrow={1}>
-            {/* Messages area */}
-            <Box flexGrow={1} borderStyle="round" borderColor="cyan" padding={1}>
+          <>
+            {/* Messages area - border sides only */}
+            <Box flexGrow={1} borderStyle="round" borderColor="cyan" padding={1} flexDirection="column">
               {messages.length === 0 ? (
                 <Box alignItems="center" justifyContent="center" flexGrow={1}>
                   <Box flexDirection="column" alignItems="center">
@@ -122,7 +131,12 @@ function EamilOS() {
                 <Box flexDirection="column">
                   {messages.map((m, i) => (
                     <Box key={i} justifyContent={m.role === 'user' ? 'flex-end' : 'flex-start'} marginBottom={1}>
-                      <Box width="80%" borderStyle={m.role === 'assistant' ? 'round' : 'single'} borderColor={m.role === 'assistant' ? 'cyan' : 'green'} padding={1}>
+                      <Box 
+                        width="80%" 
+                        borderStyle={m.role === 'assistant' ? 'round' : 'single'} 
+                        borderColor={m.role === 'assistant' ? 'cyan' : 'green'} 
+                        padding={1}
+                      >
                         {m.role === 'assistant' && <Text color="cyan">🤖 </Text>}
                         <Text>{m.content}</Text>
                         {m.agent && <Text dimColor> | {m.agent} • {m.duration}</Text>}
@@ -133,9 +147,9 @@ function EamilOS() {
               )}
             </Box>
 
-            {/* Suggestions */}
+            {/* Suggestions when empty */}
             {messages.length === 0 && !isTyping && (
-              <Box paddingX={1}>
+              <Box marginTop={1}>
                 <Text bold>Quick:</Text>
                 <Text> </Text>
                 <Text color="yellow">🏗️ REST API</Text>
@@ -144,14 +158,14 @@ function EamilOS() {
               </Box>
             )}
 
-            {/* Input */}
-            <Box borderStyle="double" borderColor="green" padding={1}>
+            {/* Input - full border to stand out */}
+            <Box marginTop={1} borderStyle="double" borderColor="green" padding={1}>
               <Text color="green">❯ </Text>
               <Text>{input || '_'}</Text>
             </Box>
-          </Box>
+          </>
         ) : (
-          // DASHBOARD MODE
+          /* DASHBOARD MODE */
           <Box alignItems="center" justifyContent="center" flexGrow={1} borderStyle="round" borderColor="cyan" padding={1}>
             <Box flexDirection="column" alignItems="center">
               <Text bold color="magenta">🔧 Power Mode</Text>
@@ -161,10 +175,11 @@ function EamilOS() {
         )}
       </Box>
 
-      {/* FOOTER - single line */}
-      <Box height={LAYOUT.footerHeight}>
-        <Box borderStyle="single" borderColor="gray" paddingX={1} height={1}>
-          <Text dimColor>Enter: send | Tab: mode | q: quit | h: help</Text>
+      {/* FOOTER - border top ONLY */}
+      <Box width="100%" height={FOOTER_HEIGHT} borderStyle="single" borderColor="gray" borderTop={false}>
+        <Box justifyContent="space-between" width="100%" paddingX={1}>
+          <Text dimColor>Enter: send | Tab: mode | h: help</Text>
+          <Text dimColor>q: quit</Text>
         </Box>
       </Box>
     </Box>
@@ -172,9 +187,6 @@ function EamilOS() {
 }
 
 async function main() {
-  // Clear screen first
-  process.stdout.write('\x1Bc');
-  
   if (!process.stdin.isTTY) {
     console.error('❌ EamilOS UI requires an interactive terminal');
     process.exit(1);
@@ -183,6 +195,9 @@ async function main() {
   process.stdin.setRawMode(true);
   process.stdin.resume();
 
+  // Clear screen before first render
+  process.stdout.write('\x1Bc');
+
   const { waitUntilExit } = render(React.createElement(EamilOS), {
     stdout: process.stdout,
     stdin: process.stdin,
@@ -190,6 +205,7 @@ async function main() {
   });
 
   const cleanup = async () => {
+    process.stdout.write('\x1B[?25h');
     process.stdin.setRawMode(false);
     bridge.shutdown();
     process.exit(0);
