@@ -1,5 +1,5 @@
 import { Feature, FeatureContext, FeatureStatus } from './types.js';
-import { getProviderManager } from '../provider-manager.js';
+import { getProviderManager } from '../providers/ProviderManager.js';
 import { parseResponse, ParseResult } from '../parsers/ResponseParser.js';
 import { ChatMessage } from '../types.js';
 import { STRICT_SYSTEM_PROMPT } from '../prompts/system.js';

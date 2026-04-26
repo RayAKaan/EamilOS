@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import { RelevanceScorer, type MessageContext } from './RelevanceScorer.js';
 import type { AgentRole } from './AgentType.js';
 
@@ -11,6 +12,21 @@ export interface CommsMessage {
   type: 'message' | 'status' | 'request' | 'response' | 'delegation';
   metadata?: Record<string, unknown>;
   compressed?: boolean;
+}
+
+export interface AgentMessage {
+  role: AgentRole;
+  content: string;
+  type: CommsMessage['type'];
+  metadata?: Record<string, unknown>;
+}
+
+export interface Session {
+  id: string;
+  agentIds: Set<string>;
+  created: number;
+  lastActivity: number;
+  context: Map<string, unknown>;
 }
 
 export interface CommsGroundConfig {
@@ -34,13 +50,16 @@ const DEFAULT_CONFIG: CommsGroundConfig = {
   relevanceThreshold: 40,
 };
 
-export class CommsGround {
+export class CommsGround extends EventEmitter {
   private messages: CommsMessage[] = [];
   private config: CommsGroundConfig;
   private scorer: RelevanceScorer;
   private agentContext: Map<string, MessageContext> = new Map();
+  private sessions: Map<string, Session> = new Map();
+  private readonly sessionTimeout = 30 * 60 * 1000;
 
   constructor(config: Partial<CommsGroundConfig> = {}) {
+    super();
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.scorer = new RelevanceScorer();
   }
@@ -54,12 +73,104 @@ export class CommsGround {
     };
 
     this.messages.push(fullMessage);
+    this.emit('message:added', fullMessage);
 
     if (this.messages.length > this.config.maxMessages * 2) {
       this.pruneOldMessages();
     }
 
     return id;
+  }
+
+  createSession(agentIds: string[]): string {
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    const now = Date.now();
+    const session: Session = {
+      id: sessionId,
+      agentIds: new Set(agentIds),
+      created: now,
+      lastActivity: now,
+      context: new Map(),
+    };
+
+    this.sessions.set(sessionId, session);
+    this.emit('session:created', { sessionId, agentIds });
+    setTimeout(() => this.cleanupSession(sessionId), this.sessionTimeout);
+    return sessionId;
+  }
+
+  getSession(sessionId: string): Session | undefined {
+    return this.sessions.get(sessionId);
+  }
+
+  setSessionContext(sessionId: string, key: string, value: unknown): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return;
+    }
+    session.lastActivity = Date.now();
+    session.context.set(key, value);
+  }
+
+  getSessionContext(sessionId: string, key: string): unknown {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return undefined;
+    }
+    return session.context.get(key);
+  }
+
+  addAgentToSession(sessionId: string, agentId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+    session.agentIds.add(agentId);
+    session.lastActivity = Date.now();
+    this.emit('session:agentAdded', { sessionId, agentId });
+    return true;
+  }
+
+  broadcastToSession(sessionId: string, message: AgentMessage, fromAgent: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    session.lastActivity = Date.now();
+
+    session.agentIds.forEach((agentId) => {
+      if (agentId !== fromAgent) {
+        this.sendToAgent(agentId, {
+          ...message,
+          metadata: {
+            ...(message.metadata || {}),
+            sessionId,
+            from: fromAgent,
+            timestamp: Date.now(),
+          },
+        });
+      }
+    });
+  }
+
+  sendToAgent(agentId: string, message: AgentMessage): string {
+    return this.addMessage({
+      sender: String(message.metadata?.from ?? 'system'),
+      recipient: agentId,
+      role: message.role,
+      content: message.content,
+      type: message.type,
+      metadata: message.metadata,
+    });
+  }
+
+  private cleanupSession(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (session && Date.now() - session.lastActivity > this.sessionTimeout) {
+      this.sessions.delete(sessionId);
+      this.emit('session:expired', { sessionId });
+    }
   }
 
   getMessages(

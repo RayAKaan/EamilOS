@@ -5,7 +5,7 @@ import { initWorkspace, Workspace } from './workspace.js';
 import { initTaskManager, TaskManager } from './task-manager.js';
 import { initEventBus, EventBus } from './event-bus.js';
 import { initLogger, Logger } from './logger.js';
-import { initProviderManager } from './provider-manager.js';
+import { initProviderManager } from './providers/ProviderManager.js';
 import { initAgentRegistry } from './agent-registry.js';
 import { initModelRouter } from './model-router.js';
 import { initContextBuilder } from './context-builder.js';
@@ -318,3 +318,4 @@ export { PromptOptimizer, type PromptOptimizerConfig } from './learning/PromptOp
 export { FailureAnalyzer, type FailureAnalyzerConfig } from './learning/FailureAnalyzer.js';
 export { EnrichmentLibrary } from './learning/EnrichmentLibrary.js';
 export * from './learning/statistics.js';
+export * from './execution/index.js';

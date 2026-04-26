@@ -1,5 +1,5 @@
 import { Task, ChatMessage } from './types.js';
-import { getProviderManager } from './provider-manager.js';
+import { getProviderManager } from './providers/ProviderManager.js';
 import { getToolRegistry } from './tools/registry.js';
 import { getLogger } from './logger.js';
 import { getResponseParser } from './parser/response-parser.js';

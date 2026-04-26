@@ -1,6 +1,7 @@
 import { ChatMessage } from '../types.js';
-import { getProviderManager } from '../provider-manager.js';
-import { parseResponse, ParsedFile, ParseResult } from '../parsers/ResponseParser.js';
+import { getProviderManager } from '../providers/ProviderManager.js';
+import { ParsedFile, ParseResult } from '../parsers/ResponseParser.js';
+import { ParserChain } from '../parsers/ParserChain.js';
 import { validate } from '../validation/ArtifactValidator.js';
 import { STRICT_SYSTEM_PROMPT } from '../prompts/system.js';
 import { getToolRegistry } from '../tools/registry.js';
@@ -45,6 +46,7 @@ export class StrictOrchestrator {
   private useRouter: boolean;
   private featureManager: FeatureManager | null = null;
   private classifier: TaskClassifier;
+  private parser: ParserChain;
 
   constructor(config: OrchestratorConfig = {}) {
     this.config = {
@@ -57,6 +59,7 @@ export class StrictOrchestrator {
     this.useRouter = this.config.useModelRouter;
     this.featureManager = config.featureManager || null;
     this.classifier = new TaskClassifier();
+    this.parser = new ParserChain();
 
     if (this.useRouter) {
       this.modelRouter = getModelRouter();
@@ -187,7 +190,20 @@ export class StrictOrchestrator {
         const rawContent = response.content || '';
         logger.debug(`Raw LLM response (${rawContent.length} chars)`);
 
-        const parseResult = parseResponse(rawContent);
+        const chainResult = await this.parser.parse(rawContent, {
+          sourceProvider: currentProvider,
+          taskType: classification.primaryCategory,
+        });
+
+        const parseResult: ParseResult = chainResult.success
+          ? (chainResult.data as ParseResult)
+          : {
+              success: false,
+              files: [],
+              rawResponse: rawContent,
+              extractionMethod: 'NONE',
+              failureReason: 'NO_JSON_FOUND',
+            };
 
         ctx.executionResult = {
           success: parseResult.success && parseResult.files.length > 0,

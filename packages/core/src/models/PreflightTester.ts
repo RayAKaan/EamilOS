@@ -1,4 +1,4 @@
-import { getProviderManager } from '../provider-manager.js';
+import { getProviderManager } from '../providers/ProviderManager.js';
 import type { ModelProfile, PreflightTestResult } from './types.js';
 import { ChatMessage } from '../types.js';
 

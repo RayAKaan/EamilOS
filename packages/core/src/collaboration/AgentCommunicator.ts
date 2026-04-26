@@ -1,4 +1,4 @@
-import { CommsGround, type CommsMessage } from './CommsGround.js';
+import { CommsGround, type CommsMessage, type AgentMessage } from './CommsGround.js';
 import { SharedMemory } from '../memory/SharedMemory.js';
 import type { AgentRole } from './AgentType.js';
 import { getAgentType } from './AgentType.js';
@@ -54,6 +54,8 @@ type MessageHandler = (
 ) => Promise<void> | void;
 
 export class AgentCommunicator {
+  private agentId?: string;
+  private sessionId?: string;
   private commsGround: CommsGround;
   private sharedMemory: SharedMemory;
   private scopes: Map<string, CommunicationScope> = new Map();
@@ -64,9 +66,24 @@ export class AgentCommunicator {
     timeout: ReturnType<typeof setTimeout>;
   }> = new Map();
 
-  constructor(commsGround: CommsGround, sharedMemory: SharedMemory) {
-    this.commsGround = commsGround;
-    this.sharedMemory = sharedMemory;
+  constructor(commsGround: CommsGround, sharedMemory: SharedMemory);
+  constructor(agentId: string, commsGround: CommsGround, sessionId?: string, sharedMemory?: SharedMemory);
+  constructor(
+    agentIdOrCommsGround: string | CommsGround,
+    commsGroundOrSharedMemory: CommsGround | SharedMemory,
+    sessionId?: string,
+    maybeSharedMemory?: SharedMemory
+  ) {
+    if (typeof agentIdOrCommsGround === 'string') {
+      this.agentId = agentIdOrCommsGround;
+      this.commsGround = commsGroundOrSharedMemory as CommsGround;
+      this.sessionId = sessionId;
+      this.sharedMemory = maybeSharedMemory ?? new SharedMemory();
+      return;
+    }
+
+    this.commsGround = agentIdOrCommsGround;
+    this.sharedMemory = commsGroundOrSharedMemory as SharedMemory;
   }
 
   createScope(
@@ -185,14 +202,42 @@ export class AgentCommunicator {
     return response;
   }
 
+  async broadcast(message: Omit<AgentMessage, 'metadata'> & { metadata?: Record<string, unknown> }): Promise<void>;
   async broadcast(
     sender: AgentIdentity,
     content: string,
     type: CommsMessage['type'],
     sessionId: string,
     metadata?: Record<string, unknown>
-  ): Promise<MessageResponse> {
-    const scope = this.scopes.get(sessionId);
+  ): Promise<MessageResponse>;
+  async broadcast(
+    senderOrMessage: AgentIdentity | (Omit<AgentMessage, 'metadata'> & { metadata?: Record<string, unknown> }),
+    content?: string,
+    type?: CommsMessage['type'],
+    sessionId?: string,
+    metadata?: Record<string, unknown>
+  ): Promise<MessageResponse | void> {
+    if (this.isSimpleBroadcast(senderOrMessage)) {
+      if (!this.sessionId || !this.agentId) {
+        throw new Error('No session assigned to communicator');
+      }
+      this.commsGround.broadcastToSession(this.sessionId, senderOrMessage, this.agentId);
+      return;
+    }
+
+    const sender = senderOrMessage;
+    const resolvedContent = content || '';
+    const resolvedType: CommsMessage['type'] = type || 'message';
+    const resolvedSessionId = sessionId || this.sessionId;
+    if (!resolvedSessionId) {
+      return {
+        success: false,
+        error: 'Invalid session',
+        timestamp: Date.now(),
+      };
+    }
+
+    const scope = this.scopes.get(resolvedSessionId);
     if (!scope) {
       return {
         success: false,
@@ -205,11 +250,11 @@ export class AgentCommunicator {
       sender: sender.id,
       recipient: 'broadcast',
       role: sender.role,
-      content,
-      type,
+      content: resolvedContent,
+      type: resolvedType,
       metadata: {
         ...metadata,
-        sessionId,
+        sessionId: resolvedSessionId,
         senderRole: sender.role,
         senderName: sender.name,
         broadcast: true,
@@ -221,6 +266,16 @@ export class AgentCommunicator {
       messageId,
       timestamp: Date.now(),
     };
+  }
+
+  setSession(sessionId: string): void {
+    this.sessionId = sessionId;
+  }
+
+  private isSimpleBroadcast(
+    value: AgentIdentity | (Omit<AgentMessage, 'metadata'> & { metadata?: Record<string, unknown> })
+  ): value is Omit<AgentMessage, 'metadata'> & { metadata?: Record<string, unknown> } {
+    return 'role' in value && 'content' in value && !('id' in value);
   }
 
   async delegate(

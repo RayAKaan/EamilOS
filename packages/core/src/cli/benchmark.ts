@@ -3,7 +3,7 @@ import { existsSync, writeFileSync } from 'fs';
 import { BenchmarkRunner, BenchmarkSuiteResult } from '../model-router/index.js';
 import { MetricsStore } from '../model-router/MetricsStore.js';
 import { getSecureLogger } from '../security/SecureLogger.js';
-import { getProviderManager } from '../provider-manager.js';
+import { getProviderManager } from '../providers/ProviderManager.js';
 import { initOrchestrator } from '../orchestrator/StrictOrchestrator.js';
 import { getConfig } from '../config.js';
 

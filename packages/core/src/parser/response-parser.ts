@@ -271,6 +271,12 @@ export class ResponseParser {
   }
 }
 
+/**
+ * @deprecated Use ParserChain with modern parser adapters instead.
+ * This alias is kept for compatibility and will be removed in v2.0.
+ */
+export class LegacyResponseParser extends ResponseParser {}
+
 let globalParser: ResponseParser | null = null;
 
 export function getResponseParser(): ResponseParser {

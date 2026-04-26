@@ -1,8 +1,10 @@
 import { AgentDefinition } from './types.js';
 import { Logger, getLogger } from './logger.js';
+import { getCommsGround } from './collaboration/CommsGround.js';
 
 export class AgentRegistry {
   private agents: Map<string, AgentDefinition> = new Map();
+  private agentSessions: Map<string, string> = new Map();
   private logger: Logger;
 
   constructor() {
@@ -16,6 +18,9 @@ export class AgentRegistry {
 
   registerAgent(agent: AgentDefinition): void {
     this.agents.set(agent.id, agent);
+    const commsGround = getCommsGround();
+    const sessionId = commsGround.createSession([agent.id]);
+    this.agentSessions.set(agent.id, sessionId);
   }
 
   getAgent(id: string): AgentDefinition | undefined {
@@ -24,6 +29,10 @@ export class AgentRegistry {
 
   getAllAgents(): AgentDefinition[] {
     return Array.from(this.agents.values());
+  }
+
+  getAgentSession(agentId: string): string | undefined {
+    return this.agentSessions.get(agentId);
   }
 
   findBestAgent(

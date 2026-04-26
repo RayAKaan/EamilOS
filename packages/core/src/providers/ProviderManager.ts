@@ -1,34 +1,107 @@
+import { EventEmitter } from 'events';
 import {
   ProviderConfig,
   LLMProvider,
   ProviderStatus,
   InitializationResult,
   ModelInfo,
-} from "./types.js";
-import { ProviderFactory } from "./ProviderFactory.js";
-import { ProviderAutoDetect } from "./ProviderAutoDetect.js";
-import { ExplainableError } from "../errors/ExplainableError.js";
-import { OllamaAdapter } from "./adapters/OllamaAdapter.js";
-import { Phase1ModelRegistry } from "../models/Phase1ModelRegistry.js";
-import {
-  ProviderCircuitBreaker,
-} from "./ProviderCircuitBreaker.js";
-import { getTypedEventBus } from "../events/TypedEventBus.js";
+  ChatMessage,
+  ToolDefinition,
+  ChatRequest,
+  ChatResponse,
+} from './types.js';
+import { ProviderFactory } from './ProviderFactory.js';
+import { ProviderAutoDetect } from './ProviderAutoDetect.js';
+import { ExplainableError } from '../errors/ExplainableError.js';
+import { OllamaAdapter } from './adapters/OllamaAdapter.js';
+import { Phase1ModelRegistry } from '../models/Phase1ModelRegistry.js';
+import { ProviderCircuitBreaker } from './ProviderCircuitBreaker.js';
+import { getTypedEventBus } from '../events/TypedEventBus.js';
+import { getConfig } from '../config.js';
 
-export class ProviderManager {
+export interface LLMRequest {
+  model?: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  timeout?: number;
+  stream?: boolean;
+  tools?: ToolDefinition[];
+  providerId?: string;
+}
+
+export type ProviderResponse = ChatResponse;
+
+export interface ProviderInfo {
+  id: string;
+  type: string;
+  model: string;
+  available: boolean;
+  supportsTools: boolean;
+}
+
+export class ProviderManager extends EventEmitter {
   private providers: Map<string, LLMProvider> = new Map();
   private providerStatuses: Map<string, ProviderStatus> = new Map();
   private circuitBreaker: ProviderCircuitBreaker;
 
+  private healthScores: Map<string, number> = new Map();
+  private failureCounts: Map<string, number> = new Map();
+  private lastUsed: Map<string, number> = new Map();
+  private disabledProviders: Set<string> = new Set();
+
+  private defaultProvider: string | null = null;
+
   constructor(circuitBreaker?: ProviderCircuitBreaker) {
+    super();
     this.circuitBreaker = circuitBreaker || new ProviderCircuitBreaker();
+  }
+
+  registerProvider(providerId: string, provider: LLMProvider): void {
+    this.providers.set(providerId, provider);
+    this.healthScores.set(providerId, 100);
+    this.failureCounts.set(providerId, 0);
+
+    if (!this.defaultProvider) {
+      this.defaultProvider = providerId;
+    }
+  }
+
+  updateProviderHealth(providerId: string, success: boolean, latencyMs: number): void {
+    const currentScore = this.healthScores.get(providerId) ?? 100;
+    const penalty = success ? Math.max(0, (latencyMs - 1000) / 10) : 30;
+
+    const newScore = success
+      ? Math.min(100, currentScore + (10 - penalty))
+      : Math.max(0, currentScore - penalty);
+
+    this.healthScores.set(providerId, newScore);
+    this.failureCounts.set(providerId, success ? 0 : (this.failureCounts.get(providerId) ?? 0) + 1);
+    this.lastUsed.set(providerId, Date.now());
+
+    this.emit('provider:healthUpdate', { providerId, score: newScore });
+
+    if ((this.failureCounts.get(providerId) ?? 0) > 5) {
+      this.disableProvider(providerId);
+    }
+  }
+
+  getHealthScore(providerId: string): number {
+    return this.healthScores.get(providerId) ?? 100;
+  }
+
+  private disableProvider(providerId: string): void {
+    if (this.providers.has(providerId)) {
+      this.disabledProviders.add(providerId);
+      this.emit('provider:disabled', { providerId, reason: 'excessive_failures' });
+    }
   }
 
   async initialize(config: ProviderConfig[]): Promise<InitializationResult> {
     let configuredProviders = config;
 
     if (configuredProviders.length === 0) {
-      console.log("No providers configured — auto-detecting...");
+      console.log('No providers configured - auto-detecting...');
       const detected = await ProviderAutoDetect.detect();
 
       if (detected.length > 0) {
@@ -36,7 +109,7 @@ export class ProviderManager {
         for (const d of detected) {
           console.log(`  - ${d.id} (${d.engine})`);
           if (d.models && d.models.length > 0) {
-            console.log(`    Models: ${d.models.slice(0, 5).join(", ")}${d.models.length > 5 ? "..." : ""}`);
+            console.log(`    Models: ${d.models.slice(0, 5).join(', ')}${d.models.length > 5 ? '...' : ''}`);
           }
         }
         configuredProviders = detected;
@@ -49,7 +122,9 @@ export class ProviderManager {
         const adapter = ProviderFactory.create(provConfig);
         adapters.push(adapter);
       } catch (error) {
-        console.warn(`Failed to create adapter for '${provConfig.id}': ${error instanceof Error ? error.message : error}`);
+        console.warn(
+          `Failed to create adapter for '${provConfig.id}': ${error instanceof Error ? error.message : error}`
+        );
       }
     }
 
@@ -67,10 +142,10 @@ export class ProviderManager {
           latencyMs: 0,
           issues: [
             {
-              severity: "warning",
-              code: "CIRCUIT_OPEN",
+              severity: 'warning',
+              code: 'CIRCUIT_OPEN',
               message: `Provider '${adapter.id}' is circuit-broken.`,
-              fix: ["Waiting for cooldown period to expire."],
+              fix: ['Waiting for cooldown period to expire.'],
               autoFixable: false,
             },
           ],
@@ -109,6 +184,11 @@ export class ProviderManager {
 
       if (status.available) {
         this.providers.set(adapter.id, adapter);
+        this.healthScores.set(adapter.id, Math.max(1, status.score || 100));
+        this.failureCounts.set(adapter.id, 0);
+        if (!this.defaultProvider) {
+          this.defaultProvider = adapter.id;
+        }
       }
     }
 
@@ -117,20 +197,19 @@ export class ProviderManager {
 
     if (available.length === 0) {
       throw new ExplainableError({
-        code: "NO_PROVIDER_AVAILABLE",
-        severity: "fatal",
-        title: "No Usable AI Providers Found",
-        message:
-          "EamilOS checked all configured providers and none are available.",
+        code: 'NO_PROVIDER_AVAILABLE',
+        severity: 'fatal',
+        title: 'No Usable AI Providers Found',
+        message: 'EamilOS checked all configured providers and none are available.',
         details: failed.map((p) => ({
           provider: `${p.id} (${p.type}/${p.engine})`,
           problems: p.issues.map((i) => i.message),
         })),
         fixes: [
-          "Option 1 — Local: Install Ollama → https://ollama.ai, then run 'ollama serve'",
-          "Option 2 — Cloud: Add an API key to .env (GROQ_API_KEY, DEEPSEEK_API_KEY, etc.)",
-          "Option 3 — Custom: Point to any OpenAI-compatible endpoint in eamilos.yaml",
-          "Option 4 — Guided: Run 'eamilos setup' for interactive configuration",
+          'Option 1 - Local: Install Ollama -> https://ollama.ai, then run "ollama serve"',
+          'Option 2 - Cloud: Add an API key to .env (GROQ_API_KEY, DEEPSEEK_API_KEY, etc.)',
+          'Option 3 - Custom: Point to any OpenAI-compatible endpoint in eamilos.yaml',
+          'Option 4 - Guided: Run "eamilos setup" for interactive configuration',
         ],
       });
     }
@@ -147,8 +226,9 @@ export class ProviderManager {
     };
   }
 
-  getProvider(id: string): LLMProvider | undefined {
-    return this.providers.get(id);
+  getProvider(id?: string): LLMProvider | undefined {
+    const resolved = id || this.defaultProvider || undefined;
+    return resolved ? this.providers.get(resolved) : undefined;
   }
 
   getProviderStatus(id: string): ProviderStatus | undefined {
@@ -159,9 +239,135 @@ export class ProviderManager {
     return Array.from(this.providerStatuses.values());
   }
 
+  getProviders(): ProviderInfo[] {
+    return this.getAllStatuses().map((status) => ({
+      id: status.id,
+      type: status.engine,
+      model: status.models[0]?.name || 'unknown',
+      available: status.available && !this.disabledProviders.has(status.id),
+      supportsTools: status.capabilities.functionCalling,
+    }));
+  }
+
+  getProviderInfo(id: string): ProviderInfo | null {
+    return this.getProviders().find((provider) => provider.id === id) ?? null;
+  }
+
+  async checkAvailability(id: string): Promise<boolean> {
+    const provider = this.providers.get(id);
+    if (!provider || this.disabledProviders.has(id)) {
+      return false;
+    }
+    try {
+      await provider.healthCheck();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  supportsTools(providerId?: string): boolean {
+    const id = providerId || this.defaultProvider;
+    if (!id) return false;
+    const status = this.providerStatuses.get(id);
+    return status?.capabilities.functionCalling ?? false;
+  }
+
+  async chat(
+    messages: import('../types.js').ChatMessage[],
+    _tools?: ToolDefinition[],
+    providerId?: string
+  ): Promise<{
+    content: string;
+    toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
+  }> {
+    const request: LLMRequest = {
+      messages: messages as unknown as ChatMessage[],
+      providerId,
+    };
+    const response = await this.routeWithFallback(request);
+    return {
+      content: response.content,
+      toolCalls: undefined,
+    };
+  }
+
+  async routeWithFallback(request: LLMRequest, maxFallbacks = 3): Promise<ProviderResponse> {
+    let currentProviderId = await this.selectProvider(request);
+    const errors: string[] = [];
+
+    for (let i = 0; i <= maxFallbacks; i++) {
+      try {
+        if (i > 0) {
+          currentProviderId = await this.selectFallbackProvider(request, errors);
+        }
+        const started = Date.now();
+        const response = await this.executeProviderRequest(currentProviderId, request);
+        this.updateProviderHealth(currentProviderId, true, Date.now() - started);
+        return response;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`${currentProviderId}: ${message}`);
+        this.updateProviderHealth(currentProviderId, false, 0);
+        continue;
+      }
+    }
+
+    throw new Error(`All providers failed: ${errors.join('; ')}`);
+  }
+
+  private async selectProvider(request: LLMRequest): Promise<string> {
+    if (request.providerId && this.providers.has(request.providerId) && !this.disabledProviders.has(request.providerId)) {
+      return request.providerId;
+    }
+
+    const sorted = Array.from(this.providers.keys())
+      .filter((id) => !this.disabledProviders.has(id))
+      .sort((a, b) => this.getHealthScore(b) - this.getHealthScore(a));
+
+    if (sorted.length === 0) {
+      throw new Error('No providers available');
+    }
+
+    return sorted[0];
+  }
+
+  private async selectFallbackProvider(request: LLMRequest, previousErrors: string[]): Promise<string> {
+    const primary = request.providerId ? [request.providerId] : [];
+    const available = Array.from(this.providers.entries())
+      .filter(([id]) => !this.disabledProviders.has(id))
+      .filter(([id]) => !primary.includes(id))
+      .filter(([id]) => !previousErrors.some((e) => e.startsWith(`${id}:`)))
+      .sort((a, b) => this.getHealthScore(b[0]) - this.getHealthScore(a[0]));
+
+    if (available.length === 0) throw new Error('No fallback providers available');
+    return available[0][0];
+  }
+
+  private async executeProviderRequest(providerId: string, request: LLMRequest): Promise<ProviderResponse> {
+    const provider = this.providers.get(providerId);
+    if (!provider) {
+      throw new Error(`Provider not found: ${providerId}`);
+    }
+
+    const modelFromStatus = this.providerStatuses.get(providerId)?.models[0]?.name;
+    const model = request.model || modelFromStatus || 'unknown';
+
+    const chatRequest: ChatRequest = {
+      model,
+      messages: request.messages,
+      temperature: request.temperature,
+      maxTokens: request.maxTokens,
+      timeout: request.timeout,
+      stream: request.stream,
+    };
+
+    return provider.chat(chatRequest);
+  }
+
   findProviderForModel(model: string): string | null {
     for (const [providerId, status] of this.providerStatuses) {
-      if (!status.available) continue;
+      if (!status.available || this.disabledProviders.has(providerId)) continue;
       if (status.models.some((m) => m.name === model)) {
         return providerId;
       }
@@ -171,7 +377,7 @@ export class ProviderManager {
 
   getProviderWithModel(providerId: string, model: string): string | null {
     const status = this.providerStatuses.get(providerId);
-    if (!status || !status.available) return null;
+    if (!status || !status.available || this.disabledProviders.has(providerId)) return null;
     if (status.models.some((m) => m.name === model)) {
       return providerId;
     }
@@ -185,7 +391,7 @@ export class ProviderManager {
     let bestMatch: { model: string; provider: string; score: number } | null = null;
 
     for (const [providerId, status] of this.providerStatuses) {
-      if (!status.available) continue;
+      if (!status.available || this.disabledProviders.has(providerId)) continue;
       if (!this.circuitBreaker.isAvailable(providerId)) continue;
       if (filterFn && !filterFn(status)) continue;
 
@@ -193,9 +399,7 @@ export class ProviderManager {
         let modelScore = status.score;
 
         if (preferTags && model.tags) {
-          const matchCount = preferTags.filter((t) =>
-            (model.tags as string[]).includes(t)
-          ).length;
+          const matchCount = preferTags.filter((t) => (model.tags as string[]).includes(t)).length;
           modelScore += matchCount * 15;
         }
 
@@ -210,17 +414,19 @@ export class ProviderManager {
 
   recordSuccess(providerId: string, latencyMs: number = 0): void {
     this.circuitBreaker.recordSuccess(providerId, latencyMs);
+    this.updateProviderHealth(providerId, true, latencyMs);
     this.updateStatusMetrics(providerId);
   }
 
   recordFailure(providerId: string, latencyMs: number = 0): void {
     this.circuitBreaker.recordFailure(providerId, latencyMs);
+    this.updateProviderHealth(providerId, false, latencyMs);
     this.updateStatusMetrics(providerId);
 
     const state = this.circuitBreaker.getStateInfo(providerId);
     if (state.blocked) {
       const eventBus = getTypedEventBus();
-      eventBus.emit("provider:circuit-opened", {
+      eventBus.emit('provider:circuit-opened', {
         providerId,
         reason: `Too many failures (${state.failures})`,
       });
@@ -264,8 +470,7 @@ export class ProviderManager {
     }
 
     if (status.models.length > 0) score += 10;
-    if (status.issues.filter((i) => i.severity === "warning").length === 0)
-      score += 10;
+    if (status.issues.filter((i) => i.severity === 'warning').length === 0) score += 10;
 
     return Math.min(100, score);
   }
@@ -274,15 +479,13 @@ export class ProviderManager {
     adapter: LLMProvider,
     status: ProviderStatus
   ): Promise<{ success: boolean; action?: string }> {
-    const ollamaIssue = status.issues.find(
-      (i) => i.code === "LOCAL_SERVICE_NOT_RUNNING"
-    );
+    const ollamaIssue = status.issues.find((i) => i.code === 'LOCAL_SERVICE_NOT_RUNNING');
     if (ollamaIssue && adapter instanceof OllamaAdapter) {
       console.log(`  Auto-fixing ${adapter.id}: Starting Ollama service...`);
       const success = await adapter.attemptAutoStart();
       if (success) {
         console.log(`  Fixed ${adapter.id}: Ollama service started`);
-        return { success: true, action: "Started Ollama service" };
+        return { success: true, action: 'Started Ollama service' };
       }
     }
 
@@ -306,16 +509,49 @@ export class ProviderManager {
   resetCircuitBreaker(providerId?: string): void {
     if (providerId) {
       this.circuitBreaker.reset(providerId);
+      this.failureCounts.set(providerId, 0);
+      this.disabledProviders.delete(providerId);
     } else {
       this.circuitBreaker.resetAll();
+      this.failureCounts.clear();
+      this.disabledProviders.clear();
     }
   }
 }
 
 let globalProviderManager: ProviderManager | null = null;
 
+async function bootstrapFromConfig(manager: ProviderManager): Promise<void> {
+  try {
+    const cfg = getConfig();
+    if (!cfg?.providers || cfg.providers.length === 0) {
+      return;
+    }
+
+    const providerConfig: ProviderConfig[] = cfg.providers.map((p) => ({
+      id: p.id,
+      type: p.type === 'ollama' ? 'local' : p.type === 'openai' ? 'api' : 'openai-compatible',
+      engine: p.type,
+      baseUrl: p.endpoint || p.base_url,
+      credentials: {
+        apiKey: p.api_key || p.credentials?.api_key,
+        token: p.credentials?.token,
+        headers: p.credentials?.headers,
+        organization: p.credentials?.organization,
+      },
+      models: p.models?.map((m) => m.id) || [],
+      rateLimitRpm: p.rate_limit_rpm,
+    }));
+
+    await manager.initialize(providerConfig);
+  } catch {
+    // Keep lazy behavior: runtime can still initialize later.
+  }
+}
+
 export function initProviderManager(): ProviderManager {
   globalProviderManager = new ProviderManager();
+  void bootstrapFromConfig(globalProviderManager);
   return globalProviderManager;
 }
 
