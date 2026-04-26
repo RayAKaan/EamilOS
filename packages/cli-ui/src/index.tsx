@@ -3,7 +3,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { render } from 'ink';
 import { Box, Text } from 'ink';
-import { createBridge } from './bridge.js';
+import { EventEmitter } from 'events';
+
+// Inline bridge to avoid import issues
+class InlineBridge extends EventEmitter {
+  private mockMode: boolean;
+  constructor(config?: { mockMode?: boolean }) {
+    super();
+    this.mockMode = config?.mockMode ?? false;
+  }
+  async initialize() {
+    if (this.mockMode) console.error('[Bridge] Running in mock mode');
+  }
+  async createTask(input: string) {
+    return { taskId: `task-${Date.now()}` };
+  }
+  async shutdown() {}
+}
+
+const bridge = new InlineBridge({ mockMode: true });
+bridge.initialize();
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -11,10 +30,6 @@ interface Message {
   agent?: string;
   duration?: string;
 }
-
-// Initialize bridge once
-const bridge = createBridge({ mockMode: true });
-bridge.initialize().catch(e => console.error('[Bridge] Init error:', e));
 
 // Constants for layout
 const HEADER_HEIGHT = 2;
@@ -187,13 +202,13 @@ function EamilOS() {
 }
 
 async function main() {
-  if (!process.stdin.isTTY) {
+  // Allow bypass for testing
+  const forceTTY = process.env.FORCE_TTY === 'true';
+  if (!forceTTY && !process.stdin.isTTY) {
+    console.error('[Debug] Not a TTY, use FORCE_TTY=true to bypass');
     console.error('❌ EamilOS UI requires an interactive terminal');
     process.exit(1);
   }
-
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
 
   // Clear screen before first render
   process.stdout.write('\x1Bc');

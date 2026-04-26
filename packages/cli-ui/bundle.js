@@ -12,6 +12,7 @@ await esbuild.build({
   target: 'node20',
   format: 'esm',
   external: ['react', 'react-dom', 'ink'],
+  inject: [],
   define: {
     'process.env.EAMILOS_VERSION': JSON.stringify(version)
   },
