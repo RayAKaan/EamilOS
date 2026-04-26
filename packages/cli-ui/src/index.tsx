@@ -3,17 +3,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { render } from 'ink';
 import { Box, Text } from 'ink';
-import { EventEmitter } from 'events';
 
-// Inline bridge to avoid import issues
-class InlineBridge extends EventEmitter {
-  private mockMode: boolean;
-  constructor(config?: { mockMode?: boolean }) {
-    super();
-    this.mockMode = config?.mockMode ?? false;
-  }
+// Constants - FIXED DIMENSIONS
+const HEADER_HEIGHT = 2;
+const FOOTER_HEIGHT = 1;
+const MODE_INDICATOR_HEIGHT = 1;
+
+// Inline bridge
+class InlineBridge {
+  constructor() {}
   async initialize() {
-    if (this.mockMode) console.error('[Bridge] Running in mock mode');
+    console.error('[Bridge] Mock mode');
   }
   async createTask(input: string) {
     return { taskId: `task-${Date.now()}` };
@@ -21,7 +21,7 @@ class InlineBridge extends EventEmitter {
   async shutdown() {}
 }
 
-const bridge = new InlineBridge({ mockMode: true });
+const bridge = new InlineBridge();
 bridge.initialize();
 
 interface Message {
@@ -31,11 +31,6 @@ interface Message {
   duration?: string;
 }
 
-// Constants for layout
-const HEADER_HEIGHT = 2;
-const FOOTER_HEIGHT = 1;
-const MODE_INDICATOR_HEIGHT = 1;
-
 function EamilOS() {
   const [mode, setMode] = useState<'chat' | 'dashboard'>('chat');
   const [input, setInput] = useState('');
@@ -44,18 +39,14 @@ function EamilOS() {
   const [renderCount, setRenderCount] = useState(0);
   
   const inputRef = useRef('');
-  const isFirstRender = useRef(true);
 
-  // Clear screen on first render
+  // CRITICAL: Clear screen ONCE on mount only
   useEffect(() => {
-    if (isFirstRender.current) {
-      process.stdout.write('\x1Bc');
-      isFirstRender.current = false;
-    }
+    process.stdout.write('\x1Bc');
     setRenderCount(c => c + 1);
-  }, []);
+  }, []); // Empty array = run once on mount
 
-  // Keyboard handler - SINGLE useEffect
+  // CRITICAL: Keyboard handler - run once on mount
   useEffect(() => {
     if (!process.stdin) return;
     
@@ -112,7 +103,7 @@ function EamilOS() {
   return (
     <Box flexDirection="column" width="100%" height="100%">
       {/* HEADER - border bottom ONLY */}
-      <Box width="100%" height={HEADER_HEIGHT} borderStyle="single" borderColor="gray" borderBottom={false}>
+      <Box width="100%" height={HEADER_HEIGHT} borderStyle="single" borderColor="gray">
         <Box justifyContent="space-between" width="100%" paddingX={1}>
           <Text color="cyan" bold>⚡ EamilOS v1.0</Text>
           <Text dimColor>Mode: {mode}</Text>
@@ -120,15 +111,13 @@ function EamilOS() {
         </Box>
       </Box>
 
-      {/* MODE INDICATOR - thin line */}
-      <Box width="100%" height={MODE_INDICATOR_HEIGHT} borderStyle="single" borderColor="magenta">
-        <Box paddingX={1}>
-          <Text color="magenta" bold>{mode === 'chat' ? '💬 Chat' : '🔧 Power'}</Text>
-          <Text> | Tab to switch</Text>
-        </Box>
+      {/* MODE INDICATOR - NO BORDER */}
+      <Box width="100%" height={MODE_INDICATOR_HEIGHT}>
+        <Text color="magenta" bold>{mode === 'chat' ? '💬 Chat Mode' : '🔧 Power Mode'}</Text>
+        <Text> | Tab to switch</Text>
       </Box>
 
-      {/* MAIN CONTENT - NO borders, just padding */}
+      {/* CONTENT - NO BORDERS, just padding */}
       <Box flexGrow={1} flexDirection="column" padding={1}>
         {mode === 'chat' ? (
           <>
@@ -162,25 +151,13 @@ function EamilOS() {
               )}
             </Box>
 
-            {/* Suggestions when empty */}
-            {messages.length === 0 && !isTyping && (
-              <Box marginTop={1}>
-                <Text bold>Quick:</Text>
-                <Text> </Text>
-                <Text color="yellow">🏗️ REST API</Text>
-                <Text> </Text>
-                <Text color="yellow">🎨 React</Text>
-              </Box>
-            )}
-
-            {/* Input - full border to stand out */}
+            {/* Input - FULL BORDER HERE ONLY */}
             <Box marginTop={1} borderStyle="double" borderColor="green" padding={1}>
               <Text color="green">❯ </Text>
               <Text>{input || '_'}</Text>
             </Box>
           </>
         ) : (
-          /* DASHBOARD MODE */
           <Box alignItems="center" justifyContent="center" flexGrow={1} borderStyle="round" borderColor="cyan" padding={1}>
             <Box flexDirection="column" alignItems="center">
               <Text bold color="magenta">🔧 Power Mode</Text>
@@ -191,7 +168,7 @@ function EamilOS() {
       </Box>
 
       {/* FOOTER - border top ONLY */}
-      <Box width="100%" height={FOOTER_HEIGHT} borderStyle="single" borderColor="gray" borderTop={false}>
+      <Box width="100%" height={FOOTER_HEIGHT} borderStyle="single" borderColor="gray">
         <Box justifyContent="space-between" width="100%" paddingX={1}>
           <Text dimColor>Enter: send | Tab: mode | h: help</Text>
           <Text dimColor>q: quit</Text>
@@ -202,16 +179,22 @@ function EamilOS() {
 }
 
 async function main() {
-  // Allow bypass for testing
-  const forceTTY = process.env.FORCE_TTY === 'true';
-  if (!forceTTY && !process.stdin.isTTY) {
-    console.error('[Debug] Not a TTY, use FORCE_TTY=true to bypass');
-    console.error('❌ EamilOS UI requires an interactive terminal');
-    process.exit(1);
+  // Allow bypass for testing or use force flag
+  const forceTTY = process.env.FORCE_TTY === 'true' || process.argv.includes('--force');
+  
+  // Try to set raw mode if TTY available
+  try {
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+    } else if (!forceTTY) {
+      console.error('❌ Interactive terminal required');
+      console.error('   Use --force to bypass (testing only)');
+      process.exit(1);
+    }
+  } catch {
+    // May fail in some environments
   }
-
-  // Clear screen before first render
-  process.stdout.write('\x1Bc');
 
   const { waitUntilExit } = render(React.createElement(EamilOS), {
     stdout: process.stdout,
@@ -221,7 +204,7 @@ async function main() {
 
   const cleanup = async () => {
     process.stdout.write('\x1B[?25h');
-    process.stdin.setRawMode(false);
+    process.stdin?.setRawMode(false);
     bridge.shutdown();
     process.exit(0);
   };
@@ -233,6 +216,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('Fatal error:', error);
+  process.stdout.write('\x1B[?25h');
+  console.error('Fatal:', error);
   process.exit(1);
 });
