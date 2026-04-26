@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { render } from 'ink';
 import { Box, Text } from 'ink';
 import { createBridge } from './bridge.js';
+
+// Layout constants
+const LAYOUT = {
+  headerHeight: 1,
+  footerHeight: 1,
+  sidebarWidth: 35,
+  minWidthForSidebar: 80,
+};
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -12,30 +20,23 @@ interface Message {
   duration?: string;
 }
 
-// Initialize bridge ONCE outside React
-let bridge = createBridge({ mockMode: true });
-
-async function initBridge() {
-  await bridge.initialize();
-  console.error('[Bridge] Initialized');
-}
-
-// Run init immediately
-initBridge().catch(e => console.error('[Bridge] Init error:', e));
+// Initialize bridge ONCE
+const bridge = createBridge({ mockMode: true });
+bridge.initialize().catch(e => console.error('[Bridge] Init error:', e));
 
 function EamilOS() {
   const [mode, setMode] = useState<'chat' | 'dashboard'>('chat');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setReady(true);
+    process.stdin?.setRawMode(true);
+    process.stdin?.resume();
   }, []);
 
   useEffect(() => {
-    if (!ready || !process.stdin) return;
+    if (!process.stdin) return;
     
     const onData = (data: Buffer) => {
       const key = data.toString();
@@ -60,7 +61,7 @@ function EamilOS() {
     return () => {
       try { process.stdin?.off('data', onData); } catch {}
     };
-  }, [ready, input]);
+  }, [input]);
 
   const doSend = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
@@ -84,79 +85,96 @@ function EamilOS() {
     setIsTyping(false);
   };
 
+  // Memoize layout calculations
+  const layout = useMemo(() => ({
+    canShowSidebar: mode === 'dashboard' && false, // Always false for now
+  }), [mode]);
+
   return (
     <Box flexDirection="column" width="100%" height="100%">
-      <Box borderStyle="round" borderColor="gray" paddingX={1} height={1}>
-        <Text color="cyan" bold>⚡ EamilOS v1.0</Text>
-        <Text> | </Text>
-        <Text dimColor>Mode: {mode}</Text>
+      {/* HEADER - single line */}
+      <Box height={LAYOUT.headerHeight}>
+        <Box borderStyle="single" borderColor="gray" paddingX={1} height={1}>
+          <Box justifyContent="space-between" width="100%">
+            <Text color="cyan" bold>⚡ EamilOS v1.0</Text>
+            <Text dimColor>Mode: {mode}</Text>
+            <Text dimColor>Tab: switch | q: quit</Text>
+          </Box>
+        </Box>
       </Box>
 
-      <Box flexGrow={1} borderStyle="round" borderColor="cyan" padding={1} flexDirection="column">
+      {/* MAIN CONTENT */}
+      <Box flexGrow={1} flexDirection="column">
         {mode === 'chat' ? (
-          messages.length === 0 ? (
-            <Box alignItems="center" justifyContent="center" height="100%">
-              <Box flexDirection="column" alignItems="center">
-                <Text bold color="cyan">⚡ EamilOS</Text>
-                <Text>Your AI agent fleet, ready to build.</Text>
-                <Text dimColor>Type and press Enter</Text>
-              </Box>
-            </Box>
-          ) : (
-            <Box flexDirection="column">
-              {messages.map((m, i) => (
-                <Box key={i} justifyContent={m.role === 'user' ? 'flex-end' : 'flex-start'} marginBottom={1}>
-                  <Box 
-                    width="80%" 
-                    borderStyle={m.role === 'assistant' ? 'round' : 'single'}
-                    borderColor={m.role === 'assistant' ? 'cyan' : 'green'}
-                    padding={1}
-                  >
-                    {m.role === 'assistant' && <Text color="cyan">🤖 </Text>}
-                    <Text>{m.content}</Text>
-                    {m.agent && <Text dimColor> | {m.agent} • {m.duration}</Text>}
+          // CHAT MODE
+          <Box flexDirection="column" flexGrow={1}>
+            {/* Messages area */}
+            <Box flexGrow={1} borderStyle="round" borderColor="cyan" padding={1}>
+              {messages.length === 0 ? (
+                <Box alignItems="center" justifyContent="center" flexGrow={1}>
+                  <Box flexDirection="column" alignItems="center">
+                    <Text bold color="cyan">⚡ EamilOS</Text>
+                    <Text>Your AI agent fleet, ready to build.</Text>
+                    <Text dimColor>Type and press Enter</Text>
                   </Box>
                 </Box>
-              ))}
+              ) : (
+                <Box flexDirection="column">
+                  {messages.map((m, i) => (
+                    <Box key={i} justifyContent={m.role === 'user' ? 'flex-end' : 'flex-start'} marginBottom={1}>
+                      <Box width="80%" borderStyle={m.role === 'assistant' ? 'round' : 'single'} borderColor={m.role === 'assistant' ? 'cyan' : 'green'} padding={1}>
+                        {m.role === 'assistant' && <Text color="cyan">🤖 </Text>}
+                        <Text>{m.content}</Text>
+                        {m.agent && <Text dimColor> | {m.agent} • {m.duration}</Text>}
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Box>
-          )
+
+            {/* Suggestions */}
+            {messages.length === 0 && !isTyping && (
+              <Box paddingX={1}>
+                <Text bold>Quick:</Text>
+                <Text> </Text>
+                <Text color="yellow">🏗️ REST API</Text>
+                <Text> </Text>
+                <Text color="yellow">🎨 React</Text>
+              </Box>
+            )}
+
+            {/* Input */}
+            <Box borderStyle="double" borderColor="green" padding={1}>
+              <Text color="green">❯ </Text>
+              <Text>{input || '_'}</Text>
+            </Box>
+          </Box>
         ) : (
-          <Box alignItems="center" justifyContent="center" height="100%">
+          // DASHBOARD MODE
+          <Box alignItems="center" justifyContent="center" flexGrow={1} borderStyle="round" borderColor="cyan" padding={1}>
             <Box flexDirection="column" alignItems="center">
               <Text bold color="magenta">🔧 Power Mode</Text>
               <Text>Press Tab to return to chat</Text>
             </Box>
           </Box>
         )}
-        
-        {isTyping && (
-          <Box borderStyle="round" borderColor="gray" padding={1} alignItems="center">
-            <Text color="cyan">claude-main thinking...</Text>
-          </Box>
-        )}
       </Box>
 
-      {mode === 'chat' && messages.length === 0 && (
-        <Box borderStyle="round" borderColor="yellow" padding={1} marginTop={1}>
-          <Text bold>Quick:</Text>
-          <Text> </Text>
-          <Text color="yellow">🏗️ REST API</Text>
+      {/* FOOTER - single line */}
+      <Box height={LAYOUT.footerHeight}>
+        <Box borderStyle="single" borderColor="gray" paddingX={1} height={1}>
+          <Text dimColor>Enter: send | Tab: mode | q: quit | h: help</Text>
         </Box>
-      )}
-
-      <Box borderStyle="double" borderColor="green" padding={1} marginTop={1}>
-        <Text color="green">❯ </Text>
-        <Text>{input || '_'}</Text>
-      </Box>
-
-      <Box borderStyle="round" borderColor="gray" paddingX={1} height={1}>
-        <Text dimColor>Enter: send | Tab: mode | q: quit</Text>
       </Box>
     </Box>
   );
 }
 
 async function main() {
+  // Clear screen first
+  process.stdout.write('\x1Bc');
+  
   if (!process.stdin.isTTY) {
     console.error('❌ EamilOS UI requires an interactive terminal');
     process.exit(1);
