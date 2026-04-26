@@ -319,3 +319,5 @@ export { FailureAnalyzer, type FailureAnalyzerConfig } from './learning/FailureA
 export { EnrichmentLibrary } from './learning/EnrichmentLibrary.js';
 export * from './learning/statistics.js';
 export * from './execution/index.js';
+export { TerminalOrchestrator } from './execution/TerminalOrchestrator.js';
+export { CLIAdapter, ClaudeCLIAdapter, CodexCLIAdapter } from './agents/cli-adapters/index.js';

@@ -347,6 +347,21 @@ export class CommsGround extends EventEmitter {
       return matchesContent && matchesRole;
     });
   }
+
+  broadcastTerminalOutput(agentId: string, data: string, sessionId: string): void {
+    this.addMessage({
+      sender: agentId,
+      recipient: 'broadcast',
+      role: 'executor',
+      content: data,
+      type: 'message',
+      metadata: {
+        sessionId,
+        terminalOutput: true,
+        timestamp: Date.now()
+      }
+    });
+  }
 }
 
 let globalCommsGround: CommsGround | null = null;
