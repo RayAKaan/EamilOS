@@ -50,14 +50,31 @@ interface LogsState {
   setLogs: (logs: LogEntry[]) => void;
 }
 
+interface MetricsState {
+  costPerHour: number;
+  queueLength: number;
+  healthy: boolean;
+  degradedNodes: number;
+  setMetrics: (metrics: Partial<MetricsState>) => void;
+}
+
+interface UIState {
+  currentView: string;
+  sidebarCollapsed: boolean;
+  setCurrentView: (view: string) => void;
+  toggleSidebar: () => void;
+}
+
 interface AgentsState {
   agents: any[];
   tasks: any[];
+  nodes: any[];
   setAgents: (agents: any[]) => void;
   setTasks: (tasks: any[]) => void;
+  setNodes: (nodes: any[]) => void;
 }
 
-export type AppState = ExecutionState & SessionState & DialogueState & LogsState & AgentsState;
+export type AppState = ExecutionState & SessionState & DialogueState & LogsState & AgentsState & MetricsState & UIState;
 
 const updateNodeRecursive = (
   node: ExecutionNode,
@@ -199,8 +216,21 @@ export const useStore = create<AppState>()((set, get) => ({
 
   agents: [],
   tasks: [],
+  nodes: [],
   setAgents: (agents: any[]) => set({ agents }),
   setTasks: (tasks: any[]) => set({ tasks }),
+  setNodes: (nodes: any[]) => set({ nodes }),
+
+  costPerHour: 0,
+  queueLength: 0,
+  healthy: true,
+  degradedNodes: 0,
+  setMetrics: (metrics: Partial<MetricsState>) => set(metrics),
+
+  currentView: 'dashboard',
+  sidebarCollapsed: false,
+  setCurrentView: (view: string) => set({ currentView: view }),
+  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 }));
 
 export const useExecutionTree = () => useStore((state) => state.tree);

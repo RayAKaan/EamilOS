@@ -1,6 +1,5 @@
 import { join } from 'path';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import type { AppState } from '../state/store';
 
 const CONFIG_DIR = join(process.env.APPDATA || process.env.HOME || '.', '.eamilos');
 const WORKSPACE_FILE = join(CONFIG_DIR, 'workspace.json');
@@ -8,8 +7,8 @@ const WORKSPACE_FILE = join(CONFIG_DIR, 'workspace.json');
 export interface Workspace {
   version: string;
   lastOpened: number;
-  currentSession: AppState['currentSession'] | null;
-  recentSessions: AppState['recentSessions'];
+  currentSession: any | null;
+  recentSessions: any[];
   view: string;
   panelSizes: number[];
 }

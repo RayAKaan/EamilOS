@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Dashboard } from './views/Dashboard';
 import { TaskRunner } from './views/TaskRunner';
 import { AgentDetail } from './views/AgentDetail';
 import { ConfigView } from './views/ConfigView';
 import { HelpOverlay, CommandPalette } from './components/HelpOverlay';
-import { SearchBar } from './components/SearchBar';
-import { SplitView } from './components/SplitView';
 import { useKeyboard } from '../hooks/useKeyboard';
+import { useStore } from '../state/store';
 import type { UIBridge } from '../bridge';
 import { loadWorkspace, saveWorkspace, createWorkspace } from '../state/workspace';
 
@@ -18,8 +17,8 @@ export interface RouterProps {
 }
 
 export const Router: React.FC<RouterProps> = ({ bridge }) => {
-  const [currentView, setCurrentView] = useState<View>('dashboard');
-  const [viewData, setViewData] = useState<any>({});
+  const { currentView, setCurrentView } = useStore();
+  const [viewData, setViewData] = React.useState<any>({});
 
   useEffect(() => {
     const saved = loadWorkspace();
@@ -29,7 +28,7 @@ export const Router: React.FC<RouterProps> = ({ bridge }) => {
   }, []);
 
   useEffect(() => {
-    const workspace = createWorkspace(currentView);
+    const workspace = createWorkspace(currentView as View);
     saveWorkspace(workspace);
   }, [currentView]);
 
@@ -46,8 +45,6 @@ export const Router: React.FC<RouterProps> = ({ bridge }) => {
       setCurrentView('config');
     } else if (key === 'ctrl+p') {
       setViewData((prev: any) => ({ ...prev, showPalette: true }));
-    } else if (key === 'ctrl+\\') {
-      setViewData((prev: any) => ({ ...prev, splitView: !prev.splitView }));
     } else if (key === '/') {
       setViewData((prev: any) => ({ ...prev, showSearch: true }));
     } else if (key === '?') {
@@ -84,7 +81,7 @@ export const Router: React.FC<RouterProps> = ({ bridge }) => {
 
   return (
     <Box flexDirection="column" width="100%" height="100%">
-      <ViewTabs active={currentView} />
+      <ViewTabs active={currentView as View} />
       <Box flexGrow={1}>
         {renderView()}
       </Box>
