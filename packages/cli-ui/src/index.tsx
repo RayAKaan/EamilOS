@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { render } from 'ink';
 import { Box, Text } from 'ink';
 import { createBridge } from './bridge.js';
@@ -12,84 +12,65 @@ interface Message {
   duration?: string;
 }
 
-let bridge: any = null;
-let inputBuffer = '';
-let currentMode: 'chat' | 'dashboard' = 'chat';
+// Initialize bridge ONCE outside React
+let bridge = createBridge({ mockMode: true });
+
+async function initBridge() {
+  await bridge.initialize();
+  console.error('[Bridge] Initialized');
+}
+
+// Run init immediately
+initBridge().catch(e => console.error('[Bridge] Init error:', e));
 
 function EamilOS() {
-  const [key, setKey] = useState('');
+  const [mode, setMode] = useState<'chat' | 'dashboard'>('chat');
+  const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [renderCount, setRenderCount] = useState(0);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setRenderCount(r => r + 1);
+    setReady(true);
   }, []);
 
   useEffect(() => {
-    if (renderCount > 1) return;
+    if (!ready || !process.stdin) return;
     
-    const init = async () => {
-      try {
-        bridge = createBridge({ mockMode: true });
-        await bridge.initialize();
-      } catch (e) {
-        console.error('Init error:', e);
-      }
-    };
-    init();
-  }, [renderCount]);
-
-  useEffect(() => {
-    if (!process.stdin || renderCount > 1) return;
-    
-    const handler = (data: Buffer) => {
-      const pressedKey = data.toString();
-      setKey(pressedKey);
+    const onData = (data: Buffer) => {
+      const key = data.toString();
       
-      if (pressedKey === '\t') {
-        currentMode = currentMode === 'chat' ? 'dashboard' : 'chat';
-        return;
-      }
-      
-      if (pressedKey === 'q') {
+      if (key === '\t') {
+        setMode(m => m === 'chat' ? 'dashboard' : 'chat');
+      } else if (key === 'q' || key === '\x03') {
         process.exit(0);
-        return;
-      }
-      
-      if (pressedKey === '\r' || pressedKey === '\n') {
-        if (inputBuffer.trim()) {
-          handleSend(inputBuffer);
-          inputBuffer = '';
+      } else if (key === '\r' || key === '\n') {
+        if (input.trim()) {
+          doSend(input);
+          setInput('');
         }
-        return;
-      }
-      
-      if (pressedKey === '\x7f' || pressedKey === '\b') {
-        inputBuffer = inputBuffer.slice(0, -1);
-        return;
-      }
-      
-      if (pressedKey.length === 1) {
-        inputBuffer += pressedKey;
+      } else if (key === '\x7f' || key === '\b') {
+        setInput(s => s.slice(0, -1));
+      } else if (key.length === 1 && key.charCodeAt(0) >= 32) {
+        setInput(s => s + key);
       }
     };
-    
-    process.stdin.on('data', handler);
-    return () => {
-      try { process.stdin?.off('data', handler); } catch {}
-    };
-  }, [renderCount]);
 
-  const handleSend = async (text: string) => {
+    process.stdin.on('data', onData);
+    return () => {
+      try { process.stdin?.off('data', onData); } catch {}
+    };
+  }, [ready, input]);
+
+  const doSend = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setIsTyping(true);
     
     try {
-      const result = await bridge?.createTask?.(text);
+      const result = await bridge.createTask(text);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: `Task created: ${result?.taskId || 'task-1'}`,
+        content: `Task created: ${result.taskId}`,
         agent: 'claude-main',
         duration: '1s'
       }]);
@@ -108,21 +89,17 @@ function EamilOS() {
       <Box borderStyle="round" borderColor="gray" paddingX={1} height={1}>
         <Text color="cyan" bold>⚡ EamilOS v1.0</Text>
         <Text> | </Text>
-        <Text dimColor>Mode: {currentMode}</Text>
-        <Text> | </Text>
-        <Text dimColor>Render: {renderCount}</Text>
+        <Text dimColor>Mode: {mode}</Text>
       </Box>
 
       <Box flexGrow={1} borderStyle="round" borderColor="cyan" padding={1} flexDirection="column">
-        {currentMode === 'chat' ? (
+        {mode === 'chat' ? (
           messages.length === 0 ? (
             <Box alignItems="center" justifyContent="center" height="100%">
               <Box flexDirection="column" alignItems="center">
                 <Text bold color="cyan">⚡ EamilOS</Text>
-                <Box marginTop={1}>
-                  <Text>Your AI agent fleet, ready to build.</Text>
-                </Box>
-                <Text dimColor>Type a message and press Enter</Text>
+                <Text>Your AI agent fleet, ready to build.</Text>
+                <Text dimColor>Type and press Enter</Text>
               </Box>
             </Box>
           ) : (
@@ -135,13 +112,9 @@ function EamilOS() {
                     borderColor={m.role === 'assistant' ? 'cyan' : 'green'}
                     padding={1}
                   >
-                    <Box flexDirection="column">
-                      {m.role === 'assistant' && <Text color="cyan">🤖</Text>}
-                      <Text>{m.content}</Text>
-                      {m.agent && (
-                        <Text dimColor>{m.agent} • {m.duration}</Text>
-                      )}
-                    </Box>
+                    {m.role === 'assistant' && <Text color="cyan">🤖 </Text>}
+                    <Text>{m.content}</Text>
+                    {m.agent && <Text dimColor> | {m.agent} • {m.duration}</Text>}
                   </Box>
                 </Box>
               ))}
@@ -158,27 +131,22 @@ function EamilOS() {
         
         {isTyping && (
           <Box borderStyle="round" borderColor="gray" padding={1} alignItems="center">
-            <Text color="cyan">claude-main</Text>
-            <Text> thinking...</Text>
+            <Text color="cyan">claude-main thinking...</Text>
           </Box>
         )}
       </Box>
 
-      {currentMode === 'chat' && messages.length === 0 && (
+      {mode === 'chat' && messages.length === 0 && (
         <Box borderStyle="round" borderColor="yellow" padding={1} marginTop={1}>
-          <Text bold>Quick starts:</Text>
-          <Box marginLeft={2}>
-            <Text color="yellow">🏗️ REST API</Text>
-          </Box>
-          <Box marginLeft={2}>
-            <Text color="yellow">🎨 React App</Text>
-          </Box>
+          <Text bold>Quick:</Text>
+          <Text> </Text>
+          <Text color="yellow">🏗️ REST API</Text>
         </Box>
       )}
 
       <Box borderStyle="double" borderColor="green" padding={1} marginTop={1}>
         <Text color="green">❯ </Text>
-        <Text>{inputBuffer || '_'}</Text>
+        <Text>{input || '_'}</Text>
       </Box>
 
       <Box borderStyle="round" borderColor="gray" paddingX={1} height={1}>
@@ -205,7 +173,7 @@ async function main() {
 
   const cleanup = async () => {
     process.stdin.setRawMode(false);
-    bridge?.shutdown();
+    bridge.shutdown();
     process.exit(0);
   };
 
