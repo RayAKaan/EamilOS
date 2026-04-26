@@ -1,31 +1,20 @@
-import React from 'react';
-import { Box } from 'ink';
-import { Header } from './components/layout/Header';
-import { Footer } from './components/layout/Footer';
-import { Sidebar } from './components/layout/Sidebar';
-import { Router } from './Router';
-import { getBorderConfig } from './themes/default';
+import React, { useState, useEffect } from 'react';
+import { Box, Text } from 'ink';
+import { ChatMode } from './modes/ChatMode';
+import { DashboardMode } from './modes/DashboardMode';
+
+export type AppMode = 'chat' | 'dashboard';
 
 export const App = ({ bridge }: { bridge: any }) => {
+  const [mode, setMode] = useState<AppMode>('chat');
+
   return (
     <Box flexDirection="column" width="100%" height="100%">
-      <Box {...getBorderConfig('panel')} borderBottom>
-        <Header />
-      </Box>
-      
-      <Box flexGrow={1} flexDirection="row">
-        <Box {...getBorderConfig('panel')} borderRight>
-          <Sidebar />
-        </Box>
-        
-        <Box flexGrow={1} {...getBorderConfig('section')}>
-          <Router bridge={bridge} />
-        </Box>
-      </Box>
-      
-      <Box {...getBorderConfig('panel')} borderTop>
-        <Footer />
-      </Box>
+      {mode === 'chat' ? (
+        <ChatMode bridge={bridge} onSwitchMode={(m: string) => setMode(m as AppMode)} />
+      ) : (
+        <DashboardMode bridge={bridge} onSwitchMode={(m: string) => setMode(m as AppMode)} />
+      )}
     </Box>
   );
 };
