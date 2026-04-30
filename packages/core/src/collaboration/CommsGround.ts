@@ -9,15 +9,20 @@ export interface CommsMessage {
   role: AgentRole;
   content: string;
   timestamp: number;
-  type: 'message' | 'status' | 'request' | 'response' | 'delegation';
+  type: 'message' | 'status' | 'request' | 'response' | 'delegation' | 'agent:output' | 'terminal:output' | 'task:assign' | 'task:complete';
   metadata?: Record<string, unknown>;
   compressed?: boolean;
 }
 
 export interface AgentMessage {
-  role: AgentRole;
-  content: string;
   type: CommsMessage['type'];
+  from?: string;
+  to?: string[];
+  role?: AgentRole;
+  content?: string;
+  data?: unknown;
+  sessionId?: string;
+  timestamp?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -80,6 +85,39 @@ export class CommsGround extends EventEmitter {
     }
 
     return id;
+  }
+
+  broadcast(message: AgentMessage): string {
+    const timestamp = message.timestamp ?? Date.now();
+    const payload = {
+      ...message,
+      timestamp,
+    };
+
+    this.emit(message.type, payload);
+
+    return this.addMessage({
+      sender: message.from || String(message.metadata?.from ?? 'system'),
+      recipient: message.to?.length ? message.to.join(',') : 'broadcast',
+      role: message.role || 'executor',
+      content: message.content ?? String(message.data ?? ''),
+      type: message.type,
+      metadata: {
+        ...(message.metadata || {}),
+        data: message.data,
+        sessionId: message.sessionId,
+      },
+    });
+  }
+
+  broadcastTerminalOutput(agentId: string, data: string, sessionId: string): string {
+    return this.broadcast({
+      type: 'terminal:output',
+      from: agentId,
+      data,
+      sessionId,
+      timestamp: Date.now(),
+    });
   }
 
   createSession(agentIds: string[]): string {
@@ -158,8 +196,8 @@ export class CommsGround extends EventEmitter {
     return this.addMessage({
       sender: String(message.metadata?.from ?? 'system'),
       recipient: agentId,
-      role: message.role,
-      content: message.content,
+      role: message.role || 'executor',
+      content: message.content ?? String(message.data ?? ''),
       type: message.type,
       metadata: message.metadata,
     });
@@ -348,20 +386,6 @@ export class CommsGround extends EventEmitter {
     });
   }
 
-  broadcastTerminalOutput(agentId: string, data: string, sessionId: string): void {
-    this.addMessage({
-      sender: agentId,
-      recipient: 'broadcast',
-      role: 'executor',
-      content: data,
-      type: 'message',
-      metadata: {
-        sessionId,
-        terminalOutput: true,
-        timestamp: Date.now()
-      }
-    });
-  }
 }
 
 let globalCommsGround: CommsGround | null = null;

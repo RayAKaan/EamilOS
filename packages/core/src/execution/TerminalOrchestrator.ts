@@ -13,6 +13,14 @@ interface PTYSession {
   commandBuffer: string[];
 }
 
+export interface TerminalOutputEvent {
+  type: 'terminal:output';
+  from: string;
+  data: string;
+  sessionId: string;
+  timestamp: number;
+}
+
 export class TerminalOrchestrator extends EventEmitter implements ITerminalExecutionProtocol {
   private sessionMap: Map<string, PTYSession> = new Map();
   private agentMapping: Map<string, string> = new Map();
@@ -69,17 +77,16 @@ export class TerminalOrchestrator extends EventEmitter implements ITerminalExecu
       session.buffer += data;
       session.lastActivity = Date.now();
 
-      this.commsGround.addMessage({
-        sender: session.agentId,
-        recipient: 'broadcast',
-        role: 'executor',
-        content: data,
-        type: 'message',
-        metadata: {
-          sessionId: session.id,
-          terminalOutput: true
-        }
-      });
+      const event: TerminalOutputEvent = {
+        type: 'terminal:output',
+        from: session.agentId,
+        data,
+        sessionId: session.id,
+        timestamp: Date.now()
+      };
+
+      this.commsGround.broadcastTerminalOutput(session.agentId, data, session.id);
+      this.emit('terminal:output', event);
     });
 
     session.pty.onExit(({ exitCode, signal }) => {
@@ -105,45 +112,49 @@ export class TerminalOrchestrator extends EventEmitter implements ITerminalExecu
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         session.state = 'error';
+        cleanup();
         reject(new Error(`Command timeout after ${timeout}ms`));
       }, timeout);
 
       let output = '';
       let started = false;
-      let ended = false;
 
-      const dataHandler = (msg: any) => {
-        if (!started && msg.content?.includes(markers.start)) {
+      const dataHandler = (event: TerminalOutputEvent) => {
+        if (event.sessionId !== sessionId) return;
+
+        let data = event.data;
+        if (!started) {
+          const markerIndex = data.indexOf(markers.start);
+          if (markerIndex === -1) return;
           started = true;
+          data = data.slice(markerIndex + markers.start.length);
+        }
+
+        const endIndex = data.indexOf(markers.end);
+        if (endIndex !== -1) {
+          output += data.slice(0, endIndex);
+          clearTimeout(timer);
+          cleanup();
+          resolve({
+            success: true,
+            output: output.trim(),
+            exitCode: 0,
+            durationMs: Date.now() - start
+          });
           return;
         }
 
-        if (started && !ended) {
-          if (msg.content?.includes(markers.end)) {
-            ended = true;
-            clearTimeout(timer);
-            const duration = Date.now() - start;
-            resolve({
-              success: true,
-              output: output.trim(),
-              exitCode: 0,
-              durationMs: duration
-            });
-          } else {
-            output += msg.content;
-          }
-        }
+        output += data;
       };
-
-      this.commsGround.on('message:added', dataHandler);
 
       const cleanup = () => {
-        this.commsGround.off('message:added', dataHandler);
+        this.off('terminal:output', dataHandler);
       };
 
-      session.pty.write(`echo "${markers.start}" && ${command} && echo "${markers.end}"\r\n`);
-      
-      setTimeout(cleanup, timeout + 1000);
+      this.on('terminal:output', dataHandler);
+      session.pty.write(`echo "${markers.start}"\r\n`);
+      session.pty.write(`${command}\r\n`);
+      session.pty.write(`echo "${markers.end}"\r\n`);
     });
   }
 

@@ -26,7 +26,7 @@ export class ClaudeCLIAdapter extends CLIAdapter {
   }
 
   parseArtifacts(output: string): string[] {
-    const filePattern = /(?:Created|Modified|Updated| wrote)\s+([^\\s]+\.[^\\s]+)/gi;
+    const filePattern = /(?:Created|Modified|Updated|wrote)\s+([^\s]+\.[^\s]+)/gi;
     const matches = [...output.matchAll(filePattern)];
     return matches.map(m => m[1]);
   }
