@@ -444,6 +444,46 @@ Used in real-world workflows to generate validated code with 0 manual fixes.
 | Plugin system | ✅ Sandboxed |
 | CLI (setup, doctor, benchmark) | ✅ Complete |
 | Error intelligence | ✅ Explainable |
+| **Premium TUI** | ✅ v1.2.0 — minimal, borderless, modern |
+| **Agent discovery** | ✅ YAML agents + health validation |
+| **Session persistence** | ✅ Encrypted save/restore + auto-save |
+| **Team management** | ✅ RBAC + workspace sharing + audit logs |
+| **Template engine** | ✅ 5 built-in project templates |
+
+---
+
+## Premium Terminal UI
+
+v1.2.0 introduces a complete TUI redesign inspired by Linear, Notion, and Raycast:
+
+```
+  EamilOS Chat              Tasks: 1  Cost: $0.00
+
+                 EamilOS v1.2.7
+      Your AI agent fleet, ready to build.
+         Type a message or press / for commands
+
+  You: Build a REST API with JWT auth
+
+  claude-main: Creating REST API structure...
+  1.2s  $0.0014  466 tokens
+
+  ❯  Add user registration endpoint
+
+  Enter: send  /: commands  Tab: dashboard  q: quit
+```
+
+**What changed:**
+- Zero borders — spacing-based separation
+- Centered welcome screen
+- Floating input with `❯` prompt
+- Clean `Agent:` / `You:` message labels
+- Subtle color hierarchy
+- Real-time task & cost metrics in header
+
+Launch with `eamilos-ui` to try it.
+
+---
 
 ---
 
