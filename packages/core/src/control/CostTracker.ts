@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { getDatabase } from '../db.js';
 
 export interface CostSnapshot {
   timestamp: number;
@@ -85,6 +86,19 @@ export class CostTracker extends EventEmitter {
     this.checkThresholds();
 
     this.emit('cost:recorded', { agentId, model, cost, totalCost: this.currentCost });
+
+    try {
+      const db = getDatabase();
+      db.insertCostRecord({
+        agentId,
+        model,
+        inputTokens,
+        outputTokens,
+        costUsd: cost,
+      });
+    } catch {
+      // Silently fail — cost tracking should not break execution
+    }
 
     return cost;
   }

@@ -13,7 +13,8 @@
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "bundle": "node bundle.js",
-    "start": "node bin/eamilos-ui"
+    "start": "node bin/eamilos-ui",
+    "test:integration": "npm run build && node test-integration.mjs"
   },
   "dependencies": {
     "@eamilos/core": "^1.1.0",

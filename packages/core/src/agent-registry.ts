@@ -4,6 +4,7 @@ import { getCommsGround } from './collaboration/CommsGround.js';
 import { TerminalOrchestrator } from './execution/TerminalOrchestrator.js';
 import { CommsGround } from './collaboration/CommsGround.js';
 import { CLIAdapter, ClaudeCLIAdapter, CodexCLIAdapter } from './agents/cli-adapters/index.js';
+import { autoDiscovery } from './auto-discovery.js';
 
 export class AgentRegistry {
   private agents: Map<string, AgentDefinition> = new Map();
@@ -12,6 +13,7 @@ export class AgentRegistry {
   private logger: Logger;
   private commsGround: CommsGround;
   private terminalOrchestrator?: TerminalOrchestrator;
+  private healthCheckInterval?: NodeJS.Timeout;
 
   constructor() {
     this.logger = getLogger();
@@ -66,6 +68,54 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     this.logger.debug('Loading built-in agents');
+  }
+
+  async autoRegisterFromDiscovery(): Promise<number> {
+    const result = await autoDiscovery.discoverAll();
+    const definitions = autoDiscovery.toAgentDefinitions();
+    
+    let registered = 0;
+    for (const definition of definitions) {
+      if (!this.agents.has(definition.id)) {
+        this.registerAgent(definition);
+        registered++;
+        this.logger.info(`Auto-registered agent: ${definition.id} (${definition.name})`);
+      }
+    }
+    
+    this.logger.info(
+      `Discovery: ${result.validAgents} valid, ${result.invalidAgents} invalid, ${result.yamlAgents.length} YAML agents loaded`
+    );
+    
+    return registered;
+  }
+
+  async checkAgentsHealth(): Promise<Map<string, boolean>> {
+    const results = new Map<string, boolean>();
+    
+    for (const [id] of this.agents) {
+      const health = await autoDiscovery.checkHealth(id);
+      results.set(id, health);
+    }
+    
+    return results;
+  }
+
+  startHealthMonitoring(intervalMs: number = 30000): void {
+    if (this.healthCheckInterval) return;
+    
+    this.healthCheckInterval = setInterval(async () => {
+      await this.checkAgentsHealth();
+    }, intervalMs);
+    
+    this.logger.info(`Health monitoring started (interval: ${intervalMs}ms)`);
+  }
+
+  stopHealthMonitoring(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = undefined;
+    }
   }
 
   registerAgent(agent: AgentDefinition): void {

@@ -1,20 +1,22 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { useStore } from '../../../state/store';
+import { useStore } from '../../../state/store.js';
 
 const shortcuts: Record<string, string> = {
-  dashboard: 'd/1 Dashboard | r/2 Run | a/3 Agents | c/4 Config',
-  'task-runner': 'Enter Run | Space Pause | x Stop | Esc Back',
-  'agent-detail': 'r Restart | s Stop | l Logs | Esc Back',
-  config: '↑↓ Navigate | Enter Edit | Esc Back'
+  dashboard: 'd Dashboard  r Run  a Agents  c Config',
+  'task-runner': 'Enter Run  Space Pause  x Stop  Esc Back',
+  'agent-detail': 'r Restart  s Stop  l Logs  Esc Back',
+  config: 'Enter Edit  Esc Back',
 };
 
 export const Footer = () => {
   const { currentView } = useStore();
-  
+
+  const viewShortcuts = currentView ? shortcuts[currentView] || shortcuts.dashboard : shortcuts.dashboard;
+
   return (
-    <Box height={1}>
-      <Text dimColor>{currentView ? shortcuts[currentView] || shortcuts.dashboard : shortcuts.dashboard} | h Help | p Palette | \ Sidebar | q Quit</Text>
+    <Box paddingX={2} paddingY={1}>
+      <Text dimColor>{viewShortcuts}  h Help  p Palette  q Quit</Text>
     </Box>
   );
 };

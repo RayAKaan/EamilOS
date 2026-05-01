@@ -554,6 +554,68 @@ export class FeedbackLoop {
     this.saveAppliedActions();
   }
 
+  recordSimpleExecution(record: SimpleExecutionRecord): void {
+    this.modelPerformance.recordSimpleExecution({
+      modelId: record.modelId,
+      success: record.success,
+      latencyMs: record.latencyMs,
+      costUSD: record.costUsd,
+      tokensIn: record.inputTokens,
+      tokensOut: record.outputTokens,
+    });
+
+    this.modelRouter.registerModel(record.modelId);
+    this.modelRouter.updateReward(
+      record.modelId,
+      {
+        id: record.taskId,
+        timestamp: Date.now(),
+        sessionId: record.projectId,
+        goal: record.taskInput,
+        taskType: 'general' as any,
+        taskComplexity: 'medium',
+        taskDomains: [],
+        strategy: 'direct' as any,
+        agentsUsed: [{
+          agentId: record.providerId,
+          role: 'general' as any,
+          model: record.modelId,
+          tokensIn: record.inputTokens,
+          tokensOut: record.outputTokens,
+          costUSD: record.costUsd,
+          latencyMs: record.latencyMs,
+          success: record.success,
+          retries: 0,
+        }],
+        modelsUsed: [record.modelId],
+        controlMode: 'auto',
+        success: record.success,
+        partialSuccess: false,
+        subtaskResults: [],
+        totalLatencyMs: record.latencyMs,
+        totalTokensIn: record.inputTokens,
+        totalTokensOut: record.outputTokens,
+        totalCostUSD: record.costUsd,
+        tickCount: 1,
+        retryCount: 0,
+        failureCount: record.success ? 0 : 1,
+        healingActions: [],
+        modelSwaps: [],
+        strategyAdaptations: [],
+        errors: record.success ? [] : [{
+          agentId: record.providerId,
+          model: record.modelId,
+          errorType: 'unknown',
+          errorMessage: 'Execution failed',
+          timestamp: Date.now(),
+          resolved: false,
+        }],
+        promptVariantsUsed: [],
+      },
+      0
+    );
+  }
+
   private loadAppliedActions(): void {
     const actionsPath = path.join(this.config.storagePath, 'applied_actions.json');
     try {
@@ -678,4 +740,29 @@ export interface LearningConfigState {
   autoApplyEnabled: boolean;
   maxAutoApplyDuration: number;
   appliedActions: AppliedAction[];
+}
+
+export interface SimpleExecutionRecord {
+  modelId: string;
+  providerId: string;
+  success: boolean;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  latencyMs: number;
+  taskInput: string;
+  projectId: string;
+  taskId: string;
+}
+
+let globalFeedbackLoop: FeedbackLoop | null = null;
+
+export function initFeedbackLoop(config?: Partial<FeedbackLoopConfig>): FeedbackLoop {
+  globalFeedbackLoop = new FeedbackLoop(config);
+  void globalFeedbackLoop.initialize();
+  return globalFeedbackLoop;
+}
+
+export function getFeedbackLoop(): FeedbackLoop | null {
+  return globalFeedbackLoop;
 }

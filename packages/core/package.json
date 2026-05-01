@@ -40,9 +40,11 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@types/js-yaml": "^4.0.9",
     "acorn": "^8.16.0",
     "better-sqlite3": "^11.8.0",
     "chalk": "^5.4.0",
+    "js-yaml": "^4.1.1",
     "nanoid": "^5.1.0",
     "node-pty": "^1.0.0",
     "ora": "^8.2.0",

@@ -564,6 +564,126 @@ export class DatabaseManager {
       humanReadable: row.human_readable as string | undefined,
     };
   }
+
+  // Cost history operations
+  insertCostRecord(data: {
+    projectId?: string;
+    taskId?: string;
+    agentId?: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    latencyMs?: number;
+    success?: boolean;
+  }): void {
+    const id = nanoid();
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO cost_history (id, timestamp, project_id, task_id, agent_id, model, input_tokens, output_tokens, cost_usd, latency_ms, success)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      now,
+      data.projectId ?? null,
+      data.taskId ?? null,
+      data.agentId ?? null,
+      data.model,
+      data.inputTokens,
+      data.outputTokens,
+      data.costUsd,
+      data.latencyMs ?? 0,
+      data.success !== false ? 1 : 0
+    );
+  }
+
+  getCostHistory(projectId?: string, limit?: number): Array<{
+    id: string;
+    timestamp: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+  }> {
+    const query = projectId
+      ? (limit
+        ? 'SELECT * FROM cost_history WHERE project_id = ? ORDER BY timestamp DESC LIMIT ?'
+        : 'SELECT * FROM cost_history WHERE project_id = ? ORDER BY timestamp DESC')
+      : (limit
+        ? 'SELECT * FROM cost_history ORDER BY timestamp DESC LIMIT ?'
+        : 'SELECT * FROM cost_history ORDER BY timestamp DESC');
+
+    const rows = (limit ? this.db.prepare(query).all(projectId, limit) : this.db.prepare(query).all(projectId ?? null)) as Record<string, unknown>[];
+    return rows.map(row => ({
+      id: row.id as string,
+      timestamp: row.timestamp as string,
+      model: row.model as string,
+      inputTokens: row.input_tokens as number,
+      outputTokens: row.output_tokens as number,
+      costUsd: row.cost_usd as number,
+    }));
+  }
+
+  getCostSummary(days?: number): {
+    totalCost: number;
+    totalTokens: number;
+    totalCalls: number;
+    byModel: Map<string, { cost: number; tokens: number; calls: number }>;
+    byAgent: Map<string, { cost: number; tokens: number; calls: number }>;
+  } {
+    const since = days ? new Date(Date.now() - days * 86400000).toISOString() : null;
+    const where = since ? 'WHERE timestamp >= ?' : '';
+    const params = since ? [since] : [];
+
+    const summary = this.db.prepare(
+      `SELECT SUM(cost_usd) as totalCost, SUM(input_tokens + output_tokens) as totalTokens, COUNT(*) as totalCalls FROM cost_history ${where}`
+    ).get(...params) as { totalCost: number | null; totalTokens: number | null; totalCalls: number | null };
+
+    const byModelRows = this.db.prepare(
+      `SELECT model, SUM(cost_usd) as cost, SUM(input_tokens + output_tokens) as tokens, COUNT(*) as calls FROM cost_history ${where} GROUP BY model ORDER BY cost DESC`
+    ).all(...params) as Record<string, unknown>[];
+
+    const byAgentRows = this.db.prepare(
+      `SELECT agent_id, SUM(cost_usd) as cost, SUM(input_tokens + output_tokens) as tokens, COUNT(*) as calls FROM cost_history ${where} WHERE agent_id IS NOT NULL GROUP BY agent_id ORDER BY cost DESC`
+    ).all(...params) as Record<string, unknown>[];
+
+    const byModel = new Map<string, { cost: number; tokens: number; calls: number }>();
+    for (const row of byModelRows) {
+      byModel.set(row.model as string, {
+        cost: row.cost as number,
+        tokens: row.tokens as number,
+        calls: row.calls as number,
+      });
+    }
+
+    const byAgent = new Map<string, { cost: number; tokens: number; calls: number }>();
+    for (const row of byAgentRows) {
+      byAgent.set(row.agent_id as string, {
+        cost: row.cost as number,
+        tokens: row.tokens as number,
+        calls: row.calls as number,
+      });
+    }
+
+    return {
+      totalCost: summary.totalCost ?? 0,
+      totalTokens: summary.totalTokens ?? 0,
+      totalCalls: summary.totalCalls ?? 0,
+      byModel,
+      byAgent,
+    };
+  }
+
+  getDailyCosts(days: number = 7): Array<{ date: string; cost: number; calls: number }> {
+    const rows = this.db.prepare(
+      `SELECT DATE(timestamp) as date, SUM(cost_usd) as cost, COUNT(*) as calls FROM cost_history WHERE timestamp >= datetime('now', ?) GROUP BY DATE(timestamp) ORDER BY date DESC`
+    ).all(`-${days} days`) as Record<string, unknown>[];
+    return rows.map(row => ({
+      date: row.date as string,
+      cost: row.cost as number,
+      calls: row.calls as number,
+    }));
+  }
 }
 
 let globalDb: DatabaseManager | null = null;

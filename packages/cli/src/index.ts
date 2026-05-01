@@ -16,6 +16,10 @@ import { pluginsCommand } from './commands/plugins.js';
 import { insightsCommand } from './commands/insights.js';
 import { explainRoutingCommand } from './commands/explain-routing.js';
 import { learningConfigCommand } from './commands/learning-config.js';
+import { registerTemplateCommand } from './commands/template.js';
+import { registerProfilesCommand } from './commands/profiles.js';
+import { registerTeamCommand } from './commands/team.js';
+import { registerAuditCommand } from './commands/audit.js';
 import { detectAndAutoInstall, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
@@ -508,6 +512,11 @@ learningCmd
       handleFatalError(error);
     }
   });
+
+registerTemplateCommand(program);
+registerProfilesCommand(program);
+registerTeamCommand(program);
+registerAuditCommand(program);
 
 program.parse(process.argv);
 

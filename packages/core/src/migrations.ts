@@ -123,4 +123,33 @@ CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_memory_scope ON memory(scope);
 CREATE INDEX IF NOT EXISTS idx_memory_project ON memory(project_id);
+
+CREATE TABLE IF NOT EXISTS cost_history (
+  id TEXT PRIMARY KEY,
+  timestamp TEXT NOT NULL,
+  project_id TEXT,
+  task_id TEXT,
+  agent_id TEXT,
+  model TEXT NOT NULL,
+  input_tokens INTEGER DEFAULT 0,
+  output_tokens INTEGER DEFAULT 0,
+  cost_usd REAL DEFAULT 0,
+  latency_ms REAL DEFAULT 0,
+  success INTEGER DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_cost_history_project ON cost_history(project_id);
+CREATE INDEX IF NOT EXISTS idx_cost_history_timestamp ON cost_history(timestamp);
+CREATE INDEX IF NOT EXISTS idx_cost_history_model ON cost_history(model);
+
+CREATE TABLE IF NOT EXISTS daily_cost_summary (
+  date TEXT PRIMARY KEY,
+  total_cost_usd REAL DEFAULT 0,
+  total_tokens INTEGER DEFAULT 0,
+  total_calls INTEGER DEFAULT 0,
+  top_model TEXT,
+  top_agent TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_cost_date ON daily_cost_summary(date);
 `;

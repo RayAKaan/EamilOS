@@ -6,13 +6,42 @@ import { initTaskManager, TaskManager } from './task-manager.js';
 import { initEventBus, EventBus } from './event-bus.js';
 import { initLogger, Logger } from './logger.js';
 import { initProviderManager } from './providers/ProviderManager.js';
-import { initAgentRegistry } from './agent-registry.js';
+import { initAgentRegistry, getAgentRegistry } from './agent-registry.js';
 import { initModelRouter } from './model-router.js';
 import { initContextBuilder } from './context-builder.js';
 import { initAgentRunner } from './agent-runner.js';
 import type { AgentExecutionResult } from './agent-runner.js';
 import { initOrchestrator, getOrchestrator } from './orchestrator/StrictOrchestrator.js';
 import { loadConfig as loadConfigFromFile } from './config.js';
+import { initBudgetTracker, getBudgetTracker } from './budget.js';
+import { initCostTracker, getCostTracker } from './control/CostTracker.js';
+import { initTemplateRegistry, TemplateEngine } from './templates/index.js';
+import { FeedbackLoop } from './learning/FeedbackLoop.js';
+import { getConfig } from './config.js';
+import { ProfileManager, initProfileManager } from './auth/index.js';
+import { KeyVault, initKeyVault } from './auth/key-vault.js';
+import { TeamManager, initTeamManager } from './teams/manager.js';
+import { WorkspaceSharing, initWorkspaceSharing } from './teams/sharing.js';
+import { AuditLogger, initAuditLogger } from './audit/logger.js';
+import { AuditReporter, initAuditReporter } from './audit/reporter.js';
+import { ComplianceManager } from './audit/compliance.js';
+import { RBAC } from './teams/rbac.js';
+import { HealthMonitor, initHealthMonitor } from './agents/HealthMonitor.js';
+import { SessionManager, initSessionManager } from './state/SessionManager.js';
+export { ProfileManager, initProfileManager, getProfileManager } from './auth/index.js';
+export { KeyVault, initKeyVault, getKeyVault } from './auth/key-vault.js';
+export { TeamManager, initTeamManager, getTeamManager } from './teams/manager.js';
+export { WorkspaceSharing, initWorkspaceSharing, getWorkspaceSharing } from './teams/sharing.js';
+export { AuditLogger, initAuditLogger, getAuditLogger } from './audit/logger.js';
+export { AuditReporter, initAuditReporter, getAuditReporter } from './audit/reporter.js';
+export { ComplianceManager } from './audit/compliance.js';
+export { RBAC } from './teams/rbac.js';
+export { HealthMonitor, initHealthMonitor, getHealthMonitor } from './agents/HealthMonitor.js';
+export type { HealthReport, AgentHealthState, HealthCheckResult } from './agents/HealthMonitor.js';
+export { SessionManager, initSessionManager, getSessionManager } from './state/SessionManager.js';
+export type { AppSession, SessionMessage, SessionContext } from './state/SessionManager.js';
+export type { Role, Team, TeamMember, TeamInvite, SharedResource, ResourcePermissions, AuditEvent, PermissionRule } from './auth/types.js';
+export { ROLE_PERMISSIONS } from './auth/types.js';
 
 export class EamilOS {
   private db: DatabaseManager;
@@ -22,6 +51,17 @@ export class EamilOS {
   private logger: Logger;
   private instanceId: string;
   private initialized: boolean = false;
+  private feedbackLoop: FeedbackLoop | null = null;
+  private templateEngine: TemplateEngine | null = null;
+  private profileManager: ProfileManager;
+  private keyVault: KeyVault;
+  private teamManager: TeamManager;
+  private workspaceSharing: WorkspaceSharing;
+  private auditLogger: AuditLogger;
+  private auditReporter: AuditReporter;
+  private complianceManager: ComplianceManager;
+  private healthMonitor: HealthMonitor;
+  private sessionManager: SessionManager;
 
   constructor() {
     this.instanceId = nanoid(8);
@@ -30,6 +70,28 @@ export class EamilOS {
     this.taskManager = initTaskManager(this.db);
     this.eventBus = initEventBus(this.db);
     this.logger = initLogger();
+    this.profileManager = initProfileManager();
+    this.keyVault = initKeyVault();
+    this.teamManager = initTeamManager();
+    this.workspaceSharing = initWorkspaceSharing();
+    this.auditLogger = initAuditLogger();
+    this.auditReporter = initAuditReporter(this.auditLogger);
+    this.complianceManager = new ComplianceManager(
+      this.auditLogger,
+      this.profileManager,
+      this.keyVault,
+      this.teamManager,
+    );
+    this.healthMonitor = initHealthMonitor();
+
+    const profileId = (() => {
+      try {
+        return this.profileManager.getActiveProfile()?.id || 'default';
+      } catch {
+        return 'default';
+      }
+    })();
+    this.sessionManager = initSessionManager(profileId);
   }
 
   async initialize(): Promise<void> {
@@ -43,7 +105,68 @@ export class EamilOS {
     initAgentRunner();
     initOrchestrator({ maxRetries: 3 });
 
+    const budgetConfig = getConfig().budget;
+    const dailyBudget = budgetConfig.max_cost_per_project_usd || 10;
+    initBudgetTracker();
+    initCostTracker(dailyBudget);
+    initTemplateRegistry();
+
+    this.feedbackLoop = new FeedbackLoop({
+      storagePath: '.eamilos/learning',
+      enableAutoApply: true,
+      maxAutoApplyDuration: 30 * 60 * 1000,
+      minConfidenceForAutoApply: 0.7,
+      enableCausalAttribution: true,
+      enableStaggeredUpdates: true,
+      enableInteractionMatrix: true,
+    });
+    await this.feedbackLoop.initialize();
+
+    this.templateEngine = new TemplateEngine();
+
+    const registry = getAgentRegistry();
+    const registered = await registry.autoRegisterFromDiscovery();
+    if (registered > 0) {
+      this.logger.info(`Auto-discovered ${registered} agents`);
+    }
+
     await this.recoverCrashedProjects();
+
+    this.healthMonitor.start();
+    this.logger.info('Health monitoring started');
+
+    await this.sessionManager.initialize();
+    const restored = await this.sessionManager.restore();
+    if (restored) {
+      this.logger.info('Session restored from previous run');
+    }
+    this.sessionManager.startAutoSave(30000);
+
+    this.healthMonitor.on('agent:health-degraded', (data: any) => {
+      const profileId = this.getActiveProfileId();
+      if (profileId) {
+        this.auditLogger.log(
+          profileId,
+          'security',
+          'agent_degraded',
+          { agentId: data.agentId, failures: data.failures, score: data.score },
+          'failure',
+        );
+      }
+    });
+
+    this.healthMonitor.on('agent:failover', (data: any) => {
+      this.logger.info(`Failover: ${data.from} -> ${data.to} (${data.tasksTransferred} tasks)`);
+      const profileId = this.getActiveProfileId();
+      if (profileId) {
+        this.auditLogger.log(
+          profileId,
+          'security',
+          'agent_failover',
+          { from: data.from, to: data.to, tasksTransferred: data.tasksTransferred },
+        );
+      }
+    });
 
     this.initialized = true;
     this.logger.success('EamilOS initialized');
@@ -250,8 +373,98 @@ export class EamilOS {
     return this.workspace.listFiles(projectId);
   }
 
+  getTemplateEngine(): TemplateEngine | null {
+    return this.templateEngine;
+  }
+
+  getFeedbackLoop(): FeedbackLoop | null {
+    return this.feedbackLoop;
+  }
+
+  getCostSnapshot() {
+    const costTracker = getCostTracker();
+    const budgetTracker = getBudgetTracker();
+    return {
+      cost: costTracker?.getSnapshot() ?? null,
+      budget: budgetTracker.check('default'),
+    };
+  }
+
+  getProfileManager(): ProfileManager {
+    return this.profileManager;
+  }
+
+  getKeyVault(): KeyVault {
+    return this.keyVault;
+  }
+
+  getTeamManager(): TeamManager {
+    return this.teamManager;
+  }
+
+  getWorkspaceSharing(): WorkspaceSharing {
+    return this.workspaceSharing;
+  }
+
+  getAuditLogger(): AuditLogger {
+    return this.auditLogger;
+  }
+
+  getAuditReporter(): AuditReporter {
+    return this.auditReporter;
+  }
+
+  getComplianceManager(): ComplianceManager {
+    return this.complianceManager;
+  }
+
+  checkPermission(role: string, action: string): boolean {
+    return RBAC.hasPermission(role as any, action);
+  }
+
+  getHealthMonitor(): HealthMonitor {
+    return this.healthMonitor;
+  }
+
+  getHealthReport() {
+    return this.healthMonitor.getHealthReport();
+  }
+
+  getSessionManager(): SessionManager {
+    return this.sessionManager;
+  }
+
+  async saveSession(sessionId?: string): Promise<string> {
+    return this.sessionManager.save(sessionId);
+  }
+
+  async listSessions(): Promise<Array<{ id: string; name: string; updatedAt: number }>> {
+    return this.sessionManager.list();
+  }
+
+  async createSession(name: string): Promise<string> {
+    return this.sessionManager.create(name);
+  }
+
+  async loadSession(sessionId: string): Promise<boolean> {
+    return this.sessionManager.restore(sessionId);
+  }
+
+  private getActiveProfileId(): string | null {
+    try {
+      const profile = this.profileManager.getActiveProfile();
+      return profile?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
   shutdown(): void {
     this.logger.info('Shutting down EamilOS');
+    this.sessionManager.stopAutoSave();
+    this.sessionManager.save().catch(() => {});
+    this.healthMonitor.stop();
+    this.feedbackLoop?.shutdown();
     this.db.close();
   }
 }
@@ -329,3 +542,9 @@ export { CircuitBreaker, ResourceLimiter } from './resilience/index.js';
 export { SecurityManager } from './security/SecurityManager.js';
 export { ConnectionPool } from './performance/ConnectionPool.js';
 export { runHealthCheck } from './health.js';
+export { autoDiscovery, AutoDiscovery, type DiscoveredAgent, type DiscoveryResult } from './auto-discovery.js';
+export { YAMLLoader, initYamlLoader, getYamlLoader } from './discovery/YAMLLoader.js';
+export { HealthValidator, type ValidationResult } from './discovery/HealthValidator.js';
+export * from './templates/index.js';
+export { BudgetTracker, initBudgetTracker, getBudgetTracker } from './budget.js';
+export { CostTracker, initCostTracker, getCostTracker } from './control/CostTracker.js';

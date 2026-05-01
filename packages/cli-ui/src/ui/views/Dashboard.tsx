@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { useStore } from '../../state/store';
 import type { UIBridge } from '../../bridge';
+import { MetricsStrip } from './CostDashboard.js';
 
 interface DashboardProps {
   bridge: UIBridge;
@@ -14,6 +15,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ bridge, onSelectAgent, onS
   const store = bridge.getStore();
   const isRunning = store((s) => s.isRunning);
 
+  const uptime = Math.floor(process.uptime());
+  const memoryUsage = process.memoryUsage();
+  const heapUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+
   const mockAgents = [
     { id: 'claude-01', name: 'Claude CLI', status: isRunning ? 'running' : 'idle', capability: 'reasoning' },
     { id: 'codex-01', name: 'Codex CLI', status: 'idle', capability: 'code-generation' },
@@ -24,7 +29,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ bridge, onSelectAgent, onS
     <Box flexDirection="column" height="100%">
       {/* Metrics Strip */}
       <Box paddingX={2}>
-        <MetricsStrip />
+        <MetricsStrip
+          isRunning={isRunning}
+          uptime={uptime}
+          heapUsedMB={heapUsedMB}
+        />
       </Box>
 
       {/* Main Content */}
@@ -59,28 +68,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ bridge, onSelectAgent, onS
 
       {/* Footer */}
       <Box paddingX={2} height={3}>
-        <Text dimColor>Navigate: arrow keys | Select: Enter | New Task: n | Run: r | Agents: a | Config: c | Help: ?</Text>
+        <Text dimColor>Navigate: arrow keys | Select: Enter | New Task: n | Run: r | Agents: a | Config: c | Cost: /cost | Help: ?</Text>
       </Box>
-    </Box>
-  );
-};
-
-const MetricsStrip: React.FC = () => {
-  const memoryUsage = process.memoryUsage();
-  const heapUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
-  const uptime = Math.floor(process.uptime());
-
-  return (
-    <Box flexDirection="row" gap={4}>
-      <Text>
-        <Text color="cyan">*</Text> Running
-      </Text>
-      <Text>
-        <Text color="green">^</Text> {Math.floor(uptime / 60)}m {uptime % 60}s
-      </Text>
-      <Text>
-        <Text color="yellow">+</Text> {heapUsedMB}MB
-      </Text>
     </Box>
   );
 };

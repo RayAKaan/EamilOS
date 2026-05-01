@@ -11,6 +11,9 @@ import { getConfig } from '../config.js';
 import { FeatureManager } from '../features/FeatureManager.js';
 import { FeatureContext } from '../features/types.js';
 import { TaskClassifier, TaskCategory } from '../model-router/TaskClassifier.js';
+import { getBudgetTracker } from '../budget.js';
+import { getCostTracker } from '../control/CostTracker.js';
+import { getFeedbackLoop } from '../learning/FeedbackLoop.js';
 
 export interface OrchestratorConfig {
   maxRetries?: number;
@@ -267,6 +270,15 @@ export class StrictOrchestrator {
         if (artifacts.length > 0) {
           logger.success(`Task completed with ${artifacts.length} artifact(s)`);
 
+          this.recordExecutionCost(
+            projectId,
+            'orchestrator-task',
+            currentModelId || 'unknown',
+            currentProvider || 'unknown',
+            0,
+            rawContent.length / 4
+          );
+
           if (this.useRouter && this.modelRouter && currentModelId && currentProvider) {
             this.modelRouter.recordResult(
               currentModelId,
@@ -333,6 +345,15 @@ export class StrictOrchestrator {
     }
 
     logger.error(`All ${this.config.maxRetries} attempts exhausted`);
+
+    this.recordExecutionCost(
+      projectId,
+      'orchestrator-task',
+      currentModelId || 'unknown',
+      currentProvider || 'unknown',
+      0,
+      0
+    );
 
     if (this.useRouter && this.modelRouter && currentModelId && currentProvider) {
       this.modelRouter.recordResult(
@@ -453,6 +474,64 @@ export class StrictOrchestrator {
     escalation += `Task: ${originalTask}`;
 
     return escalation;
+  }
+
+  recordExecutionCost(
+    projectId: string,
+    taskId: string,
+    modelId: string,
+    providerId: string,
+    inputTokens: number,
+    outputTokens: number
+  ): void {
+    const budgetTracker = getBudgetTracker();
+    const costTracker = getCostTracker();
+
+    const costUsd = this.estimateCostUsd(inputTokens, outputTokens, modelId);
+
+    budgetTracker.recordUsage(projectId, taskId, {
+      inputTokens,
+      outputTokens,
+      costUsd,
+    });
+
+    if (costTracker) {
+      costTracker.recordInference(
+        `${providerId}:${modelId}`,
+        modelId,
+        inputTokens,
+        outputTokens
+      );
+    }
+
+    const feedbackLoop = getFeedbackLoop();
+    if (feedbackLoop) {
+      feedbackLoop.recordSimpleExecution({
+        modelId,
+        providerId,
+        success: true,
+        inputTokens,
+        outputTokens,
+        costUsd,
+        latencyMs: 0,
+        taskInput: '',
+        projectId,
+        taskId,
+      });
+    }
+  }
+
+  private estimateCostUsd(inputTokens: number, outputTokens: number, modelId: string): number {
+    const rates: Record<string, { input: number; output: number }> = {
+      'gpt-4o': { input: 5e-6, output: 15e-6 },
+      'gpt-4o-mini': { input: 1.5e-7, output: 6e-7 },
+      'claude-3.5-sonnet': { input: 3e-6, output: 15e-6 },
+      'claude-3-opus': { input: 15e-6, output: 75e-6 },
+      'claude-sonnet-4-20250514': { input: 3e-6, output: 15e-6 },
+      'deepseek-chat': { input: 1.4e-7, output: 2.8e-7 },
+    };
+    const rate = rates[modelId.toLowerCase()] || { input: 1e-6, output: 1e-6 };
+    return inputTokens * rate.input + outputTokens * rate.output;
   }
 }
 

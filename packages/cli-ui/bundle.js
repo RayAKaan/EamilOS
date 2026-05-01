@@ -16,6 +16,7 @@ await esbuild.build({
   define: {
     'process.env.EAMILOS_VERSION': JSON.stringify(version)
   },
+  loader: { '.ts': 'ts' },
 });
 
 console.log('Bundled to dist/eamilos-ui.js, version:', version);

@@ -43,6 +43,70 @@ export class ModelPerformance {
     }
   }
 
+  recordSimpleExecution(data: {
+    modelId: string;
+    success: boolean;
+    latencyMs: number;
+    costUSD: number;
+    tokensIn: number;
+    tokensOut: number;
+  }): void {
+    let metrics = this.globalMetrics.get(data.modelId);
+
+    if (!metrics) {
+      metrics = {
+        modelId: data.modelId,
+        totalExecutions: 0,
+        successfulExecutions: 0,
+        failedExecutions: 0,
+        avgLatencyMs: 0,
+        avgCostUSD: 0,
+        avgTokensIn: 0,
+        avgTokensOut: 0,
+        p50LatencyMs: 0,
+        p95LatencyMs: 0,
+        p99LatencyMs: 0,
+        successRate: 0,
+        successRateCI: { lower: 0, upper: 1 },
+        costPerSuccess: 0,
+        throughput: 0,
+        reliabilityScore: 0,
+        qualityScore: 0,
+        efficiencyScore: 0,
+        overallScore: 0,
+        lastUpdated: 0,
+        sampleSize: 0,
+        latencyTrend: { slope: 0, direction: 'stable' as const },
+        successTrend: { slope: 0, direction: 'stable' as const },
+      };
+      this.globalMetrics.set(data.modelId, metrics);
+    }
+
+    const n = metrics.sampleSize + 1;
+    metrics.totalExecutions++;
+    metrics.sampleSize = n;
+    if (data.success) metrics.successfulExecutions++;
+    else metrics.failedExecutions++;
+
+    metrics.avgLatencyMs = metrics.avgLatencyMs + (data.latencyMs - metrics.avgLatencyMs) / n;
+    metrics.avgCostUSD = metrics.avgCostUSD + (data.costUSD - metrics.avgCostUSD) / n;
+    metrics.avgTokensIn = metrics.avgTokensIn + (data.tokensIn - metrics.avgTokensIn) / n;
+    metrics.avgTokensOut = metrics.avgTokensOut + (data.tokensOut - metrics.avgTokensOut) / n;
+
+    metrics.successRate = metrics.totalExecutions > 0 ? metrics.successfulExecutions / metrics.totalExecutions : 0;
+    const ci = wilsonScore(metrics.successfulExecutions, metrics.totalExecutions, this.config.confidenceLevel);
+    metrics.successRateCI = { lower: ci.lowerBound, upper: ci.upperBound };
+
+    if (metrics.successfulExecutions > 0) {
+      metrics.costPerSuccess = metrics.avgCostUSD / metrics.successRate;
+    }
+
+    metrics.reliabilityScore = metrics.successRate;
+    metrics.efficiencyScore = Math.max(0, 1 - metrics.avgCostUSD);
+    metrics.overallScore = metrics.reliabilityScore * 0.6 + metrics.efficiencyScore * 0.4;
+    metrics.lastUpdated = Date.now();
+  }
+
   private recordAgentPerformance(
     agentId: string,
     modelId: string,
