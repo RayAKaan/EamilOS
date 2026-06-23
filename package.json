@@ -1,18 +1,17 @@
 {
   "name": "eamilos",
-  "version": "1.3.0",
-  "description": "Multi-agent orchestration platform with OpenCode + Gemini CLI and knowledge graph",
+  "version": "1.4.0",
+  "description": "AI execution kernel — Multi-agent orchestration with OpenCode + Gemini CLI, knowledge graph, React Ink TUI, and intelligent model routing",
   "type": "module",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/cli"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "clean": "npm run clean --workspaces --if-present",
+    "build": "npm run build -w @eamilos/cli",
+    "test": "npm run test -w @eamilos/cli",
+    "clean": "npm run clean -w @eamilos/cli",
     "reset": "rm -rf node_modules packages/*/node_modules packages/*/dist",
-    "ui": "npm run start -w @eamilos/cli-ui",
     "cli": "npx eamilos"
   },
   "engines": {

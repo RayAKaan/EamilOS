@@ -1,4 +1,4 @@
-import { FeedbackLoop } from '@eamilos/core';
+import { FeedbackLoop } from '../core/index.js';
 import * as path from 'path';
 import * as os from 'os';
 

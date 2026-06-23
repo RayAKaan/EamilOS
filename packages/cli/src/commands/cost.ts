@@ -1,7 +1,7 @@
 // PHASE 2: Full implementation - cost breakdown command
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { initEamilOS } from '@eamilos/core';
+import { initEamilOS } from '../core/index.js';
 
 export function registerCostCommand(program: Command): void {
   program
@@ -27,7 +27,7 @@ export function registerCostCommand(program: Command): void {
         let totalTokens = 0;
         let totalCost = 0;
 
-        const modelEvents = events.filter((e: { type: string }) => e.type === 'model.called');
+        const modelEvents = events.filter((e) => e.type === 'model.called');
 
         for (const event of modelEvents) {
           const data = event.data as { tokens?: number; costUsd?: number };

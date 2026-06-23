@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { initNetworkManager } from '@eamilos/core';
+import { initNetworkManager } from '../core/index.js';
 
 interface ConnectArgs {
   address: string;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { initEamilOS, formatError as humanizeError } from '@eamilos/core';
+import { initEamilOS, formatError as humanizeError } from './core/index.js';
 import { init } from './commands/init.js';
 import { run } from './commands/run.js';
 import { status } from './commands/status.js';
@@ -16,7 +16,7 @@ import { pluginsCommand } from './commands/plugins.js';
 import { insightsCommand } from './commands/insights.js';
 import { explainRoutingCommand } from './commands/explain-routing.js';
 import { learningConfigCommand } from './commands/learning-config.js';
-import { createMultiAgentCommands } from '@eamilos/multi-agent';
+import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAndAutoInstall, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
@@ -70,43 +70,13 @@ async function detectAndShowProviders(): Promise<void> {
 async function launchUI(args: string[]) {
   const { spawn } = await import('child_process');
   const path = await import('path');
-  const { createRequire } = await import('module');
-  const { existsSync } = await import('fs');
+  const { fileURLToPath } = await import('url');
   
   // Run provider detection before launching UI
   await detectAndShowProviders();
   
-  const cliDir = path.dirname(path.join(import.meta.url));
-  const cliPkgDir = path.join(cliDir, '..');
-  
-  let cliUiPath: string | undefined;
-  
-  // Method 1: Try using createRequire to resolve @eamilos/cli-ui (works both locally and globally)
-  const require = createRequire(import.meta.url);
-  try {
-    cliUiPath = require.resolve('@eamilos/cli-ui/bin/eamilos-ui');
-  } catch {
-    // Fallback: try relative paths for local development
-    const possiblePaths = [
-      path.join(cliPkgDir, 'cli-ui', 'bin', 'eamilos-ui'),
-      path.join(cliPkgDir, 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui'),
-    ];
-    cliUiPath = possiblePaths.find(p => existsSync(p));
-  }
-  
-  if (!cliUiPath) {
-    const { default: chalk } = await import('chalk');
-    console.error('');
-    console.error(chalk.red('❌') + ' CLI UI not found.');
-    console.error('');
-    console.error(chalk.dim('Fix:'));
-    console.error('  npm install -g @eamilos/cli-ui');
-    console.error('');
-    console.error(chalk.dim('Then run:'));
-    console.error('  eamilos');
-    process.exit(1);
-  }
-  
+  const __filename = fileURLToPath(import.meta.url);
+  const cliUiPath = path.resolve(path.dirname(__filename), 'ui', 'bin', 'eamilos-ui');
   const rootDir = process.cwd();
   spawn('node', [cliUiPath, ...args], { stdio: 'inherit', shell: true, cwd: rootDir });
 }
@@ -188,7 +158,9 @@ program
       }
       const { spawn } = await import('child_process');
       const path = await import('path');
-      const cliUiPath = path.join(process.cwd(), 'node_modules', '@eamilos', 'cli-ui', 'bin', 'eamilos-ui');
+      const { fileURLToPath } = await import('url');
+      const __filename = fileURLToPath(import.meta.url);
+      const cliUiPath = path.resolve(path.dirname(__filename), 'ui', 'bin', 'eamilos-ui');
       spawn(cliUiPath, [], { stdio: 'inherit', shell: true });
     } catch (error) {
       handleFatalError(error);
@@ -236,7 +208,7 @@ program
   .option('--output <file>', 'Save results to file')
   .action(async (options) => {
     try {
-      const { benchmarkCommand } = await import('@eamilos/core');
+      const { benchmarkCommand } = await import('./core/index.js');
       await benchmarkCommand({
         model: options.model,
         verbose: options.verbose,

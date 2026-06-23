@@ -7,7 +7,7 @@
 Every AI tool gives you text and hopes it works.<br/>
 EamilOS gives you **verified, validated, working files** — every time.
 
-[![npm](https://img.shields.io/npm/v/eamilos.svg?style=flat-square)](https://www.npmjs.com/package/eamilos)
+[![npm](https://img.shields.io/npm/v/@eamilos/cli.svg?style=flat-square)](https://www.npmjs.com/package/@eamilos/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg?style=flat-square)](https://nodejs.org/)
 
@@ -27,7 +27,7 @@ EamilOS gives you **verified, validated, working files** — every time.
 
 Run:
 ```
-npm install -g eamilos
+npm install -g @eamilos/cli
 eamilos run "Build something"
 ```
 
@@ -87,7 +87,7 @@ The model was unreliable. **The system was not.**
 ## ⚡ Quick Start
 
 ```bash
-npm install -g eamilos
+npm install -g @eamilos/cli
 eamilos setup
 eamilos run "Create a Python calculator with add, subtract, multiply, divide"
 ```

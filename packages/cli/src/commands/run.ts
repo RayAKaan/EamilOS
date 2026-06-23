@@ -1,4 +1,4 @@
-import { EamilOS } from '@eamilos/core';
+import { EamilOS } from '../core/index.js';
 import { header, success, info, kv, divider, error as printError } from '../ui.js';
 
 interface RunOptions {

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PluginType } from '@eamilos/core';
+import { PluginType } from '../core/index.js';
 
 interface CreatePluginArgs {
   name: string;

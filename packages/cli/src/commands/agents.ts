@@ -1,7 +1,7 @@
 // PHASE 2: Full implementation - list agents command
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { initAgentRegistry } from '@eamilos/core';
+import { initAgentRegistry } from '../core/index.js';
 
 export function registerAgentsCommand(program: Command): void {
   program

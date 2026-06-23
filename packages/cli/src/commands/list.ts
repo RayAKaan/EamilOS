@@ -1,4 +1,4 @@
-import { EamilOS } from '@eamilos/core';
+import { EamilOS } from '../core/index.js';
 import { header, subheader, kv, statusBadge, formatDate, divider } from '../ui.js';
 
 export async function list(eamilos: EamilOS): Promise<void> {

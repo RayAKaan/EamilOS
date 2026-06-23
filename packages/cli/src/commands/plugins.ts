@@ -1,4 +1,4 @@
-import { PluginManager, getSecureLogger, FeatureManager, EventBus } from '@eamilos/core';
+import { PluginManager, getSecureLogger, FeatureManager, EventBus } from '../core/index.js';
 
 let pluginManager: PluginManager | null = null;
 

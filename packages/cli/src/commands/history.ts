@@ -1,7 +1,7 @@
 // PHASE 2: Full implementation - event history command
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { initEamilOS } from '@eamilos/core';
+import { initEamilOS } from '../core/index.js';
 
 export function registerHistoryCommand(program: Command): void {
   program
@@ -23,7 +23,7 @@ export function registerHistoryCommand(program: Command): void {
         let events = eamilos.getProjectEvents(projectId, limit);
 
         if (options.type) {
-          events = events.filter((e: { type: string }) => e.type === options.type);
+          events = events.filter((e) => e.type === options.type);
         }
 
         console.log(chalk.bold(`\n📜 Event History for ${project.name}\n`));

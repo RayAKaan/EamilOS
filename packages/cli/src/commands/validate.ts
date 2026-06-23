@@ -2,8 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { parse } from 'yaml';
-import { ConfigNormalizer } from '@eamilos/core';
-import { OllamaDetector } from '@eamilos/core';
+import { ConfigNormalizer } from '../core/index.js';
+import { OllamaDetector } from '../core/index.js';
 
 export interface ValidationResult {
   valid: boolean;

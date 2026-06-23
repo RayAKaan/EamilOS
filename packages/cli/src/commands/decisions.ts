@@ -1,7 +1,7 @@
 // PHASE 2: Full implementation - decision log command
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { initEamilOS } from '@eamilos/core';
+import { initEamilOS } from '../core/index.js';
 
 export function registerDecisionsCommand(program: Command): void {
   program

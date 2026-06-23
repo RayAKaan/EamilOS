@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { getNetworkManager } from '@eamilos/core';
+import { getNetworkManager } from '../core/index.js';
 
 export async function nodesCommand(): Promise<void> {
   const networkManager = getNetworkManager();

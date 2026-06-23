@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { initNetworkManager, NodeCapabilityScanner } from '@eamilos/core';
+import { initNetworkManager, NodeCapabilityScanner } from '../core/index.js';
 
 interface WorkerArgs {
   port?: number;

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { parse } from 'yaml';
-import { PathValidator, LeakDetector, OllamaDetector, ConfigNormalizer } from '@eamilos/core';
+import { PathValidator, LeakDetector, OllamaDetector, ConfigNormalizer } from '../core/index.js';
 
 export interface DoctorCheck {
   name: string;
@@ -207,7 +207,7 @@ async function checkConfigNormalization(): Promise<DoctorCheck> {
       autoFixable: true,
       fixInstruction: 'Run: eamilos doctor --fix',
       fix: async () => {
-        const healer = await import('@eamilos/core');
+        const healer = await import('../core/index.js');
         await healer.ConfigHealer.heal(configPath!);
       }
     };

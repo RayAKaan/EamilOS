@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { getNetworkManager, getTaskStore } from '@eamilos/core';
+import { getNetworkManager, getTaskStore } from '../core/index.js';
 
 interface NodeStats {
   name: string;

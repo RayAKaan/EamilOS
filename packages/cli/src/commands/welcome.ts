@@ -1,5 +1,5 @@
-import { OllamaDetector } from '@eamilos/core';
-import { AutoInit } from '@eamilos/core';
+import { OllamaDetector } from '../core/index.js';
+import { AutoInit } from '../core/index.js';
 import * as os from 'os';
 
 export interface WelcomeOptions {

@@ -1,4 +1,4 @@
-import { EamilOS } from '@eamilos/core';
+import { EamilOS } from '../core/index.js';
 import {
   header,
   subheader,
