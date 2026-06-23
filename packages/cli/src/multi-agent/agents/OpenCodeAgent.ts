@@ -52,37 +52,27 @@ export class OpenCodeAgent extends BaseAgent {
 
   async checkInstalled(): Promise<{ available: boolean; version?: string; error?: string }> {
     try {
-      let result: string;
+      const result = execSync('npx --no-install opencode-ai --version 2>&1', { timeout: 15000, encoding: 'utf-8' });
+      const version = this.extractVersion(result);
+      return { available: true, version };
+    } catch {
       try {
-        result = execSync('npx opencode-ai --version 2>&1', { timeout: 30000, encoding: 'utf-8' });
+        const result = execSync('npx --no-install opencode --version 2>&1', { timeout: 15000, encoding: 'utf-8' });
+        const version = this.extractVersion(result);
+        return { available: true, version };
       } catch {
         try {
-          result = execSync('npx opencode --version 2>&1', { timeout: 30000, encoding: 'utf-8' });
-        } catch {
           const npmList = execSync('npm list -g opencode-ai opencode 2>&1', { timeout: 10000, encoding: 'utf-8' });
           if (npmList.toString().includes('opencode')) {
             return { available: true, version: 'installed (version check unavailable)' };
           }
-          throw new Error('Package not found in npm list');
-        }
-      }
+        } catch {}
 
-      const version = this.extractVersion(result);
-      return { available: true, version };
-    } catch (err) {
-      const errorMsg = (err as Error).message;
-
-      if (errorMsg.includes('ENOENT') || errorMsg.includes('not found')) {
         return {
           available: false,
           error: 'OpenCode not found. Run: npm install -g opencode-ai',
         };
       }
-
-      return {
-        available: false,
-        error: errorMsg.slice(0, 200),
-      };
     }
   }
 
@@ -197,10 +187,29 @@ export class OpenCodeAgent extends BaseAgent {
 
     const health = await this.checkInstalled();
     if (!health.available) {
-      return this.createErrorMessage(id, `OpenCode not available: ${health.error}`, startTime);
+      return this.kernelFallback(message, id, startTime);
     }
 
     return this.sendOneShot(message, id, startTime);
+  }
+
+  private async kernelFallback(message: string, id: string, startTime: number): Promise<TerminalMessage> {
+    try {
+      const { getProviderManager } = await import('../../core/provider-manager.js');
+      const pm = getProviderManager();
+      const result = await pm.chat([
+        {
+          role: 'system',
+          content: 'You are OpenCode, an elite code-generation agent inside the EamilOS unified swarm. Output working production-ready code files as JSON: {"files": [{"path": "...", "content": "..."}]}. Never output descriptions or placeholders.',
+        },
+        { role: 'user', content: message },
+      ]);
+      const content = result.content || '(empty response from kernel)';
+      this.emitChunk('opencode', content);
+      return this.createMessage(id, content, content, [], { duration: Date.now() - startTime, kernelFallback: true });
+    } catch (err) {
+      return this.createErrorMessage(id, `Kernel fallback failed: ${(err as Error).message}`, startTime);
+    }
   }
 
   private async callServer(prompt: string): Promise<string> {

@@ -29,17 +29,26 @@ function checkBinary(cmd: string, args: string): CheckResult {
 }
 
 function checkOpenCodeSync(): CheckResult {
-  let result = checkBinary('opencode', '--version');
+  let result = checkBinary('npx', '--no-install opencode-ai --version');
   if (!result.available) {
-    result = checkBinary('npx', 'opencode-ai --version');
+    result = checkBinary('npx', '--no-install opencode --version');
+  }
+  if (!result.available) {
+    result = checkBinary('opencode', '--version');
+  }
+  if (!result.available) {
+    result = checkBinary('npx', '--yes opencode-ai --version');
   }
   return result;
 }
 
 function checkGeminiSync(): CheckResult {
-  let result = checkBinary('gemini', '--version');
+  let result = checkBinary('npx', '--no-install @google/gemini-cli --version');
   if (!result.available) {
-    result = checkBinary('npx', '@google/gemini-cli --version');
+    result = checkBinary('gemini', '--version');
+  }
+  if (!result.available) {
+    result = checkBinary('npx', '--yes @google/gemini-cli --version');
   }
   return result;
 }

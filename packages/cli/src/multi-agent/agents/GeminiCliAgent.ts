@@ -67,8 +67,8 @@ export class GeminiCliAgent extends BaseAgent {
 
     try {
       const result = execSync(
-        `npx @google/gemini-cli --version 2>&1`,
-        { timeout: 30000, encoding: 'utf-8' }
+        'npx --no-install @google/gemini-cli --version 2>&1',
+        { timeout: 15000, encoding: 'utf-8' }
       );
 
       const version = this.extractVersion(result);
@@ -77,49 +77,29 @@ export class GeminiCliAgent extends BaseAgent {
       GeminiCliAgent.cachedVersion = version;
 
       return { available: true, version };
-    } catch (err) {
-      const errorMsg = (err as Error).message;
-
-      if (this.isCommandNotFoundError(errorMsg)) {
-        try {
-          const npmCheck = execSync(
-            'npm list @google/gemini-cli --depth=0 2>&1',
-            { timeout: 10000, encoding: 'utf-8' }
-          );
-
-          if (npmCheck.toString().includes('@google/gemini-cli')) {
-            GeminiCliAgent.installChecked = true;
-            GeminiCliAgent.isInstalled = true;
-            GeminiCliAgent.cachedVersion = 'installed via npm';
-            return { available: true, version: 'installed via npm' };
-          }
-        } catch {}
-
-        GeminiCliAgent.installChecked = true;
-        GeminiCliAgent.isInstalled = false;
-        GeminiCliAgent.cachedVersion = null;
-
-        return {
-          available: false,
-          error: 'Gemini CLI not found. Run: npm install -g @google/gemini-cli',
-        };
-      }
-
+    } catch {
       try {
-        execSync('npx --version 2>&1', { timeout: 5000, encoding: 'utf-8' });
-        GeminiCliAgent.installChecked = true;
-        GeminiCliAgent.isInstalled = false;
-        GeminiCliAgent.cachedVersion = null;
-        return {
-          available: false,
-          error: `Package check failed: ${errorMsg.slice(0, 200)}`,
-        };
-      } catch {
-        return {
-          available: false,
-          error: 'npx not available — Node.js may not be properly installed',
-        };
-      }
+        const npmCheck = execSync(
+          'npm list @google/gemini-cli --depth=0 2>&1',
+          { timeout: 10000, encoding: 'utf-8' }
+        );
+
+        if (npmCheck.toString().includes('@google/gemini-cli')) {
+          GeminiCliAgent.installChecked = true;
+          GeminiCliAgent.isInstalled = true;
+          GeminiCliAgent.cachedVersion = 'installed via npm';
+          return { available: true, version: 'installed via npm' };
+        }
+      } catch {}
+
+      GeminiCliAgent.installChecked = true;
+      GeminiCliAgent.isInstalled = false;
+      GeminiCliAgent.cachedVersion = null;
+
+      return {
+        available: false,
+        error: 'Gemini CLI not found. Run: npm install -g @google/gemini-cli',
+      };
     }
   }
 
@@ -150,12 +130,7 @@ export class GeminiCliAgent extends BaseAgent {
 
     const health = await this.checkInstalled();
     if (!health.available) {
-      return this.createErrorMessage(
-        id,
-        `Gemini CLI not available: ${health.error}`,
-        startTime,
-        { errorType: 'not-installed' }
-      );
+      return this.kernelFallback(message, id, startTime);
     }
 
     return new Promise((resolve) => {
@@ -275,12 +250,7 @@ export class GeminiCliAgent extends BaseAgent {
 
     const health = await this.checkInstalled();
     if (!health.available) {
-      return this.createErrorMessage(
-        id,
-        `Gemini CLI not available: ${health.error}`,
-        startTime,
-        { errorType: 'not-installed' }
-      );
+      return this.kernelFallback(prompt + '\n\n' + inputContent, id, startTime);
     }
 
     return new Promise((resolve) => {
@@ -355,6 +325,25 @@ export class GeminiCliAgent extends BaseAgent {
         resolve(this.createErrorMessage(id, `Process error: ${err.message}`, startTime, { errorType: 'process-error' }));
       });
     });
+  }
+
+  private async kernelFallback(message: string, id: string, startTime: number): Promise<TerminalMessage> {
+    try {
+      const { getProviderManager } = await import('../../core/provider-manager.js');
+      const pm = getProviderManager();
+      const result = await pm.chat([
+        {
+          role: 'system',
+          content: 'You are Gemini CLI, an elite research and analysis agent inside the EamilOS unified swarm. Focus on analysis, planning, and review. Be concise and provide structured output.',
+        },
+        { role: 'user', content: message },
+      ]);
+      const content = result.content || '(empty response from kernel)';
+      this.emit('chunk', 'gemini', content);
+      return this.createMessage(id, content, content, [], { duration: Date.now() - startTime, kernelFallback: true });
+    } catch (err) {
+      return this.createErrorMessage(id, `Kernel fallback failed: ${(err as Error).message}`, startTime, {});
+    }
   }
 
   private parseResponse(raw: string, _id: string): GeminiResult {
