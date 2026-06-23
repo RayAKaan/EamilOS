@@ -13,24 +13,15 @@ await esbuild.build({
   format: 'esm',
   outfile: join(root, 'dist', 'eamilos-ui.js'),
   external: [
-    // Node.js builtins
+    'blessed',
     'fs', 'fs/promises', 'path', 'os', 'child_process', 'stream',
     'stream/promises', 'util', 'events', 'crypto', 'http', 'https',
     'net', 'tls', 'url', 'querystring', 'readline', 'tty', 'assert',
     'buffer', 'module', 'process', 'v8', 'vm', 'worker_threads',
     'cluster', 'dns', 'dgram', 'zlib', 'string_decoder', 'timers',
     'timers/promises', 'constants', 'punycode', 'perf_hooks',
-    // Third-party (loaded from node_modules at runtime)
-    'blessed',
-    'zustand',
-    'nanoid',
-    'react',
-    'react-dom',
-    // Native bindings
-    'pty.js',
-    'term.js',
-    // Heavy deps that don't need bundling
-    'execa',
+    'pty.js', 'term.js',
+    'zustand', 'nanoid', 'react', 'react-dom', 'execa',
   ],
   define: {
     'process.env.NODE_ENV': '"production"',

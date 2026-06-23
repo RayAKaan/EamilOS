@@ -1,35 +1,43 @@
+/**
+ * useOrchestrator — Run the DualOrchestrator and stream events to the UI
+ * Uses plain functions (not hooks) for imperative store access.
+ */
 import { useStore } from '../state/store.js';
 import type { ExecutionStrategy } from '../types/ui.js';
 
 type EventHandler = (...args: unknown[]) => void;
 
+const EVENTS = {
+  TASK_STARTED: 'task:started',
+  TASK_COMPLETED: 'task:completed',
+  TASK_FAILED: 'task:failed',
+} as const;
+
+interface OrchestratorResult {
+  success: boolean;
+  taskId: string;
+  strategy: ExecutionStrategy;
+  primaryResult?: string;
+  secondaryResult?: string;
+  finalOutput?: string;
+  files: Array<{ path: string; action: string; content?: string }>;
+  graphNodes: string[];
+  attempts: number;
+  duration: number;
+  errors: string[];
+  validated?: boolean;
+  agentUsed?: string;
+}
+
 interface MinimalOrchestrator {
   on(event: string, handler: EventHandler): void;
   off(event: string, handler: EventHandler): void;
-  execute(task: string, forceStrategy?: ExecutionStrategy): Promise<{
-    success: boolean;
-    taskId: string;
-    strategy: ExecutionStrategy;
-    primaryResult?: string;
-    secondaryResult?: string;
-    finalOutput?: string;
-    files: Array<{ path: string; action: string; content?: string }>;
-    graphNodes: string[];
-    attempts: number;
-    duration: number;
-    errors: string[];
-    validated?: boolean;
-    agentUsed?: string;
-  }>;
-}
-
-function getAgentKey(agent: string): 'opencode' | 'gemini' {
-  return agent.toLowerCase().includes('gemini') ? 'gemini' : 'opencode';
+  execute(task: string, forceStrategy?: ExecutionStrategy): Promise<OrchestratorResult>;
 }
 
 function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 1000) return ms + 'ms';
+  return (ms / 1000).toFixed(1) + 's';
 }
 
 function delay(ms: number): Promise<void> {
@@ -52,9 +60,7 @@ export async function run(prompt: string, strategy?: ExecutionStrategy): Promise
   state.setRunning(true);
   state.setExecutionStart();
   state.setStrategy(strat);
-  state.updateGraphStats({
-    nodes: 0, edges: 0, strategy: strat, duration: undefined, toolsUsed: undefined, validated: false,
-  });
+  state.updateGraphStats({ nodes: 0, edges: 0, strategy: strat, duration: undefined, toolsUsed: undefined, validated: false });
   state.setLastPrompt(prompt);
 
   currentStartTime = Date.now();
@@ -62,20 +68,29 @@ export async function run(prompt: string, strategy?: ExecutionStrategy): Promise
 
   const sysId = state.addMessage({
     type: 'system',
-    content: `Strategy: ${strat} -- Initializing agents...`,
+    content: 'Strategy: ' + strat + ' -- Initializing agents...',
   });
 
   await runOrchestrator(prompt, strat, sysId);
 }
 
-async function runOrchestrator(
-  prompt: string,
-  strat: ExecutionStrategy,
-  sysId: string
-): Promise<void> {
+function allAgentsOffline(): boolean {
+  const st = useStore.getState();
+  return st.agentStatus.opencode.status === 'offline' && st.agentStatus.gemini.status === 'offline';
+}
+
+async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: string): Promise<void> {
   const state = useStore.getState();
   let orchestrator: MinimalOrchestrator | null = null;
   const handlers: Array<[string, EventHandler]> = [];
+
+  // If both agents are offline, skip orchestrator and run simulation
+  if (allAgentsOffline()) {
+    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- No agents available, running simulation' });
+    await runSimulation(prompt, strat, sysId);
+    state.setRunning(false);
+    return;
+  }
 
   try {
     const mod = await import('../../multi-agent/orchestrator/index.js');
@@ -86,149 +101,126 @@ async function runOrchestrator(
         maxRetries?: number;
         timeoutMs?: number;
         env?: Record<string, string>;
-      }) => MinimalOrchestrator;
+      }) => MinimalOrchestrator
     };
 
     orchestrator = new DualOrchestrator({
       strategy: strat,
       workingDir: process.cwd(),
       maxRetries: 2,
-      timeoutMs: 180000,
+      timeoutMs: 60000,
       env: process.env as Record<string, string>,
     });
   } catch (importErr) {
-    state.updateMessage(sysId, {
-      content: `Strategy: ${strat} -- Orchestrator not found, running simulation`,
-    });
+    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Orchestrator not found, running simulation' });
     await runSimulation(prompt, strat, sysId);
     state.setRunning(false);
     return;
   }
 
-  // Register event handlers
   const on = (event: string, handler: EventHandler) => {
     orchestrator!.on(event, handler);
     handlers.push([event, handler]);
   };
+
   const off = (event: string, handler: EventHandler) => {
     orchestrator!.off(event, handler);
   };
 
-  // Agent started
-  on('agent.started', (agent: unknown) => {
-    const k = getAgentKey(String(agent));
-    agentMsgIds[k] = state.addMessage({ type: k, content: '', agent: k, isStreaming: true });
-    state.updateMessage(sysId, {
-      content: `Strategy: ${strat} -- Agent started: ${String(agent)}`,
-    });
-    state.setAgentStatus(k, { status: 'busy' });
-  });
-
-  // Agent output chunks (streaming)
-  on('agent.output', (agent: unknown, chunk: unknown) => {
+  on(EVENTS.TASK_STARTED, (data: unknown) => {
     if (abortRef) return;
-    const id = agentMsgIds[getAgentKey(String(agent))];
-    if (id) state.appendToMessage(id, String(chunk));
+    const d = data as { task?: string; taskId?: string };
+    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task started: ' + (d.task ?? 'processing') });
   });
 
-  // Agent completed
-  on('agent.completed', (agent: unknown, result: unknown) => {
-    const k = getAgentKey(String(agent));
-    const id = agentMsgIds[k];
-    if (id) {
-      state.updateMessage(id, { isStreaming: false });
-      const msg = state.messages.find((m) => m.id === id);
-      if (msg && !msg.content.trim() && result) {
-        state.updateMessage(id, { content: String(result) });
-      }
-    }
-    state.setAgentStatus(k, { status: 'ready' });
-  });
-
-  // Validation events
-  on('validation.started', () => {
-    state.updateMessage(sysId, { content: `Strategy: ${strat} -- Validating...` });
-  });
-
-  on('validation.passed', () => {
-    state.updateMessage(sysId, { content: `Strategy: ${strat} -- Validation passed` });
-  });
-
-  on('validation.failed', (result: unknown) => {
-    state.updateMessage(sysId, {
-      content: `Strategy: ${strat} -- Validation failed: ${String(result)}`,
-    });
-  });
-
-  // Graph events
-  on('graph.node', () => state.updateGraphStats({ nodes: state.graphStats.nodes + 1 }));
-  on('graph.edge', () => state.updateGraphStats({ edges: state.graphStats.edges + 1 }));
-
-  // Orchestrator done
-  on('orchestrator.done', (data: unknown) => {
-    const d = data as { duration?: number; strategy?: string; success?: boolean } | undefined;
-    const dur = Date.now() - currentStartTime;
-    const { graphStats } = state;
-    const toolsUsed = Object.values(agentMsgIds).reduce((a, id) => {
-      if (!id) return a;
-      return a + (state.messages.find((m) => m.id === id)?.tools?.length ?? 0);
-    }, 0);
-    state.updateGraphStats({
-      duration: dur,
-      toolsUsed,
-      validated: true,
-    });
-    state.addMessage({
-      type: 'graph-stats',
-      content: JSON.stringify({
-        strategy: strat,
-        duration: formatDuration(dur),
-        toolsUsed,
-        nodes: graphStats.nodes,
-        edges: graphStats.edges,
-        validated: true,
-      }),
-    });
-    state.setRunning(false);
-  });
-
-  // Orchestrator error
-  on('orchestrator.error', (err: unknown) => {
-    state.addMessage({ type: 'error', content: String(err) });
-    state.setRunning(false);
-  });
-
-  // Task-level events (for tracking)
-  on('task:started', () => {
-    state.updateMessage(sysId, { content: `Strategy: ${strat} -- Task running...` });
-  });
-  on('task:completed', (data: unknown) => {
-    const d = data as { attempts?: number; agent?: string } | undefined;
-    state.updateMessage(sysId, {
-      content: `Strategy: ${strat} -- Task completed (${d?.attempts ?? 1} attempt(s))`,
-    });
-  });
-  on('task:failed', (data: unknown) => {
-    const d = data as { errors?: string[] } | undefined;
-    state.addMessage({
-      type: 'error',
-      content: `Task failed: ${(d?.errors ?? ['Unknown error']).join(', ')}`,
-    });
+  on(EVENTS.TASK_COMPLETED, (data: unknown) => {
+    if (abortRef) return;
+    const d = data as { taskId?: string; attempts?: number; agent?: string };
+    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task completed (' + (d.attempts ?? 1) + ' attempt(s))' });
+    state.updateGraphStats({ nodes: 2, edges: 1 });
     state.setAgentStatus('opencode', { status: 'ready' });
     state.setAgentStatus('gemini', { status: 'ready' });
   });
 
-  // Execute!
+  on(EVENTS.TASK_FAILED, (data: unknown) => {
+    const d = data as { taskId?: string; errors?: string[] };
+    state.addMessage({ type: 'error', content: 'Task failed: ' + ((d.errors ?? ['Unknown error']) as string[]).join(', ') });
+    state.setAgentStatus('opencode', { status: 'ready' });
+    state.setAgentStatus('gemini', { status: 'ready' });
+  });
+
   try {
-    await orchestrator.execute(prompt, strat);
+    const result = await (orchestrator as MinimalOrchestrator).execute(prompt, strat);
+    const duration = Date.now() - currentStartTime;
+
+    if (result.primaryResult || result.finalOutput) {
+      const ocId = state.addMessage({
+        type: 'opencode',
+        content: result.finalOutput ?? result.primaryResult ?? '',
+        agent: 'opencode',
+        isStreaming: false,
+      });
+      agentMsgIds.opencode = ocId;
+    }
+
+    if (result.secondaryResult && result.secondaryResult !== result.primaryResult) {
+      const gemId = state.addMessage({
+        type: 'gemini',
+        content: result.secondaryResult,
+        agent: 'gemini',
+        isStreaming: false,
+      });
+      agentMsgIds.gemini = gemId;
+    }
+
+    if (result.files && result.files.length > 0) {
+      const ocId = agentMsgIds.opencode;
+      if (ocId) {
+        for (const file of result.files) {
+          state.addToolToMessage(ocId, {
+            name: file.action,
+            args: file.path,
+            status: 'done',
+            result: file.content ? '(edited ' + file.content.length + ' chars)' : undefined,
+          });
+        }
+      }
+    }
+
+    state.updateGraphStats({
+      duration,
+      nodes: result.graphNodes?.length ?? 2,
+      edges: result.files?.length ?? 0,
+      toolsUsed: result.files?.length ?? 0,
+      validated: result.validated ?? false,
+    });
+
+    state.addMessage({
+      type: 'graph-stats',
+      content: JSON.stringify({
+        strategy: strat,
+        duration: formatDuration(duration),
+        toolsUsed: result.files?.length ?? 0,
+        nodes: result.graphNodes?.length ?? 2,
+        edges: result.files?.length ?? 0,
+        validated: result.validated ?? false,
+        agentUsed: result.agentUsed,
+      }),
+    });
+
+    if (result.errors && result.errors.length > 0) {
+      for (const err of result.errors) {
+        state.addMessage({ type: 'error', content: err });
+      }
+    }
   } catch (execErr) {
     const msg = execErr instanceof Error ? execErr.message : String(execErr);
-    state.addMessage({ type: 'error', content: `Execution failed: ${msg}` });
-    state.setRunning(false);
+    state.addMessage({ type: 'error', content: 'Execution failed: ' + msg });
   } finally {
     for (const [event, handler] of handlers) {
       off(event, handler);
     }
+    state.setRunning(false);
   }
 }
 
@@ -236,27 +228,21 @@ export function cancel(): void {
   abortRef = true;
   const state = useStore.getState();
   state.setRunning(false);
-  state.addMessage({ type: 'system', content: 'Execution cancelled by user' });
+  state.addMessage({ type: 'system', content: 'Execution cancelled by user.' });
 }
 
-async function runSimulation(
-  prompt: string,
-  strat: ExecutionStrategy,
-  sysId: string
-): Promise<void> {
+async function runSimulation(prompt: string, strat: ExecutionStrategy, sysId: string): Promise<void> {
   const state = useStore.getState();
 
   await delay(300);
   if (abortRef) return;
 
-  const ocId = state.addMessage({
-    type: 'opencode', content: '', agent: 'opencode', isStreaming: true,
-  });
+  const ocId = state.addMessage({ type: 'opencode', content: '', agent: 'opencode', isStreaming: true });
   agentMsgIds.opencode = ocId;
   state.setAgentStatus('opencode', { status: 'busy' });
 
   const ocChunks = [
-    `Analyzing: "${prompt.slice(0, 50)}${prompt.length > 50 ? '...' : ''}"\n\n`,
+    'Analyzing: "' + prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '') + '"\n\n',
     'Planning implementation...\n',
     '- Setup project structure\n',
     '- Implement core logic\n',
@@ -288,10 +274,7 @@ async function runSimulation(
 
   if ((strat === 'opencode-first' || strat === 'parallel') && !abortRef) {
     await delay(250);
-
-    const gemId = state.addMessage({
-      type: 'gemini', content: '', agent: 'gemini', isStreaming: true,
-    });
+    const gemId = state.addMessage({ type: 'gemini', content: '', agent: 'gemini', isStreaming: true });
     agentMsgIds.gemini = gemId;
     state.setAgentStatus('gemini', { status: 'busy' });
 
@@ -309,15 +292,12 @@ async function runSimulation(
       state.updateMessage(gemId, { isStreaming: false });
       state.setAgentStatus('gemini', { status: 'ready' });
     }
-
     state.updateGraphStats({ nodes: 12, edges: 8 });
   }
 
   if (abortRef) return;
 
-  state.updateMessage(sysId, {
-    content: `Strategy: ${strat} -- Simulation complete`,
-  });
+  state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Simulation complete' });
 
   const duration = Date.now() - currentStartTime;
   state.addMessage({

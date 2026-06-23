@@ -1,3 +1,4 @@
+// Message types for EamilOS TUI
 export type AgentStatus = 'ready' | 'busy' | 'offline';
 export type ExecutionStrategy = 'gemini-first' | 'opencode-first' | 'parallel' | 'swarm';
 export type MessageType = 'user' | 'opencode' | 'gemini' | 'system' | 'thinking' | 'graph-stats' | 'error';
@@ -35,7 +36,6 @@ export interface GraphStats {
 export interface AgentInfo {
   status: AgentStatus;
   version?: string;
-  model?: string;
 }
 
 export interface AppState {

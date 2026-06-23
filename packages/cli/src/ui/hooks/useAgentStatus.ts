@@ -1,3 +1,7 @@
+/**
+ * checkAgentStatus — Check OpenCode and Gemini CLI availability
+ * Auto-runs on import to populate agent status in the store.
+ */
 import { execSync } from 'child_process';
 import { useStore } from '../state/store.js';
 
@@ -8,7 +12,7 @@ interface CheckResult {
 
 function checkBinary(cmd: string, args: string): CheckResult {
   try {
-    const raw = execSync(`${cmd} ${args} 2>&1`, {
+    const raw = execSync(cmd + ' ' + args + ' 2>&1', {
       timeout: 6000,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -25,17 +29,17 @@ function checkBinary(cmd: string, args: string): CheckResult {
 }
 
 function checkOpenCodeSync(): CheckResult {
-  let result = checkBinary('opencode', '--version 2>&1');
+  let result = checkBinary('opencode', '--version');
   if (!result.available) {
-    result = checkBinary('npx', 'opencode-ai --version 2>&1');
+    result = checkBinary('npx', 'opencode-ai --version');
   }
   return result;
 }
 
 function checkGeminiSync(): CheckResult {
-  let result = checkBinary('gemini', '--version 2>&1');
+  let result = checkBinary('gemini', '--version');
   if (!result.available) {
-    result = checkBinary('npx', '@google/gemini-cli --version 2>&1');
+    result = checkBinary('npx', '@google/gemini-cli --version');
   }
   return result;
 }
@@ -63,4 +67,5 @@ export function checkAgentStatus(): void {
   }
 }
 
+// Auto-run on import
 checkAgentStatus();

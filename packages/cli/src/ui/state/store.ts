@@ -13,7 +13,7 @@ interface StoreActions {
   addMessage: (msg: Omit<Message, 'id' | 'timestamp'>) => string;
   updateMessage: (id: string, updates: Partial<Message>) => void;
   appendToMessage: (id: string, chunk: string) => void;
-  addToolToMessage: (messageId: string, tool: Omit<ToolCall, 'id'>) => string;
+  addToolToMessage: (id: string, tool: Omit<ToolCall, 'id'>) => string;
   updateToolInMessage: (messageId: string, toolId: string, updates: Partial<ToolCall>) => void;
   setRunning: (running: boolean) => void;
   setStrategy: (strategy: ExecutionStrategy) => void;
