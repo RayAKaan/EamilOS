@@ -72,5 +72,8 @@ export async function run(
     divider();
     printError(`Execution failed: ${err instanceof Error ? err.message : String(err)}`);
     info(`Run "eamilos status ${project.id}" to see project details`);
+  } finally {
+    eamilos.shutdown();
+    process.exit(0);
   }
 }

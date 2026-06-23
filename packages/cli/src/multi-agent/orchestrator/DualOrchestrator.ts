@@ -77,6 +77,7 @@ export class DualOrchestrator extends EventEmitter {
       maxRetries: 3,
       timeoutMs: 240000,
       ...config,
+      workingDir: config.workingDir || process.cwd(),
     };
 
     this.openCodeAgent = new OpenCodeAgent({

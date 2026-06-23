@@ -14,7 +14,7 @@ class PythonValidator implements LanguageValidator {
       const line = lines[i];
       const lineNum = i + 1;
 
-      if (/^\s+\s+\s+/.test(line)) {
+      if (/^( +\t|\t+ )/.test(line)) {
         errors.push({
           filePath,
           line: lineNum,
