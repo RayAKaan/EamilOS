@@ -1,6 +1,6 @@
 export type AgentStatus = 'ready' | 'busy' | 'offline';
-export type ExecutionStrategy = 'opencode-first' | 'gemini-first' | 'parallel' | 'swarm';
-export type MessageType = 'user' | 'opencode' | 'gemini' | 'system' | 'error' | 'graph-stats';
+export type ExecutionStrategy = 'gemini-first' | 'opencode-first' | 'parallel' | 'swarm';
+export type MessageType = 'user' | 'opencode' | 'gemini' | 'system' | 'thinking' | 'graph-stats' | 'error';
 export type ToolStatus = 'pending' | 'running' | 'done' | 'failed';
 
 export interface ToolCall {
@@ -20,6 +20,7 @@ export interface Message {
   tools?: ToolCall[];
   agent?: 'opencode' | 'gemini';
   isStreaming?: boolean;
+  eventLabel?: string;
 }
 
 export interface GraphStats {

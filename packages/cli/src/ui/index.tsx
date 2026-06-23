@@ -1,194 +1,440 @@
 /**
- * EamilOS TUI — Pure Blessed, no React hooks
+ * EamilOS TUI Entry Point — Pure Blessed, no JSX
  */
-import blessed from 'blessed';
+import * as blessed from 'blessed';
 import { useStore } from './state/store.js';
 import { run, cancel } from './hooks/useOrchestrator.js';
-import { renderMessageBox } from './components/MessageBlock.js';
+import { renderMessageBox, getMsgHeight } from './components/MessageBlock.js';
 import type { ExecutionStrategy, Message } from './types/ui.js';
 
+// ─── Screen singleton ─────────────────────────────────────────────────────────
+
 const screen = blessed.screen({
-  autoPadding: true,
+  autoPadding: false,
   smartCSR: true,
   resizeTimeout: 100,
   fullUnicode: true,
   title: 'EamilOS',
+  dockBorders: false,
+  ignoreLocked: ['C-c'],
 });
 
-let renderInterval: ReturnType<typeof setInterval> | null = null;
-let lastRenderHash = '';
+// Keep stdin alive so textbox can receive input
+process.stdin.resume();
+process.stdin.setRawMode?.(true);
 
-function renderApp(): void {
-  const state = useStore.getState();
-  const w = state.terminalWidth;
-  const h = state.terminalHeight;
-  const messages = state.messages;
-  const isRunning = state.isRunning;
-  const agentStatus = state.agentStatus;
-  const strategy = state.currentStrategy;
-  const graphStats = state.graphStats;
-  const showGraphPanel = state.showGraphPanel;
-  const version = '1.4.0';
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-  if (screen.children) {
-    for (const child of screen.children as unknown as Array<{ destroy: () => void }>) {
-      try { child.destroy(); } catch { /* ignore */ }
+const STRATEGIES: ExecutionStrategy[] = [
+  'opencode-first',
+  'gemini-first',
+  'parallel',
+  'swarm',
+];
+
+const VERSION = '1.4.0';
+
+const SPINNER = ['|', '/', '-', '\\'];
+let spinnerFrame = 0;
+let spinnerTimer: ReturnType<typeof setInterval> | null = null;
+
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+
+function startSpinner(): void {
+  if (spinnerTimer) return;
+  spinnerTimer = setInterval(() => {
+    spinnerFrame = (spinnerFrame + 1) % SPINNER.length;
+    try {
+      const s = SPINNER[spinnerFrame];
+      // Find the spinner text in the input box and update it
+      const inputBox = screen.children?.[screen.children.length - 1] as
+        | { children?: Array<{ setContent?: (c: string) => void }> }
+        | undefined;
+      const spinnerChild = (inputBox as any)?.children?.[0];
+      if (spinnerChild?.setContent) {
+        spinnerChild.setContent(`  ${s} ${s} ${s} Agents working  --  Ctrl+C to cancel`);
+      }
+    } catch {
+      stopSpinner();
     }
-  }
-
-  // Status Bar
-  const dotOC = agentStatus.opencode.status === 'offline' ? 'O' : '*';
-  const dotGM = agentStatus.gemini.status === 'offline' ? 'O' : '*';
-  const ocVer = agentStatus.opencode.version ?? '?';
-  const gmVer = agentStatus.gemini.version ?? '?';
-  const statusText = isRunning ? 'RUNNING' : 'READY';
-  const left = ` EamilOS ${version} [${statusText}] `;
-  const center = ` [${dotOC}]OpenCode v${ocVer}  [${dotGM}]Gemini v${gmVer} `;
-  const right = ` strategy:${strategy}  nodes:${graphStats.nodes} edges:${graphStats.edges} `;
-  const avail = w - left.length - right.length;
-  const centerTrunc = center.length > avail - 2 ? center.slice(0, avail - 3) + '>' : center;
-  const statusLine = left + centerTrunc + right.padStart(w - left.length - centerTrunc.length, ' ');
-
-  const statusBar = blessed.box({ parent: screen, top: 0, left: 0, width: w, height: 1, border: { type: 'line' }, style: { border: { fg: 'gray' } } });
-  blessed.text({ parent: statusBar, top: 0, left: 0, width: w, content: trunc(statusLine, w), fg: 'cyan', bold: true });
-
-  // Message Area
-  const histHeight = showGraphPanel ? h - 6 : h - 5;
-
-  if (messages.length === 0) {
-    const welcomeBox = blessed.box({ parent: screen, top: 1, left: 0, width: w, height: histHeight, align: 'center', valign: 'middle' });
-    const borderBox = blessed.box({ parent: welcomeBox, top: 'center', left: 'center', width: Math.min(w - 4, 50), height: 12, border: { type: 'line' }, style: { border: { fg: 'cyan' } } });
-    blessed.text({ parent: borderBox, top: 0, align: 'center', content: pad('', Math.min(w - 8, 46)), fg: 'cyan' });
-    blessed.text({ parent: borderBox, top: 1, align: 'center', content: '  EamilOS  Multi-Agent Orchestrator  ', fg: 'cyan', bold: true });
-    blessed.text({ parent: borderBox, top: 2, align: 'center', content: `  v${version}  `, fg: 'cyan' });
-    blessed.text({ parent: borderBox, top: 4, align: 'center', content: '  OpenCode Agent  +  Gemini CLI Agent  ', fg: 'white' });
-    blessed.text({ parent: borderBox, top: 5, align: 'center', content: '  Graphify Knowledge Graph          ', fg: 'white' });
-    blessed.text({ parent: borderBox, top: 7, align: 'center', content: '  Strategies: opencode-first | gemini-first | parallel | swarm  ', fg: 'gray' });
-    blessed.text({ parent: borderBox, top: 9, align: 'center', content: pad('', Math.min(w - 8, 46)), fg: 'cyan' });
-  } else {
-    const historyBox = blessed.box({ parent: screen, top: 1, left: 0, width: w, height: histHeight, scrollable: true, alwaysScroll: true });
-    let y = 0;
-    for (const msg of messages) {
-      renderMessageBox(historyBox, msg, w, y);
-      y += getMsgHeight(msg);
-    }
-    historyBox.setScrollPerc(100);
-  }
-
-  // Graph Panel
-  if (showGraphPanel) {
-    const panel = blessed.box({ parent: screen, top: h - 6, left: 0, width: w, height: 1, border: { type: 'line' }, style: { border: { fg: 'blue' } } });
-    blessed.text({ parent: panel, content: `  GRAPHIFY  |  nodes: ${graphStats.nodes}  |  edges: ${graphStats.edges}  |  strategy: ${graphStats.strategy}  `, fg: 'blue', bold: true });
-  }
-
-  // Input Area
-  const inputTop = h - (showGraphPanel ? 5 : 4);
-  const inputArea = blessed.box({ parent: screen, top: inputTop, left: 0, width: w, height: 4 });
-
-  const stratBar = blessed.box({ parent: inputArea, top: 0, left: 0, width: w, height: 1, border: { type: 'line' }, style: { border: { fg: 'gray' } } });
-  blessed.text({ parent: stratBar, content: '  Strategy: [1]opencode-first  [2]gemini-first  [3]parallel  [4]swarm', fg: 'gray' });
-
-  const inputBox = blessed.box({ parent: inputArea, top: 1, left: 0, width: w, height: 1, border: { type: 'line' }, style: { border: { fg: isRunning ? 'yellow' : 'cyan' } } });
-
-  if (isRunning) {
-    let frame = 0;
-    const spinnerFrames = ['/', '-', '\\', '|'];
-    blessed.text({ parent: inputBox, content: `  ${spinnerFrames[0]} ${spinnerFrames[0]} ${spinnerFrames[0]} Agents working  --  Ctrl+C to cancel`, fg: 'yellow' });
-    const spinnerId = setInterval(() => {
-      frame = (frame + 1) % 4;
-      try {
-        const el = inputBox.children?.[0] as { setContent: (c: string) => void } | undefined;
-        el?.setContent(`  ${spinnerFrames[frame]} ${spinnerFrames[frame]} ${spinnerFrames[frame]} Agents working  --  Ctrl+C to cancel`);
-      } catch { clearInterval(spinnerId); }
-    }, 150);
-  } else {
-    blessed.text({ parent: inputBox, content: ' >', fg: 'cyan', bold: true });
-    const input = blessed.textbox({ parent: inputBox, left: 3, width: w - 18, height: 1, style: { fg: 'white' }, inputOnFocus: true });
-
-    input.key('enter', () => {
-      const val = input.getValue().trim();
-      if (!val) return;
-      input.clearValue();
-      input.blur();
-      run(val);
-      renderApp();
-    });
-    input.key('up', () => {
-      const last = useStore.getState().lastPrompt;
-      if (last) input.setValue(last);
-    });
-    input.key('down', () => { input.clearValue(); });
-    ['1', '2', '3', '4'].forEach((num, i) => {
-      input.key(num, () => {
-        const strat: ExecutionStrategy[] = ['opencode-first', 'gemini-first', 'parallel', 'swarm'];
-        useStore.getState().setStrategy(strat[i]);
-        renderApp();
-      });
-    });
-    input.focus();
-  }
-
-  blessed.text({ parent: inputArea, top: 2, left: 2, content: '  Up: repeat last  |  1-4: switch strategy  |  Ctrl+L: clear  |  Ctrl+G: graph  |  Ctrl+C: exit', fg: 'gray' });
-
-  // Key handlers
-  screen.unkey('C-c'); screen.unkey('C-l'); screen.unkey('C-g');
-  screen.key('C-c', () => {
-    if (useStore.getState().isRunning) { cancel(); renderApp(); }
-    else { screen.destroy(); process.exit(0); }
-  });
-  screen.key('C-l', () => { useStore.getState().clearMessages(); renderApp(); });
-  screen.key('C-g', () => { useStore.getState().toggleGraphPanel(); renderApp(); });
-
-  screen.render();
+  }, 150);
 }
 
-function getMsgHeight(msg: Message): number {
-  if (msg.type === 'user') return 2;
-  if (msg.type === 'opencode' || msg.type === 'gemini') return 2 + (msg.tools?.length ?? 0) + (msg.isStreaming ? 1 : 0) + (msg.content.length > 0 ? 1 : 0);
-  if (msg.type === 'system' || msg.type === 'error') return 2;
-  if (msg.type === 'graph-stats') return 8;
-  return 1;
+function stopSpinner(): void {
+  if (spinnerTimer) {
+    clearInterval(spinnerTimer);
+    spinnerTimer = null;
+  }
 }
 
-function trunc(str: string, max: number): string {
-  return str.length <= max ? str : str.slice(0, max - 1) + '>';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+}
+
+function trunc(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen - 1) + '>';
 }
 
 function pad(str: string, len: number): string {
   return str.padEnd(len);
 }
 
-function initTerminalSize(): void {
-  useStore.getState().setTerminalSize(screen.width, screen.height);
+// ─── Clear screen safely ──────────────────────────────────────────────────────
+
+function clearScreen(): void {
+  const children = [...(screen.children ?? [])] as Array<{ destroy?: () => void; detach?: () => void }>;
+  for (const child of children) {
+    try { child.detach?.(); child.destroy?.(); } catch { /* ignore */ }
+  }
 }
 
-function startRenderLoop(): void {
-  if (renderInterval) return;
-  renderInterval = setInterval(() => {
+// ─── Status bar ───────────────────────────────────────────────────────────────
+
+function buildStatusBar(w: number): void {
+  const { agentStatus, isRunning, currentStrategy, graphStats } = useStore.getState();
+
+  const dotOC = agentStatus.opencode.status === 'offline' ? 'O' : '*';
+  const dotGM = agentStatus.gemini.status === 'offline' ? 'O' : '*';
+  const ocVer = agentStatus.opencode.version ?? '?';
+  const gmVer = agentStatus.gemini.version ?? '?';
+  const statusText = isRunning ? 'RUNNING' : 'READY';
+
+  const left = ` EamilOS ${VERSION} [${statusText}] `;
+  const right = ` strategy:${currentStrategy}  nodes:${graphStats.nodes} edges:${graphStats.edges} `;
+  const avail = w - left.length - right.length;
+  const centerTrunc = ` [${dotOC}]OpenCode v${ocVer}  [${dotGM}]Gemini v${gmVer} `.slice(0, Math.max(avail - 2, 10));
+
+  const bar = blessed.box({
+    parent: screen,
+    top: 0,
+    left: 0,
+    width: w,
+    height: 1,
+    border: { type: 'line' },
+    style: { border: { fg: 'gray' } },
+  });
+
+  blessed.text({
+    parent: bar,
+    top: 0,
+    left: 0,
+    width: w,
+    content: trunc(left + centerTrunc + right.padStart(w - left.length - centerTrunc.length, ' '), w),
+    style: { fg: 'cyan', bold: true },
+  });
+}
+
+// ─── Message area ─────────────────────────────────────────────────────────────
+
+function buildMessageArea(w: number, h: number): void {
+  const { messages } = useStore.getState();
+
+  if (messages.length === 0) {
+    buildWelcome(w, h);
+    return;
+  }
+
+  const hist = blessed.box({
+    parent: screen,
+    top: 1,
+    left: 0,
+    width: w,
+    height: h - 1,
+    scrollable: true,
+    alwaysScroll: true,
+  });
+
+  let y = 0;
+  for (const msg of messages) {
+    renderMessageBox(hist, msg, w, y);
+    y += getMsgHeight(msg, w);
+  }
+
+  // Scroll to bottom
+  setTimeout(() => {
+    try { hist.setScrollPerc(100); } catch { /* ignore */ }
+  }, 50);
+}
+
+// ─── Welcome screen ───────────────────────────────────────────────────────────
+
+function buildWelcome(w: number, h: number): void {
+  const container = blessed.box({
+    parent: screen,
+    top: 1,
+    left: 0,
+    width: w,
+    height: h - 1,
+    align: 'center',
+    valign: 'middle',
+  });
+
+  const boxW = Math.min(w - 8, 52);
+  const boxH = 14;
+  const boxLeft = Math.max(Math.floor((w - boxW) / 2), 0);
+  const boxTop = Math.max(Math.floor((h - boxH) / 2) - 2, 0);
+
+  const inner = blessed.box({
+    parent: container,
+    top: boxTop,
+    left: boxLeft,
+    width: boxW,
+    height: boxH,
+    border: { type: 'line' },
+    style: { border: { fg: 'cyan' } },
+  });
+
+  const innerW = boxW - 4;
+  const lines: Array<[string, blessed.Widgets.Color, boolean]> = [
+    [pad('', innerW), 'cyan', false],
+    [`  EamilOS  Multi-Agent Orchestrator  `, 'cyan', true],
+    [`  v${VERSION}  `, 'cyan', false],
+    [pad('', innerW), 'cyan', false],
+    [`  OpenCode Agent  +  Gemini CLI Agent  `, 'white', false],
+    [`  Graphify Knowledge Graph          `, 'white', false],
+    [pad('', innerW), 'white', false],
+    [`  Strategies:  `, 'gray', false],
+    [`    [1] opencode-first   [2] gemini-first  `, 'gray', false],
+    [`    [3] parallel         [4] swarm         `, 'gray', false],
+    [pad('', innerW), 'white', false],
+    [`  Type a prompt and press Enter to begin  `, 'gray', false],
+    [pad('', innerW), 'cyan', false],
+  ];
+
+  lines.forEach(([content, fg, bold], i) => {
+    blessed.text({
+      parent: inner,
+      top: i,
+      left: 1,
+      content,
+      style: { fg, bold },
+    });
+  });
+}
+
+// ─── Input area ───────────────────────────────────────────────────────────────
+
+function buildInputArea(w: number, bottomY: number): void {
+  const { isRunning, currentStrategy } = useStore.getState();
+
+  // Strategy bar
+  const stratBar = blessed.box({
+    parent: screen,
+    top: bottomY,
+    left: 0,
+    width: w,
+    height: 1,
+    border: { type: 'line' },
+    style: { border: { fg: 'gray' } },
+  });
+
+  const stratStr = STRATEGIES.map((s, i) => {
+    const active = s === currentStrategy;
+    return `[${i + 1}]${s}`;
+  }).join('  ');
+
+  blessed.text({
+    parent: stratBar,
+    top: 0,
+    left: 1,
+    content: ` Strategy: ${stratStr}`,
+    style: { fg: 'gray' },
+  });
+
+  // Input box
+  const inputBorderColor: blessed.Widgets.Color = isRunning ? 'yellow' : 'cyan';
+  const inputBox = blessed.box({
+    parent: screen,
+    top: bottomY + 1,
+    left: 0,
+    width: w,
+    height: 1,
+    border: { type: 'line' },
+    style: { border: { fg: inputBorderColor } },
+  });
+
+  if (isRunning) {
+    blessed.text({
+      parent: inputBox,
+      top: 0,
+      left: 1,
+      content: `  ${SPINNER[0]} ${SPINNER[0]} ${SPINNER[0]} Agents working  --  Ctrl+C to cancel`,
+      style: { fg: 'yellow' },
+    });
+    startSpinner();
+  } else {
+    stopSpinner();
+    blessed.text({
+      parent: inputBox,
+      top: 0,
+      left: 1,
+      content: ' >',
+      style: { fg: 'cyan', bold: true },
+    });
+
+    const textbox = blessed.textbox({
+      parent: inputBox,
+      left: 4,
+      width: Math.max(w - 18, 20),
+      height: 1,
+      inputOnFocus: true,
+      style: { fg: 'white' },
+    });
+
+    // Enter to submit
+    textbox.key('enter', () => {
+      const value = textbox.getValue().trim();
+      if (!value) return;
+      textbox.clearValue();
+      textbox.blur();
+      run(value);
+    });
+
+    // Up to recall last prompt
+    textbox.key('up', () => {
+      const last = useStore.getState().lastPrompt;
+      if (last) textbox.setValue(last);
+    });
+
+    // Down to clear
+    textbox.key('down', () => {
+      textbox.clearValue();
+    });
+
+    // Strategy shortcuts 1-4
+    STRATEGIES.forEach((s, i) => {
+      textbox.key(String(i + 1), () => {
+        if (textbox.getValue().length === 0) {
+          useStore.getState().setStrategy(s);
+          renderApp();
+        }
+      });
+    });
+
+    textbox.focus();
+  }
+
+  // Hint bar
+  const hintsBar = blessed.box({
+    parent: screen,
+    top: bottomY + 2,
+    left: 0,
+    width: w,
+    height: 1,
+  });
+
+  blessed.text({
+    parent: hintsBar,
+    content: trunc('  Up: repeat last  |  1-4: switch strategy  |  Ctrl+L: clear  |  Ctrl+G: graph  |  Ctrl+C: cancel/exit', w),
+    style: { fg: 'gray' },
+  });
+}
+
+// ─── Main render ──────────────────────────────────────────────────────────────
+
+function renderApp(): void {
+  try {
+    stopSpinner();
+    clearScreen();
+
     const state = useStore.getState();
-    const hash = `${state.messages.length}|${state.isRunning}|${state.terminalWidth}|${state.terminalHeight}`;
+    const w = state.terminalWidth;
+    const h = state.terminalHeight;
+
+    // Status bar
+    buildStatusBar(w);
+
+    // Message area (reserve bottom 3 rows for strategy + input + hints)
+    const msgAreaHeight = h - 4;
+    buildMessageArea(w, msgAreaHeight);
+
+    // Bottom: strategy + input + hints
+    const bottomY = h - 3;
+    buildInputArea(w, bottomY);
+
+    screen.render();
+  } catch (err) {
+    console.error('Render error:', err);
+  }
+}
+
+// ─── Global key bindings (registered once, outside render cycle) ──────────────
+
+screen.key('C-c', () => {
+  const state = useStore.getState();
+  if (state.isRunning) {
+    cancel();
+  } else {
+    stopSpinner();
+    try { screen.destroy(); } catch { /* ignore */ }
+    process.exit(0);
+  }
+});
+
+screen.key('C-l', () => {
+  useStore.getState().clearMessages();
+  renderApp();
+});
+
+screen.key('C-g', () => {
+  useStore.getState().toggleGraphPanel();
+  renderApp();
+});
+
+// ─── Store subscription for live updates ─────────────────────────────────────
+
+let lastRenderHash = '';
+let pendingRender = false;
+
+useStore.subscribe(() => {
+  if (pendingRender) return;
+  pendingRender = true;
+
+  setImmediate(() => {
+    pendingRender = false;
+    const state = useStore.getState();
+    const hash = [
+      state.messages.length,
+      state.messages[state.messages.length - 1]?.content?.length ?? 0,
+      state.isRunning ? 1 : 0,
+      state.currentStrategy,
+      screen.width,
+      screen.height,
+    ].join('|');
+
     if (hash !== lastRenderHash) {
       lastRenderHash = hash;
       renderApp();
     }
-  }, 100);
-}
+  });
+});
 
-initTerminalSize();
-renderApp();
+// ─── Resize handler ───────────────────────────────────────────────────────────
 
 screen.on('resize', () => {
-  initTerminalSize();
+  useStore.getState().setTerminalSize(screen.width as number, screen.height as number);
   renderApp();
 });
 
-startRenderLoop();
-process.stdin.resume();
-process.on('SIGTERM', () => {
-  if (renderInterval) clearInterval(renderInterval);
+// ─── Shutdown ─────────────────────────────────────────────────────────────────
+
+function shutdown(): void {
+  stopSpinner();
   try { screen.destroy(); } catch { /* ignore */ }
   process.exit(0);
-});
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+// ─── Initialize and start ─────────────────────────────────────────────────────
+
+useStore.getState().setTerminalSize(screen.width as number, screen.height as number);
+renderApp();
 
 export function startUI(): Promise<void> {
   return new Promise(() => {});
