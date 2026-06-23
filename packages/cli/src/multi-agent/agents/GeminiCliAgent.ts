@@ -183,11 +183,15 @@ export class GeminiCliAgent extends BaseAgent {
       });
 
       proc.stdout?.on('data', (data: Buffer) => {
-        output += data.toString();
+        const chunk = data.toString();
+        output += chunk;
+        this.emit('chunk', 'gemini', chunk);
       });
 
       proc.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString();
+        const chunk = data.toString();
+        stderr += chunk;
+        this.emit('chunk', 'gemini', chunk);
       });
 
       const timeout = setTimeout(() => {
@@ -307,10 +311,14 @@ export class GeminiCliAgent extends BaseAgent {
       proc.stdin?.end();
 
       proc.stdout?.on('data', (data: Buffer) => {
-        output += data.toString();
+        const chunk = data.toString();
+        output += chunk;
+        this.emit('chunk', 'gemini', chunk);
       });
 
       proc.stderr?.on('data', (data: Buffer) => {
+        const chunk = data.toString();
+        this.emit('chunk', 'gemini', `[stderr] ${chunk}`);
       });
 
       const timeout = setTimeout(() => {

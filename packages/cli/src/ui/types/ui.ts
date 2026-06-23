@@ -1,71 +1,54 @@
-export type GraphNodeStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked';
+export type AgentStatus = 'ready' | 'busy' | 'offline';
+export type ExecutionStrategy = 'opencode-first' | 'gemini-first' | 'parallel' | 'swarm';
+export type MessageType = 'user' | 'opencode' | 'gemini' | 'system' | 'error' | 'graph-stats';
+export type ToolStatus = 'pending' | 'running' | 'done' | 'failed';
 
-export interface ExecutionNode {
+export interface ToolCall {
   id: string;
-  label: string;
-  status: GraphNodeStatus;
-  children: ExecutionNode[];
-  reason?: string;
-  metadata?: {
-    attempt?: number;
-    model?: string;
-    cost?: number;
-    duration?: number;
-  };
-  question?: AgentQuestion;
-  blocked?: boolean;
+  name: string;
+  args: string;
+  status: ToolStatus;
+  result?: string;
+  lines?: number;
+}
+
+export interface Message {
+  id: string;
+  type: MessageType;
+  content: string;
   timestamp: number;
-  updatedAt?: number;
+  tools?: ToolCall[];
+  agent?: 'opencode' | 'gemini';
+  isStreaming?: boolean;
 }
 
-export type SessionStatus = 'active' | 'completed' | 'failed' | 'abandoned';
-
-export interface LogEntry {
-  id: string;
-  timestamp: number;
-  level: 'info' | 'warn' | 'error' | 'debug';
-  message: string;
-  metadata?: Record<string, unknown>;
+export interface GraphStats {
+  nodes: number;
+  edges: number;
+  strategy: ExecutionStrategy;
+  duration?: number;
+  toolsUsed?: number;
+  validated?: boolean;
 }
 
-export interface Session {
-  id: string;
-  goal: string;
-  status: SessionStatus;
-  createdAt: number;
-  lastUpdated: number;
-  
-  state: {
-    executionTree: ExecutionNode;
-    logs: LogEntry[];
-    attempt: number;
-    budgetUsed: number;
-    constraints?: string[];
+export interface AgentInfo {
+  status: AgentStatus;
+  version?: string;
+  model?: string;
+}
+
+export interface AppState {
+  messages: Message[];
+  isRunning: boolean;
+  currentStrategy: ExecutionStrategy;
+  graphStats: GraphStats;
+  agentStatus: {
+    opencode: AgentInfo;
+    gemini: AgentInfo;
   };
-  
-  metadata: {
-    modelPreference?: string;
-    autoRetry?: boolean;
-    maxAttempts?: number;
-  };
-}
-
-export type QuestionType = 'choice' | 'text' | 'confirm';
-
-export interface AgentQuestion {
-  id: string;
-  type: QuestionType;
-  question: string;
-  options?: string[];
-  default?: string;
-  required: boolean;
-  timeout?: number;
-  context?: string;
-  nodeId?: string;
-}
-
-export interface AgentAnswer {
-  questionId: string;
-  answer: string;
-  timestamp: number;
+  lastPrompt: string;
+  showGraphPanel: boolean;
+  executionStart?: number;
+  terminalWidth: number;
+  terminalHeight: number;
 }

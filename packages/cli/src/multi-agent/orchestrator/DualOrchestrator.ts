@@ -76,22 +76,31 @@ export class DualOrchestrator extends EventEmitter {
     this.config = {
       maxRetries: 3,
       timeoutMs: 240000,
+      workingDir: process.cwd(),
       ...config,
     };
 
     this.openCodeAgent = new OpenCodeAgent({
-      workingDir: config.workingDir,
-      env: config.env,
-      timeoutMs: config.timeoutMs,
+      workingDir: this.config.workingDir,
+      env: this.config.env,
+      timeoutMs: this.config.timeoutMs,
     });
 
     this.geminiAgent = new GeminiCliAgent({
-      workingDir: config.workingDir,
-      env: config.env,
-      timeoutMs: config.timeoutMs,
+      workingDir: this.config.workingDir,
+      env: this.config.env,
+      timeoutMs: this.config.timeoutMs,
     });
 
     this.graph = new Graphify();
+
+    // Forward chunk events from agents
+    this.geminiAgent.on('chunk', (agent: string, chunk: string) => {
+      this.emit('agent.output', agent, chunk);
+    });
+    this.openCodeAgent.on('chunk', (agent: string, chunk: string) => {
+      this.emit('agent.output', agent, chunk);
+    });
 
     this.graph.createAgentNode('opencode', 'OpenCode Agent', [
       'code-generation', 'refactoring', 'multi-model', 'file-editing', 'open-source',
@@ -208,6 +217,7 @@ Task: "${task}"`
     };
 
     this.emit('task:started', { task, taskId: taskNode.id });
+    this.emit('orchestrator.started', { task, taskId: taskNode.id, strategy: result.strategy });
 
     let analysis: TaskAnalysis;
     try {
@@ -226,6 +236,8 @@ Task: "${task}"`
 
     while (result.attempts < maxRetries && !result.success) {
       result.attempts++;
+
+      this.emit('agent.started', result.strategy === 'gemini-first' ? 'gemini' : 'opencode');
 
       try {
         let execResult;
@@ -266,13 +278,21 @@ Task: "${task}"`
         result.primaryResult = execResult.primary;
         result.secondaryResult = execResult.secondary;
 
+        this.emit('agent.completed', usedAgent, execResult.primary || execResult.secondary);
+        this.emit('graph.node', { type: 'result', agent: usedAgent });
+        this.emit('graph.edge', { from: taskNode.id, to: 'result' });
+
         const validationResult = await this.validateOutput(execResult, analysis.type);
+
+        this.emit('validation.started', {});
 
         if (validationResult.valid) {
           result.success = true;
           result.finalOutput = validationResult.output;
           result.files = validationResult.files;
           result.validated = true;
+
+          this.emit('validation.passed', {});
 
           for (const file of result.files) {
             this.graph.trackFile(file.path, file.content || '', usedAgent, file.action as 'created' | 'modified' | 'deleted');
@@ -281,6 +301,7 @@ Task: "${task}"`
 
           this.graph.completeTask(taskNode.id, result.finalOutput || '');
           this.emit('task:completed', { taskId: taskNode.id, attempts: result.attempts, agent: usedAgent });
+          this.emit('orchestrator.done', { duration: Date.now() - startTime, strategy: result.strategy, success: true });
         } else {
           this.graph.recordError(
             `Validation failed: ${validationResult.errors.join(', ')}`,
@@ -298,6 +319,7 @@ Task: "${task}"`
         const errorMsg = (err as Error).message;
         result.errors.push(errorMsg);
         this.graph.recordError(errorMsg, 'orchestrator', { attempt: result.attempts });
+        this.emit('orchestrator.error', errorMsg);
       }
     }
 
@@ -308,6 +330,7 @@ Task: "${task}"`
         properties: { ...taskNode.properties, status: 'failed', errors: result.errors },
       });
       this.emit('task:failed', { taskId: taskNode.id, errors: result.errors });
+      this.emit('orchestrator.error', result.errors.join('; '));
     }
 
     return result;
@@ -699,6 +722,9 @@ Task: "${task}"`
     const match = content.match(pattern);
     return match ? match[1].trim() : '';
   }
+
+  /** Alias for execute(), used by the TUI */
+  run = this.execute.bind(this);
 
   getGraph(): Graphify {
     return this.graph;

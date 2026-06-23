@@ -1,3 +1,8 @@
 #!/usr/bin/env node
 
-import '../../../dist/eamilos-ui.js';
+import { startUI } from '../../../dist/eamilos-ui.js';
+
+startUI().catch((err) => {
+  console.error('Failed to start EamilOS UI:', err.message);
+  process.exit(1);
+});

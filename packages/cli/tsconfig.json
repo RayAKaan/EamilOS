@@ -3,12 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "jsx": "react-jsx",
     "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "strict": false,
-    "noImplicitAny": false
+    "noUnusedParameters": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["src/ui/**/*.tsx"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "src/ui/**/*.tsx", "src/ui/**/*.ts"]
 }

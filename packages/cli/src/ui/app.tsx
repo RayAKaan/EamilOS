@@ -1,110 +1,133 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
-import { ExecutionView } from './screens/ExecutionView';
-import { SessionResumeScreen } from './screens/SessionResumeScreen';
-import { useSessionPersistence } from './hooks/useSessionPersistence';
-import { useAgentDialogue } from './hooks/useAgentDialogue';
-
-const EAMILOS_VERSION = process.env.EAMILOS_VERSION || '1.0.0';
-
-type AppScreen = 'resume' | 'execution';
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-class ErrorBoundary extends React.Component<{children?: React.ReactNode}, ErrorBoundaryState> {
-  constructor(props: {}) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    console.error('UI Error:', error, errorInfo);
-  }
-
-  render(): React.ReactNode {
-    if (this.state.hasError) {
-      return (
-        <Box flexDirection="column" padding={2}>
-          <Text color="red">UI Error</Text>
-          <Text dimColor>{this.state.error?.message || 'Unknown error'}</Text>
-          <Text dimColor>Press Ctrl+C to exit</Text>
-        </Box>
-      );
-    }
-    return this.props.children;
-  }
-}
+import React, { useState, useEffect, useCallback } from 'react';
+import { Box, Text, useApp, useInput, useStdout } from 'ink';
+import { useStore } from './state/store.js';
+import { useOrchestrator } from './hooks/useOrchestrator.js';
+import { useAgentStatus } from './hooks/useAgentStatus.js';
+import { MessageHistory } from './components/MessageHistory.js';
+import { StatusBar } from './components/StatusBar.js';
+import { InputBox } from './components/InputBox.js';
+import { WelcomeBanner } from './components/WelcomeBanner.js';
+import type { ExecutionStrategy } from './types/ui.js';
 
 export const App: React.FC = () => {
-  const [screen, setScreen] = useState<AppScreen>('resume');
-  const { createSession, resumeSession } = useSessionPersistence();
-  const { hasPendingQuestion } = useAgentDialogue();
+  const { exit } = useApp();
+  const { stdout } = useStdout();
+  const [terminalWidth, setTerminalWidth] = useState(() => stdout.columns || 80);
 
   useEffect(() => {
-    setScreen('resume');
-  }, []);
+    const handler = () => setTerminalWidth(stdout.columns);
+    stdout.on('resize', handler);
+    return () => { stdout.off('resize', handler); };
+  }, [stdout]);
 
-  const handleResume = async (sessionId: string) => {
-    try {
-      await resumeSession(sessionId);
-      setScreen('execution');
-    } catch (error) {
-      console.error('Resume failed:', error);
+  const messages = useStore((s) => s.messages);
+  const isRunning = useStore((s) => s.isRunning);
+  const currentStrategy = useStore((s) => s.currentStrategy);
+  const graphStats = useStore((s) => s.graphStats);
+  const agentStatus = useStore((s) => s.agentStatus);
+  const lastPrompt = useStore((s) => s.lastPrompt);
+  const showGraphPanel = useStore((s) => s.showGraphPanel);
+  const setStrategy = useStore((s) => s.setStrategy);
+  const toggleGraphPanel = useStore((s) => s.toggleGraphPanel);
+  const clearMessages = useStore((s) => s.clearMessages);
+
+  const { run, cancel } = useOrchestrator();
+
+  useAgentStatus();
+
+  useInput((input, key) => {
+    if (key.ctrl && input === 'c') {
+      if (isRunning) cancel();
+      else exit();
     }
-  };
+    if (key.ctrl && input === 'l') clearMessages();
+    if (key.ctrl && input === 'g') toggleGraphPanel();
+  });
 
-  const handleNew = () => {
-    createSession('New Task');
-    setScreen('execution');
-  };
+  const handleSubmit = useCallback(
+    (prompt: string, strategy: ExecutionStrategy) => run(prompt, strategy),
+    [run]
+  );
+
+  const handleStrategyChange = useCallback(
+    (s: ExecutionStrategy) => setStrategy(s),
+    [setStrategy]
+  );
+
+  const showWelcome = messages.length === 0;
 
   return (
-    <ErrorBoundary>
-      <Box flexDirection="column" height="100%">
-        <Box paddingX={1} paddingY={0.5}>
-          <Text bold color="cyan">EamilOS</Text>
-          <Text dimColor> v{EAMILOS_VERSION}</Text>
-          {hasPendingQuestion && (
-            <Text color="yellow"> [Awaiting Input]</Text>
-          )}
-        </Box>
+    <Box flexDirection="column" width={terminalWidth}>
+      <StatusBar
+        opencode={agentStatus.opencode}
+        gemini={agentStatus.gemini}
+        strategy={currentStrategy}
+        graphStats={graphStats}
+        isRunning={isRunning}
+        terminalWidth={terminalWidth}
+        version="1.0.0"
+      />
 
-        <Box flexGrow={1}>
-          {screen === 'resume' && (
-            <SessionResumeScreen
-              onResume={handleResume}
-              onNew={handleNew}
-            />
-          )}
-          
-          {screen === 'execution' && (
-            <ExecutionView />
-          )}
-        </Box>
-
-        <Box 
-          borderStyle="round" 
-          borderColor="gray"
-          paddingX={1}
-          paddingY={0.5}
-        >
-          <Text dimColor>
-            {screen === 'execution' 
-              ? hasPendingQuestion 
-                ? 'Execution Mode - Awaiting Input' 
-                : 'Execution Mode' 
-              : 'Session Manager'}
-            {' | Ctrl+C Exit'}
-          </Text>
-        </Box>
+      <Box flexDirection="column" flexGrow={1}>
+        {showWelcome ? (
+          <WelcomeBanner />
+        ) : (
+          <MessageHistory messages={messages} />
+        )}
       </Box>
-    </ErrorBoundary>
+
+      {showGraphPanel && (
+        <Box
+          borderStyle="single"
+          borderColor="blue"
+          paddingX={1}
+          paddingY={0}
+          flexShrink={0}
+          gap={1}
+        >
+          <Text color="blue" bold>
+            📊 Graphify
+          </Text>
+          <Text dimColor>│</Text>
+          <Text>
+            N:<Text color="cyan">{graphStats.nodes}</Text>
+          </Text>
+          <Text dimColor>│</Text>
+          <Text>
+            E:<Text color="cyan">{graphStats.edges}</Text>
+          </Text>
+          <Text dimColor>│</Text>
+          <Text>
+            S:<Text color="cyan">{graphStats.strategy}</Text>
+          </Text>
+          {graphStats.duration !== undefined && (
+            <>
+              <Text dimColor>│</Text>
+              <Text>
+                D:<Text color="cyan">{(graphStats.duration / 1000).toFixed(1)}s</Text>
+              </Text>
+            </>
+          )}
+          {graphStats.toolsUsed !== undefined && (
+            <>
+              <Text dimColor>│</Text>
+              <Text>
+                T:<Text color="cyan">{graphStats.toolsUsed}</Text>
+              </Text>
+            </>
+          )}
+        </Box>
+      )}
+
+      <InputBox
+        isRunning={isRunning}
+        onSubmit={handleSubmit}
+        lastPrompt={lastPrompt}
+        currentStrategy={currentStrategy}
+        onStrategyChange={handleStrategyChange}
+      />
+    </Box>
   );
 };
+
+export default App;

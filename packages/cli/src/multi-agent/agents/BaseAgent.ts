@@ -127,6 +127,10 @@ export abstract class BaseAgent extends EventEmitter {
 
   abstract send(message: string): Promise<TerminalMessage>;
 
+  protected emitChunk(agentName: string, chunk: string): void {
+    this.emit('chunk', agentName, chunk);
+  }
+
   protected createMessage(
     id: string,
     content: string,

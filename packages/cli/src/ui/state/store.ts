@@ -1,201 +1,79 @@
 import { create } from 'zustand';
+import { randomBytes } from 'crypto';
 import type {
-  ExecutionNode,
-  Session,
-  AgentQuestion,
-  LogEntry,
+  AppState,
+  Message,
+  ToolCall,
+  ExecutionStrategy,
+  AgentInfo,
+  GraphStats,
 } from '../types/ui.js';
 
-interface ExecutionState {
-  tree: ExecutionNode | null;
-  currentNodeId: string | null;
-  isRunning: boolean;
-  attempt: number;
-  maxAttempts: number;
-  setTree: (tree: ExecutionNode) => void;
-  updateNode: (nodeId: string, updates: Partial<ExecutionNode>) => void;
-  addNode: (parentId: string | null, node: ExecutionNode) => void;
-  setCurrentNode: (nodeId: string | null) => void;
-  setRunning: (running: boolean) => void;
-  incrementAttempt: () => void;
-  resetExecution: () => void;
+function uid(): string {
+  return randomBytes(6).toString('hex');
 }
 
-interface SessionState {
-  currentSession: Session | null;
-  recentSessions: Session[];
-  autoSaveEnabled: boolean;
-  lastSaved: number | null;
-  setCurrentSession: (session: Session | null) => void;
-  addRecentSession: (session: Session) => void;
-  removeRecentSession: (sessionId: string) => void;
-  updateSessionState: (updates: Partial<Session['state']>) => void;
-  setAutoSave: (enabled: boolean) => void;
-  setLastSaved: (timestamp: number) => void;
+interface Actions {
+  addMessage:          (msg: Omit<Message, 'id' | 'timestamp'>) => string;
+  updateMessage:       (id: string, updates: Partial<Message>) => void;
+  appendToMessage:     (id: string, chunk: string) => void;
+  addToolToMessage:    (messageId: string, tool: Omit<ToolCall, 'id'>) => string;
+  updateToolInMessage: (messageId: string, toolId: string, updates: Partial<ToolCall>) => void;
+  setRunning:          (running: boolean) => void;
+  setStrategy:         (strategy: ExecutionStrategy) => void;
+  setAgentStatus:      (agent: 'opencode' | 'gemini', info: Partial<AgentInfo>) => void;
+  updateGraphStats:    (stats: Partial<GraphStats>) => void;
+  setLastPrompt:       (prompt: string) => void;
+  toggleGraphPanel:    () => void;
+  clearMessages:       () => void;
+  setExecutionStart:   () => void;
+  setTerminalSize:     (width: number, height: number) => void;
 }
 
-interface DialogueState {
-  pendingQuestion: AgentQuestion | null;
-  isBlocked: boolean;
-  setPendingQuestion: (question: AgentQuestion | null) => void;
-  setBlocked: (blocked: boolean) => void;
-  answerQuestion: (answer: string) => void;
-}
+export const useStore = create<AppState & Actions>((set) => ({
+  messages:       [],
+  isRunning:      false,
+  currentStrategy:'opencode-first',
+  graphStats:     { nodes: 0, edges: 0, strategy: 'opencode-first' },
+  agentStatus:    { opencode: { status: 'offline' }, gemini: { status: 'offline' } },
+  lastPrompt:     '',
+  showGraphPanel: false,
+  terminalWidth:  process.stdout.columns ?? 120,
+  terminalHeight: process.stdout.rows    ?? 30,
 
-interface LogsState {
-  logs: LogEntry[];
-  maxLogs: number;
-  addLog: (log: Omit<LogEntry, 'id' | 'timestamp'>) => void;
-  clearLogs: () => void;
-  setLogs: (logs: LogEntry[]) => void;
-}
-
-export type AppState = ExecutionState & SessionState & DialogueState & LogsState;
-
-const updateNodeRecursive = (
-  node: ExecutionNode,
-  nodeId: string,
-  updates: Partial<ExecutionNode>
-): ExecutionNode => {
-  if (node.id === nodeId) {
-    return {
-      ...node,
-      ...updates,
-      updatedAt: Date.now(),
-      children: updates.children ?? node.children,
-    };
-  }
-  return {
-    ...node,
-    children: node.children.map((child: ExecutionNode) => updateNodeRecursive(child, nodeId, updates)),
-  };
-};
-
-const addNodeRecursive = (
-  tree: ExecutionNode,
-  parentId: string,
-  node: ExecutionNode
-): ExecutionNode => {
-  if (tree.id === parentId) {
-    return {
-      ...tree,
-      children: [...tree.children, node],
-    };
-  }
-  return {
-    ...tree,
-    children: tree.children.map((child: ExecutionNode) => addNodeRecursive(child, parentId, node)),
-  };
-};
-
-export const useStore = create<AppState>()((set, get) => ({
-  tree: null,
-  currentNodeId: null,
-  isRunning: false,
-  attempt: 1,
-  maxAttempts: 3,
-
-  setTree: (tree: ExecutionNode) => set({ tree }),
-
-  updateNode: (nodeId: string, updates: Partial<ExecutionNode>) => {
-    const tree = get().tree;
-    if (!tree) return;
-    set({ tree: updateNodeRecursive(tree, nodeId, updates) });
+  addMessage: (msg) => {
+    const id = uid();
+    set((s) => ({ messages: [...s.messages, { id, timestamp: Date.now(), ...msg }] }));
+    return id;
   },
-
-  addNode: (parentId: string | null, node: ExecutionNode) => {
-    const tree = get().tree;
-    if (!tree) {
-      set({ tree: node });
-      return;
-    }
-    if (parentId === null) {
-      set({ tree: node });
-      return;
-    }
-    set({ tree: addNodeRecursive(tree, parentId, node) });
+  updateMessage: (id, updates) =>
+    set((s) => ({ messages: s.messages.map((m) => m.id === id ? { ...m, ...updates } : m) })),
+  appendToMessage: (id, chunk) =>
+    set((s) => ({ messages: s.messages.map((m) => m.id === id ? { ...m, content: m.content + chunk } : m) })),
+  addToolToMessage: (messageId, tool) => {
+    const toolId = uid();
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === messageId ? { ...m, tools: [...(m.tools ?? []), { id: toolId, ...tool }] } : m
+      ),
+    }));
+    return toolId;
   },
-
-  setCurrentNode: (nodeId: string | null) => set({ currentNodeId: nodeId }),
-  setRunning: (running: boolean) => set({ isRunning: running }),
-  incrementAttempt: () => set((state) => ({ attempt: state.attempt + 1 })),
-  resetExecution: () => set({
-    tree: null,
-    currentNodeId: null,
-    isRunning: false,
-    attempt: 1,
-  }),
-
-  currentSession: null,
-  recentSessions: [],
-  autoSaveEnabled: true,
-  lastSaved: null,
-
-  setCurrentSession: (session: Session | null) => set({ currentSession: session }),
-
-  addRecentSession: (session: Session) => set((state) => ({
-    recentSessions: [
-      session,
-      ...state.recentSessions.filter((s) => s.id !== session.id)
-    ].slice(0, 10),
-  })),
-
-  removeRecentSession: (sessionId: string) => set((state) => ({
-    recentSessions: state.recentSessions.filter((s) => s.id !== sessionId),
-  })),
-
-  updateSessionState: (updates: Partial<Session['state']>) => {
-    const state = get();
-    if (!state.currentSession) return;
-    set({
-      currentSession: {
-        ...state.currentSession,
-        state: { ...state.currentSession.state, ...updates },
-        lastUpdated: Date.now(),
-      },
-    });
-  },
-
-  setAutoSave: (enabled: boolean) => set({ autoSaveEnabled: enabled }),
-  setLastSaved: (timestamp: number) => set({ lastSaved: timestamp }),
-
-  pendingQuestion: null,
-  isBlocked: false,
-
-  setPendingQuestion: (question: AgentQuestion | null) => set({
-    pendingQuestion: question,
-    isBlocked: question !== null,
-  }),
-
-  setBlocked: (blocked: boolean) => set({ isBlocked: blocked }),
-
-  answerQuestion: () => {
-    set({ pendingQuestion: null, isBlocked: false });
-  },
-
-  logs: [],
-  maxLogs: 100,
-
-  addLog: (log: Omit<LogEntry, 'id' | 'timestamp'>) => set((state) => {
-    const newLog: LogEntry = {
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
-      ...log,
-    };
-    return {
-      logs: [...state.logs, newLog].slice(-state.maxLogs),
-    };
-  }),
-
-  clearLogs: () => set({ logs: [] }),
-  setLogs: (logs: LogEntry[]) => set({ logs }),
+  updateToolInMessage: (messageId, toolId, updates) =>
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === messageId
+          ? { ...m, tools: (m.tools ?? []).map((t) => t.id === toolId ? { ...t, ...updates } : t) }
+          : m
+      ),
+    })),
+  setRunning:       (running)  => set({ isRunning: running }),
+  setStrategy:      (strategy) => set((s) => ({ currentStrategy: strategy, graphStats: { ...s.graphStats, strategy } })),
+  setAgentStatus:   (agent, info) => set((s) => ({ agentStatus: { ...s.agentStatus, [agent]: { ...s.agentStatus[agent], ...info } } })),
+  updateGraphStats: (stats)    => set((s) => ({ graphStats: { ...s.graphStats, ...stats } })),
+  setLastPrompt:    (prompt)   => set({ lastPrompt: prompt }),
+  toggleGraphPanel: ()         => set((s) => ({ showGraphPanel: !s.showGraphPanel })),
+  clearMessages:    ()         => set({ messages: [] }),
+  setExecutionStart:()         => set({ executionStart: Date.now() }),
+  setTerminalSize:  (w, h)     => set({ terminalWidth: w, terminalHeight: h }),
 }));
-
-export const useExecutionTree = () => useStore((state) => state.tree);
-export const useCurrentSession = () => useStore((state) => state.currentSession);
-export const usePendingQuestion = () => useStore((state) => state.pendingQuestion);
-export const useLogs = () => useStore((state) => state.logs);
-export const useIsBlocked = () => useStore((state) => state.isBlocked);
-export const useCurrentNode = () => useStore((state) => state.currentNodeId);
-export const useIsRunning = () => useStore((state) => state.isRunning);
-export const useAttempt = () => useStore((state) => state.attempt);

@@ -200,25 +200,7 @@ export class OpenCodeAgent extends BaseAgent {
       return this.createErrorMessage(id, `OpenCode not available: ${health.error}`, startTime);
     }
 
-    try {
-      if (!OpenCodeAgent.serverRunning) {
-        await this.startServer();
-      }
-
-      const response = await this.callServer(message);
-      const duration = Date.now() - startTime;
-      const parsed = this.parseResponse(response, id);
-
-      return this.createMessage(
-        id,
-        parsed.output,
-        response,
-        parsed.tools,
-        { duration, files: parsed.files, stats: parsed.stats, serverMode: true }
-      );
-    } catch {
-      return this.sendOneShot(message, id, startTime);
-    }
+    return this.sendOneShot(message, id, startTime);
   }
 
   private async callServer(prompt: string): Promise<string> {
@@ -250,9 +232,7 @@ export class OpenCodeAgent extends BaseAgent {
   private sendOneShot(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
     return new Promise((resolve) => {
       const args = [
-        'run',
-        '--format', 'json',
-        '--no-tui',
+        'run', prompt,
       ];
 
       if (this.config.model) {
@@ -273,9 +253,6 @@ export class OpenCodeAgent extends BaseAgent {
         },
       });
 
-      proc.stdin?.write(prompt);
-      proc.stdin?.end();
-
       proc.on('error', (err) => {
         if (!timedOut) {
           clearTimeout(timeout);
@@ -284,11 +261,15 @@ export class OpenCodeAgent extends BaseAgent {
       });
 
       proc.stdout?.on('data', (data: Buffer) => {
-        output += data.toString();
+        const chunk = data.toString();
+        output += chunk;
+        this.emitChunk('opencode', chunk);
       });
 
       proc.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString();
+        const chunk = data.toString();
+        stderr += chunk;
+        this.emitChunk('opencode', chunk);
       });
 
       const timeout = setTimeout(() => {
