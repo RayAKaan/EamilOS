@@ -1,7 +1,7 @@
 /**
  * EamilOS TUI Entry Point — Pure Blessed, no JSX
  */
-import * as blessed from 'blessed';
+import blessed from 'blessed';
 import { useStore } from './state/store.js';
 import { run, cancel } from './hooks/useOrchestrator.js';
 import { renderMessageBox, getMsgHeight } from './components/MessageBlock.js';

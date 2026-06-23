@@ -1,4 +1,4 @@
-import * as blessed from 'blessed';
+import blessed from 'blessed';
 import type { Message } from '../types/ui.js';
 
 function trunc(str: string, maxLen: number): string {
