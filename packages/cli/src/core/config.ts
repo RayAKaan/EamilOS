@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { parse } from 'yaml';
 import { ConfigSchema, EamilOSConfig } from './schemas/config.js';
-import { NormalizedConfig } from './config/ConfigNormalizer.js';
+import { ConfigNormalizer, NormalizedConfig } from './config/ConfigNormalizer.js';
 import { AutoInit } from './config/AutoInit.js';
 
 export class ConfigLoader {
@@ -45,9 +45,13 @@ export class ConfigLoader {
 
     const content = readFileSync(foundPath, 'utf-8');
     const resolved = this.resolveEnvVars(content);
-    const parsed = parse(resolved) as unknown;
+    const parsed = parse(resolved) as Record<string, unknown>;
 
-    const result = ConfigSchema.safeParse(parsed);
+    const normalizer = new ConfigNormalizer();
+    const normalized = normalizer.normalize(parsed || {});
+    const converted = this.convertNormalizedToSchema(normalized);
+
+    const result = ConfigSchema.safeParse(converted);
 
     if (!result.success) {
       const errors = result.error.errors.map(

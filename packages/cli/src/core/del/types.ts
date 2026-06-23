@@ -20,7 +20,6 @@ export function isErr<T, E>(result: Result<T, E>): result is { ok: false; error:
 
 export function unwrap<T, E>(result: Result<T, E>): T {
   if (!result.ok) {
-    // @ts-expect-error — pre-existing: Result union needs narrowing
     throw new Error(`unwrap called on Err: ${JSON.stringify(result.error)}`);
   }
   return result.value;
@@ -31,17 +30,14 @@ export function unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T {
 }
 
 export function map<T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<U, E> {
-  // @ts-expect-error — pre-existing: Result<T,E> not assignable to Result<U,E>
   return result.ok ? ok(fn(result.value)) : result;
 }
 
 export function mapErr<T, E, F>(result: Result<T, E>, fn: (error: E) => F): Result<T, F> {
-  // @ts-expect-error — pre-existing: Result union needs narrowing
   return result.ok ? result : err(fn(result.error));
 }
 
 export function flatMap<T, U, E>(result: Result<T, E>, fn: (value: T) => Result<U, E>): Result<U, E> {
-  // @ts-expect-error — pre-existing: Result<T,E> not assignable to Result<U,E>
   return result.ok ? fn(result.value) : result;
 }
 

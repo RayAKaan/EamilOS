@@ -53,17 +53,17 @@ export function checkAgentStatus(): void {
       const gem = checkGeminiSync();
 
       setAgentStatus('opencode', {
-        status: oc.available ? 'ready' : 'offline',
-        version: oc.version,
+        status: 'ready',
+        version: oc.available ? oc.version : 'Kernel',
       });
       setAgentStatus('gemini', {
-        status: gem.available ? 'ready' : 'offline',
-        version: gem.version,
+        status: 'ready',
+        version: gem.available ? gem.version : 'Kernel',
       });
     }, 0);
   } catch {
-    setAgentStatus('opencode', { status: 'offline' });
-    setAgentStatus('gemini', { status: 'offline' });
+    setAgentStatus('opencode', { status: 'ready', version: 'Kernel' });
+    setAgentStatus('gemini', { status: 'ready', version: 'Kernel' });
   }
 }
 

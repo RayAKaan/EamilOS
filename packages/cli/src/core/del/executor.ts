@@ -160,9 +160,7 @@ export class DELExecutor {
     const extractResult = extract(context.rawOutput.rawText);
 
     if (!extractResult.ok) {
-      // @ts-expect-error — pre-existing: Result union needs narrowing
       errors.push(extractResult.error);
-      // @ts-expect-error — pre-existing: Result union needs narrowing
       callbacks?.onStageError?.('extraction', extractResult.error, context);
       callbacks?.onStageComplete?.('extraction', context);
 
@@ -180,7 +178,6 @@ export class DELExecutor {
     const schemaResult = validateSchema(payload, this.config);
 
     if (!schemaResult.ok || !schemaResult.value.valid) {
-      // @ts-expect-error — pre-existing: Result union needs narrowing
       const schemaError = schemaResult.ok ? schemaResult.value.errors[0] : schemaResult.error;
       if (schemaError) {
         errors.push(schemaError);

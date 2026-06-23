@@ -76,7 +76,6 @@ export class DualOrchestrator extends EventEmitter {
     this.config = {
       maxRetries: 3,
       timeoutMs: 240000,
-      workingDir: process.cwd(),
       ...config,
     };
 

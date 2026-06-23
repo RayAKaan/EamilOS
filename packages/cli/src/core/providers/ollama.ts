@@ -50,6 +50,7 @@ export function createOllamaProvider(endpoint: string, model: string): LLMProvid
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(400),
     });
 
     if (!response.ok) {

@@ -268,8 +268,10 @@ function render(): void {
     style: { fg: 'gray' },
   });
 
-  // ── Input row (row h-2) ───────────────────────────────────────────────────
+  // ── Input row (row h-2) — always visible ──────────────────────────────────
   const inputY = stratY + 1;
+
+  if (spinnerTimer) { clearInterval(spinnerTimer); spinnerTimer = null; }
 
   if (isRunning) {
     text({
@@ -277,24 +279,22 @@ function render(): void {
       top: inputY,
       left: 0,
       width: w,
-      content: '  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' agents working  --  Ctrl+C to cancel',
+      content: '  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + '  >',
       style: { fg: 'yellow' },
     });
-    if (spinnerTimer) clearInterval(spinnerTimer);
     spinnerTimer = setInterval(() => {
       spinnerFrame = (spinnerFrame + 1) % SPINNER.length;
       try {
         const kids = (mainScreen.children ?? []) as Array<{ top?: number; setContent?: (c: string) => void }>;
         const el = kids.find(c => c.top === inputY);
         if (el?.setContent) {
-          el.setContent('  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' agents working  --  Ctrl+C to cancel');
+          el.setContent('  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + '  >');
         }
       } catch {
         if (spinnerTimer) clearInterval(spinnerTimer);
       }
     }, 120);
   } else {
-    if (spinnerTimer) { clearInterval(spinnerTimer); spinnerTimer = null; }
     text({
       parent: mainScreen,
       top: inputY,
@@ -303,44 +303,44 @@ function render(): void {
       content: ' >',
       style: { fg: 'cyan', bold: true },
     });
-
-    const tb = textbox({
-      parent: mainScreen,
-      top: inputY,
-      left: 3,
-      width: Math.max(w - 6, 20),
-      height: 1,
-      inputOnFocus: true,
-      style: { fg: 'white' },
-    });
-
-    tb.key('enter', () => {
-      const val = tb.getValue().trim();
-      if (!val) return;
-      tb.clearValue();
-      run(val);
-    });
-
-    tb.key('up', () => {
-      const last = useStore.getState().lastPrompt;
-      if (last) tb.setValue(last);
-    });
-
-    tb.key('down', () => {
-      tb.clearValue();
-    });
-
-    STRATEGIES.forEach((s, i) => {
-      tb.key(String(i + 1), () => {
-        if (tb.getValue().length === 0) {
-          useStore.getState().setStrategy(s);
-          render();
-        }
-      });
-    });
-
-    tb.focus();
   }
+
+  const tb = textbox({
+    parent: mainScreen,
+    top: inputY,
+    left: 4,
+    width: Math.max(w - 8, 20),
+    height: 1,
+    inputOnFocus: true,
+    style: { fg: 'white' },
+  });
+
+  tb.key('enter', () => {
+    const val = tb.getValue().trim();
+    if (!val || isRunning) return;
+    tb.clearValue();
+    run(val);
+  });
+
+  tb.key('up', () => {
+    const last = useStore.getState().lastPrompt;
+    if (last) tb.setValue(last);
+  });
+
+  tb.key('down', () => {
+    tb.clearValue();
+  });
+
+  STRATEGIES.forEach((s, i) => {
+    tb.key(String(i + 1), () => {
+      if (tb.getValue().length === 0) {
+        useStore.getState().setStrategy(s);
+        render();
+      }
+    });
+  });
+
+  tb.focus();
 
   // ── Hints (row h-1) ───────────────────────────────────────────────────────
   const hintsY = inputY + 1;

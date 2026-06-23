@@ -187,7 +187,6 @@ export class MultiAgentOrchestrator {
       if (!commitResult.ok) {
         const error: ClassifiedError = {
           code: 'SCHEMA_MISMATCH' as DELErrorCode,
-          // @ts-expect-error — pre-existing: Result union needs narrowing
           message: `Context key ${commitResult.error.key} already exists`,
           context: task.id,
           stage: 'schema',

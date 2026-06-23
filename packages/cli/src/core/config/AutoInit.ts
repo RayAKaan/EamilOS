@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { parse } from 'yaml';
 import { ConfigNormalizer, NormalizedConfig } from './ConfigNormalizer.js';
 import { ConfigWriter } from './ConfigWriter.js';
 import { OllamaDetector } from '../providers/OllamaDetector.js';
@@ -131,7 +132,6 @@ export class AutoInit {
   private loadConfigFile(configPath: string): Record<string, unknown> {
     try {
       const content = fs.readFileSync(configPath, 'utf-8');
-      const { parse } = require('yaml');
       return parse(content) as Record<string, unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

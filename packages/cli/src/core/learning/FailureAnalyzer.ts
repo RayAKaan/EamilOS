@@ -162,9 +162,6 @@ export class FailureAnalyzer {
       case 'api_error':
         parts.push('External API failure');
         break;
-      case 'rate_limit':
-        parts.push('API rate limit exceeded');
-        break;
       default:
         parts.push('Unexpected error condition');
     }
