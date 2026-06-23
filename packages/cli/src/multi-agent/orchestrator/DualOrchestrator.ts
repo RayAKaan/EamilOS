@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { OpenCodeAgent } from '../agents/OpenCodeAgent.js';
 import { GeminiCliAgent } from '../agents/GeminiCliAgent.js';
 import { Graphify, KGNode } from '../graph/Graphify.js';
+import { TerminalMessage } from '../agents/BaseAgent.js';
 
 export function isErrorResponse(content: string): boolean {
   if (!content || content.length > 5000) return false;
@@ -21,6 +22,26 @@ export function isErrorResponse(content: string): boolean {
 
   return errorPatterns.some(pattern => lower.includes(pattern.toLowerCase()));
 }
+
+export const EAMILOS_SWARM_SYSTEM_PROMPT = `
+[EamilOS 1.4.0 — Unified Autonomous Multi-Agent Kernel]
+You are operating as a specialized intelligence node within EamilOS, pooling the collective execution power of OpenCode AI (75+ models & code synthesis) and Gemini CLI (multimodal long-context research) into a single unified agent system.
+Your supreme directive is to generate verified, validated, production-ready working code.
+Guaranteed Execution Protocols:
+1. MAX POWER SYNTHESIS: Leverage complete architectural implementation, comprehensive error handling, modular design patterns, and strict security compliance.
+2. NO PLACEHOLDERS: Never output conceptual descriptions, "TODO: implement later", or temporary filenames like data.json/temp.js.
+3. STRUCTURED OUTPUT: For coding goals, respond directly with valid JSON:
+{
+  "summary": "Architectural overview of working solution",
+  "files": [
+    {
+      "path": "relative/path/filename.ext",
+      "content": "# Complete working production code...",
+      "language": "programming_language"
+    }
+  ]
+}
+`.trim();
 
 export type ExecutionStrategy = 'gemini-first' | 'opencode-first' | 'parallel' | 'swarm';
 export type TaskType = 'code' | 'research' | 'analyze' | 'refactor' | 'debug' | 'general';
@@ -336,6 +357,66 @@ Task: "${task}"`
     return result;
   }
 
+  /**
+   * Wraps an agent send() with a 3-second gauntlet timeout.
+   * If the CLI binary hangs, lacks credentials, or encounters a network error,
+   * EamilOS intercepts the failure, logs a self-healing reroute event, and
+   * falls back to the internal ProviderManager kernel.
+   */
+  private async sendWithGauntlet(
+    agent: 'opencode' | 'gemini-cli',
+    message: string,
+    signal?: AbortSignal
+  ): Promise<TerminalMessage> {
+    const agentObj = agent === 'opencode' ? this.openCodeAgent : this.geminiAgent;
+
+    try {
+      const result = await Promise.race([
+        agentObj.send(message),
+        new Promise<TerminalMessage>((_, reject) => {
+          const timer = setTimeout(() => reject(new Error(`Gauntlet 3s timeout for ${agent} — CLI binary unavailable, hanging, or lacks credentials`)), 3000);
+          if (signal) signal.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('Aborted')); }, { once: true });
+        }),
+      ]);
+      return result;
+    } catch (err) {
+      const reason = (err as Error).message;
+
+      this.emit('orchestrator.reroute', { agent, reason });
+      this.graph.recordAgentAction(agent, 'gauntlet-timeout', reason.length > 200 ? reason.slice(0, 200) : reason);
+
+      try {
+        const { getProviderManager } = await import('../../core/provider-manager.js');
+        const pm = getProviderManager();
+        const systemPrompt = agent === 'opencode'
+          ? 'You are OpenCode, an elite code-generation agent inside the EamilOS unified swarm. Output working production-ready code files as JSON: {"files": [{"path": "...", "content": "..."}]}. Never output descriptions or placeholders.'
+          : 'You are Gemini CLI, an elite research and analysis agent inside the EamilOS unified swarm. Focus on analysis, planning, and review. Be concise and provide structured output.';
+
+        const result = await pm.chat([
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message },
+        ]);
+
+        const content = result.content || '(empty kernel response)';
+        return {
+          id: `${agent}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          timestamp: Date.now(),
+          content,
+          raw: content,
+          metadata: { kernelFallback: true, gauntletReroute: true, duration: 0 },
+        };
+      } catch (innerErr) {
+        return {
+          id: `${agent}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          timestamp: Date.now(),
+          content: `Kernel fallback failed: ${(innerErr as Error).message}`,
+          raw: '',
+          metadata: { kernelFallback: true, gauntletReroute: true, error: (innerErr as Error).message },
+        };
+      }
+    }
+  }
+
   private async executeGeminiFirst(
     task: string,
     analysis: TaskAnalysis
@@ -349,7 +430,7 @@ Task: "${task}"`
     let researchSuccess = false;
 
     try {
-      const researchResponse = await this.geminiAgent.send(researchPrompt);
+      const researchResponse = await this.sendWithGauntlet('gemini-cli', researchPrompt);
       if (!isErrorResponse(researchResponse.content)) {
         research = researchResponse.content;
         researchSuccess = true;
@@ -366,7 +447,7 @@ Task: "${task}"`
 
     if (!researchSuccess) {
       try {
-        const opencodePlan = await this.openCodeAgent.send(
+        const opencodePlan = await this.sendWithGauntlet('opencode',
           `Analyze and plan: ${task}\n\nProvide a clear implementation plan with specific files to create and steps to follow.`
         );
         research = opencodePlan.content;
@@ -384,7 +465,7 @@ Task: "${task}"`
 
     let implementation = '';
     try {
-      const implResponse = await this.openCodeAgent.send(implementationPrompt);
+      const implResponse = await this.sendWithGauntlet('opencode', implementationPrompt);
       implementation = implResponse.content;
       this.graph.recordAgentAction('opencode', 'implementation', implementation);
     } catch (err) {
@@ -413,7 +494,7 @@ Task: "${task}"`
     let implementationSuccess = false;
 
     try {
-      const implResponse = await this.openCodeAgent.send(implPrompt);
+      const implResponse = await this.sendWithGauntlet('opencode', implPrompt);
       implementation = implResponse.content;
       implementationSuccess = true;
       this.graph.recordAgentAction('opencode', 'implementation', implementation);
@@ -435,7 +516,7 @@ Task: "${task}"`
         ? `Debug and fix issues in:\n${implementation}\n\nFiles: ${files.map(f => f.path).join(', ')}\n\nProvide corrected code.`
         : `Review this implementation:\n${implementation}\n\nFiles: ${files.map(f => f.path).join(', ')}\n\nCheck for correctness, potential bugs, and suggest improvements.`;
 
-      const reviewResponse = await this.geminiAgent.send(reviewPrompt);
+      const reviewResponse = await this.sendWithGauntlet('gemini-cli', reviewPrompt);
 
       if (!isErrorResponse(reviewResponse.content)) {
         review = reviewResponse.content;
@@ -468,8 +549,8 @@ Task: "${task}"`
     const opencodePrompt = `Implement: ${task}\n\n## Context\n${contextStr}\n\nReturn JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
 
     const [researchPromise, implementationPromise] = await Promise.allSettled([
-      this.geminiAgent.send(geminiPrompt),
-      this.openCodeAgent.send(opencodePrompt),
+      this.sendWithGauntlet('gemini-cli', geminiPrompt),
+      this.sendWithGauntlet('opencode', opencodePrompt),
     ]);
 
     let research = '';
@@ -486,7 +567,7 @@ Task: "${task}"`
 
     if (!implementation && research) {
       try {
-        const fallbackImpl = await this.openCodeAgent.send(`Based on this plan:\n${research}\n\nImplement it. Return JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`);
+        const fallbackImpl = await this.sendWithGauntlet('opencode', `Based on this plan:\n${research}\n\nImplement it. Return JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`);
         implementation = fallbackImpl.content;
         this.graph.recordAgentAction('opencode', 'implementation (fallback)', implementation);
       } catch {}
@@ -511,8 +592,8 @@ Task: "${task}"`
     const opencodePrompt = `Implement: ${task}\n\n## Context\n${contextStr}\n\nReturn JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
 
     const [geminiResult, opencodeResult] = await Promise.allSettled([
-      this.geminiAgent.send(geminiPrompt),
-      this.openCodeAgent.send(opencodePrompt),
+      this.sendWithGauntlet('gemini-cli', geminiPrompt),
+      this.sendWithGauntlet('opencode', opencodePrompt),
     ]);
 
     const geminiContent = geminiResult.status === 'fulfilled' ? geminiResult.value.content : '';
@@ -556,7 +637,7 @@ Task: "${task}"`
     errors: string[];
   }> {
     const errors: string[] = [];
-    const finalOutput = result.secondary || result.primary;
+    const finalOutput = result.files.length > 0 ? result.primary : (result.secondary || result.primary);
     const validatedFiles = [...result.files];
 
     const expectsCode = !taskType ||
