@@ -35,6 +35,9 @@ Thumbs.db
 *.bak
 *.tmp
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # Generated files in src (should be in dist only)
 packages/*/src/*.js
 packages/*/src/*.d.ts
