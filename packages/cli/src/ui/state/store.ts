@@ -32,7 +32,7 @@ const defaultGraphStats: GraphStats = {
   strategy: 'opencode-first',
 };
 
-const defaultAgentInfo: AgentInfo = { status: 'offline' };
+const defaultAgentInfo: AgentInfo = { status: 'offline', version: 'Kernel' };
 
 export const useStore = create<AppState & StoreActions>((set) => ({
   messages: [],

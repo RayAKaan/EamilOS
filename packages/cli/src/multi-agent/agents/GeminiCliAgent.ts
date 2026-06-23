@@ -160,7 +160,6 @@ export class GeminiCliAgent extends BaseAgent {
 
     return new Promise((resolve) => {
       const args = [
-        '--non-interactive',
         '--prompt', message,
         '--output-format', 'json',
         '--yolo',
@@ -286,7 +285,6 @@ export class GeminiCliAgent extends BaseAgent {
 
     return new Promise((resolve) => {
       const args = [
-        '--non-interactive',
         '--output-format', 'json',
         '--yolo',
         '--prompt', prompt,

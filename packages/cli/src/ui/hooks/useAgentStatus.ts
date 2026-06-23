@@ -48,19 +48,17 @@ export function checkAgentStatus(): void {
   const setAgentStatus = useStore.getState().setAgentStatus;
 
   try {
-    setTimeout(() => {
-      const oc = checkOpenCodeSync();
-      const gem = checkGeminiSync();
+    const oc = checkOpenCodeSync();
+    const gem = checkGeminiSync();
 
-      setAgentStatus('opencode', {
-        status: 'ready',
-        version: oc.available ? oc.version : 'Kernel',
-      });
-      setAgentStatus('gemini', {
-        status: 'ready',
-        version: gem.available ? gem.version : 'Kernel',
-      });
-    }, 0);
+    setAgentStatus('opencode', {
+      status: 'ready',
+      version: oc.available ? oc.version : 'Kernel',
+    });
+    setAgentStatus('gemini', {
+      status: 'ready',
+      version: gem.available ? gem.version : 'Kernel',
+    });
   } catch {
     setAgentStatus('opencode', { status: 'ready', version: 'Kernel' });
     setAgentStatus('gemini', { status: 'ready', version: 'Kernel' });
