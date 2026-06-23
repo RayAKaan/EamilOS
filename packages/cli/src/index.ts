@@ -16,6 +16,7 @@ import { pluginsCommand } from './commands/plugins.js';
 import { insightsCommand } from './commands/insights.js';
 import { explainRoutingCommand } from './commands/explain-routing.js';
 import { learningConfigCommand } from './commands/learning-config.js';
+import { createMultiAgentCommands } from '@eamilos/multi-agent';
 import { detectAndAutoInstall, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
@@ -508,6 +509,8 @@ learningCmd
       handleFatalError(error);
     }
   });
+
+program.addCommand(createMultiAgentCommands());
 
 program.parse(process.argv);
 

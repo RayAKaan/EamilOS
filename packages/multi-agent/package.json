@@ -1,0 +1,48 @@
+{
+  "name": "@eamilos/multi-agent",
+  "version": "1.2.8",
+  "description": "EamilOS Dual-CLI Agent Orchestrator — OpenCode + Gemini CLI with Graphify knowledge graph",
+  "type": "module",
+  "main": "dist/index.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./agents": "./dist/agents/index.js",
+    "./graph": "./dist/graph/index.js",
+    "./orchestrator": "./dist/orchestrator/index.js"
+  },
+  "files": [
+    "dist/**/*.ts",
+    "dist/**/*.js"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@eamilos/core": "^1.2.8",
+    "chalk": "^5.4.0",
+    "commander": "^13.1.0",
+    "ora": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "multi-agent",
+    "opencode",
+    "gemini-cli",
+    "eamilos",
+    "orchestration",
+    "knowledge-graph"
+  ],
+  "license": "MIT"
+}
