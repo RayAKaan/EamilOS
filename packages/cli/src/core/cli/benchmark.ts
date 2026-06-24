@@ -18,6 +18,7 @@ async function detectAvailableModels(): Promise<Array<{ modelId: string; provide
   const models: Array<{ modelId: string; provider: string }> = [];
 
   try {
+    await loadConfig();
     const config = getConfig();
     for (const providerConfig of config.providers) {
       for (const modelConfig of providerConfig.models) {

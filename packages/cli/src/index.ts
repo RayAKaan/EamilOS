@@ -16,6 +16,7 @@ import { pluginsCommand } from './commands/plugins.js';
 import { insightsCommand } from './commands/insights.js';
 import { explainRoutingCommand } from './commands/explain-routing.js';
 import { learningConfigCommand } from './commands/learning-config.js';
+import { helloCommand } from './commands/hello.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAndAutoInstall, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -285,6 +286,8 @@ program
     try {
       const eamilos = await initEamilOS();
       await status(eamilos, projectId);
+      eamilos.shutdown();
+      process.exit(0);
     } catch (error) {
       handleFatalError(error);
     }
@@ -297,6 +300,8 @@ program
     try {
       const eamilos = await initEamilOS();
       await list(eamilos);
+      eamilos.shutdown();
+      process.exit(0);
     } catch (error) {
       handleFatalError(error);
     }
@@ -310,6 +315,8 @@ program
       const eamilos = await initEamilOS();
       await eamilos.pauseProject(projectId);
       console.log('Project paused');
+      eamilos.shutdown();
+      process.exit(0);
     } catch (error) {
       handleFatalError(error);
     }
@@ -323,6 +330,8 @@ program
       const eamilos = await initEamilOS();
       await eamilos.resumeProject(projectId);
       console.log('Project resumed');
+      eamilos.shutdown();
+      process.exit(0);
     } catch (error) {
       handleFatalError(error);
     }
@@ -336,6 +345,8 @@ program
       const eamilos = await initEamilOS();
       await eamilos.cancelProject(projectId);
       console.log('Project cancelled');
+      eamilos.shutdown();
+      process.exit(0);
     } catch (error) {
       handleFatalError(error);
     }
@@ -349,6 +360,8 @@ program
       const eamilos = await initEamilOS();
       const count = eamilos.retryFailedTasks(projectId);
       console.log(`Retried ${count} failed tasks`);
+      eamilos.shutdown();
+      process.exit(0);
     } catch (error) {
       handleFatalError(error);
     }
@@ -407,6 +420,17 @@ program
         complexity: options.complexity,
         model: options.model,
       });
+    } catch (error) {
+      handleFatalError(error);
+    }
+  });
+
+program
+  .command('hello [name]')
+  .description('Display a greeting with system info')
+  .action(async (name?: string) => {
+    try {
+      await helloCommand(name);
     } catch (error) {
       handleFatalError(error);
     }
