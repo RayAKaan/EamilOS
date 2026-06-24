@@ -358,109 +358,18 @@ Task: "${task}"`
   }
 
   /**
-   * Wraps an agent send() with a 3-second gauntlet timeout.
-   *
-   * Phase 1 — Health check: determine whether the CLI binary is installed
-   * (may take up to ~15s for npx --no-install to time out).
-   *
-   * Phase 2 — Gauntlet: if the binary IS available, race the actual CLI
-   * invocation against a 3-second timeout.  If the CLI hangs or the
-   * provider returns a credential / network error, EamilOS intercepts the
-   * failure, logs a self-healing reroute event, and falls back to the
-   * internal ProviderManager kernel.
-   *
-   * If the binary is NOT available we skip the gauntlet and go straight
-   * to the kernel — no point waiting 3s for something we already know
-   * won't work.
+   * Dispatch directly through the EamilOS Execution Kernel (ProviderManager),
+   * bypassing external npx child process spawning. Both OpenCodeAgent and
+   * GeminiCliAgent now route through ProviderManager natively, so no health
+   * check or gauntlet timeout is needed.
    */
   private async sendWithGauntlet(
     agent: 'opencode' | 'gemini-cli',
     message: string,
-    signal?: AbortSignal
+    _signal?: AbortSignal
   ): Promise<TerminalMessage> {
     const agentObj = agent === 'opencode' ? this.openCodeAgent : this.geminiAgent;
-
-    /* ---------- phase 1 : health check ---------- */
-    let health;
-    try {
-      health = await agentObj.checkInstalled();
-    } catch {
-      health = { available: false, error: 'health check threw' };
-    }
-
-    /* ---------- phase 2 : gauntlet (only if CLI binary exists) ---------- */
-    if (health.available) {
-      try {
-        const result = await Promise.race([
-          agentObj.send(message),
-          new Promise<TerminalMessage>((_, reject) => {
-            const timer = setTimeout(
-              () => reject(
-                new Error(`Gauntlet 3s timeout for ${agent} — CLI binary "${agentObj.command}" hanging or lacks credentials`)
-              ),
-              3000,
-            );
-            if (signal) {
-              signal.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('Aborted')); }, { once: true });
-            }
-          }),
-        ]);
-        return result;
-      } catch (err) {
-        const reason = (err as Error).message;
-        this.emit('orchestrator.reroute', { agent, reason });
-        this.graph.recordAgentAction(
-          agent,
-          'gauntlet-timeout',
-          reason.length > 200 ? reason.slice(0, 200) : reason,
-        );
-        this.graph.recordError(`${agent} gauntlet timed out`, 'orchestrator', { reason });
-      }
-    } else {
-      this.graph.recordAgentAction(agent, 'not-installed', 'Binary not found — skipping gauntlet, using kernel fallback');
-    }
-
-    /* ---------- kernel fallback ---------- */
-    return this.kernelFallback(agent, message);
-  }
-
-  /**
-   * Synthesize a response through the internal ProviderManager kernel
-   * when the external CLI binary is unavailable or hangs.
-   */
-  private async kernelFallback(
-    agent: 'opencode' | 'gemini-cli',
-    message: string,
-  ): Promise<TerminalMessage> {
-    try {
-      const { getProviderManager } = await import('../../core/provider-manager.js');
-      const pm = getProviderManager();
-      const systemPrompt = agent === 'opencode'
-        ? 'You are OpenCode, an elite code-generation agent inside the EamilOS unified swarm. Output working production-ready code files as JSON: {"files": [{"path": "...", "content": "..."}]}. Never output descriptions or placeholders.'
-        : 'You are Gemini CLI, an elite research and analysis agent inside the EamilOS unified swarm. Focus on analysis, planning, and review. Be concise and provide structured output.';
-
-      const result = await pm.chat([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message },
-      ]);
-
-      const content = result.content || '(empty kernel response)';
-      return {
-        id: `${agent}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        timestamp: Date.now(),
-        content,
-        raw: content,
-        metadata: { kernelFallback: true, gauntletReroute: true, duration: 0 },
-      };
-    } catch (innerErr) {
-      return {
-        id: `${agent}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        timestamp: Date.now(),
-        content: `Kernel fallback failed: ${(innerErr as Error).message}`,
-        raw: '',
-        metadata: { kernelFallback: true, gauntletReroute: true, error: (innerErr as Error).message },
-      };
-    }
+    return agentObj.send(message);
   }
 
   private async executeGeminiFirst(

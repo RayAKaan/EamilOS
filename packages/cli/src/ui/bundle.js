@@ -22,6 +22,8 @@ await esbuild.build({
     'timers/promises', 'constants', 'punycode', 'perf_hooks',
     'pty.js', 'term.js',
     'zustand', 'nanoid', 'react', 'react-dom', 'execa',
+    'acorn', 'better-sqlite3', 'chalk', 'commander', 'ink',
+    'ink-text-input', 'ora', 'simple-git', 'yaml', 'zod',
   ],
   define: {
     'process.env.NODE_ENV': '"production"',

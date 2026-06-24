@@ -318,3 +318,5 @@ export { PromptOptimizer, type PromptOptimizerConfig } from './learning/PromptOp
 export { FailureAnalyzer, type FailureAnalyzerConfig } from './learning/FailureAnalyzer.js';
 export { EnrichmentLibrary } from './learning/EnrichmentLibrary.js';
 export * from './learning/statistics.js';
+export { CallsignRegistry } from './identity/CallsignRegistry.js';
+export { ConflictArbiter } from './comms/ConflictArbiter.js';

@@ -40,3 +40,9 @@ export {
   type MessageWithCausality,
   type CausalityChain,
 } from './DistributedAgentCommunicator.js';
+
+export {
+  ConflictArbiter,
+  type ArtifactCandidate,
+  type ArtifactResolution,
+} from './ConflictArbiter.js';
