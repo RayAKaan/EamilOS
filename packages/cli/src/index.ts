@@ -76,9 +76,9 @@ async function launchUI(args: string[]) {
   await detectAndShowProviders();
   
   const __filename = fileURLToPath(import.meta.url);
-  const cliUiPath = path.resolve(path.dirname(__filename), 'ui', 'bin', 'eamilos-ui');
+  const cliUiPath = path.resolve(path.dirname(__filename), 'eamilos-ui.js');
   const rootDir = process.cwd();
-  spawn('node', [cliUiPath, ...args], { stdio: 'inherit', shell: true, cwd: rootDir });
+  spawn('node', [cliUiPath, ...args], { stdio: 'inherit', cwd: rootDir });
 }
 
 program
@@ -160,8 +160,8 @@ program
       const path = await import('path');
       const { fileURLToPath } = await import('url');
       const __filename = fileURLToPath(import.meta.url);
-      const cliUiPath = path.resolve(path.dirname(__filename), 'ui', 'bin', 'eamilos-ui');
-      spawn(cliUiPath, [], { stdio: 'inherit', shell: true });
+      const cliUiPath = path.resolve(path.dirname(__filename), 'eamilos-ui.js');
+      spawn('node', [cliUiPath], { stdio: 'inherit' });
     } catch (error) {
       handleFatalError(error);
     }

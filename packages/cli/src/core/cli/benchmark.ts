@@ -5,7 +5,7 @@ import { MetricsStore } from '../model-router/MetricsStore.js';
 import { getSecureLogger } from '../security/SecureLogger.js';
 import { getProviderManager } from '../provider-manager.js';
 import { initOrchestrator } from '../orchestrator/StrictOrchestrator.js';
-import { getConfig } from '../config.js';
+import { getConfig, loadConfig } from '../config.js';
 
 export interface BenchmarkArgs {
   model?: string;
@@ -75,6 +75,8 @@ function calculateOverallScore(result: BenchmarkSuiteResult): number {
 export async function benchmarkCommand(args: BenchmarkArgs = {}): Promise<void> {
   console.log(chalk.bold('\n EamilOS Model Benchmark'));
   console.log('═'.repeat(50));
+
+  try { await loadConfig(); } catch { /* config optional */ }
 
   console.log(chalk.dim('\n Detecting available models...\n'));
   const availableModels = await detectAvailableModels();
