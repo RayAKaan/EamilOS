@@ -1,55 +1,66 @@
-// Message types for EamilOS TUI
-export type AgentStatus = 'ready' | 'busy' | 'offline';
+export type AgentStatus    = 'ready' | 'busy' | 'offline';
 export type ExecutionStrategy = 'gemini-first' | 'opencode-first' | 'parallel' | 'swarm';
-export type MessageType = 'user' | 'opencode' | 'gemini' | 'eamilos' | 'system' | 'thinking' | 'graph-stats' | 'error';
+
+// 'arbiter' is new in v2 — emitted when ConflictArbiter resolves a file conflict
+export type MessageType =
+  | 'user'
+  | 'opencode'
+  | 'gemini'
+  | 'eamilos'
+  | 'arbiter'
+  | 'system'
+  | 'thinking'
+  | 'graph-stats'
+  | 'error';
+
 export type ToolStatus = 'pending' | 'running' | 'done' | 'failed';
 
 export interface ToolCall {
-  id: string;
-  name: string;
-  args: string;
-  status: ToolStatus;
+  id:      string;
+  name:    string;
+  args:    string;
+  status:  ToolStatus;
   result?: string;
-  lines?: number;
+  lines?:  number;
 }
 
 export interface Message {
-  id: string;
-  type: MessageType;
-  content: string;
-  timestamp: number;
-  tools?: ToolCall[];
-  agent?: 'opencode' | 'gemini' | 'EamilOS';
+  id:          string;
+  type:        MessageType;
+  content:     string;
+  timestamp:   number;
+  tools?:      ToolCall[];
+  agent?:      'opencode' | 'gemini' | 'EamilOS';
   isStreaming?: boolean;
-  eventLabel?: string;
+  eventLabel?:  string;
 }
 
 export interface GraphStats {
-  nodes: number;
-  edges: number;
-  strategy: ExecutionStrategy;
-  duration?: number;
+  nodes:      number;
+  edges:      number;
+  strategy:   ExecutionStrategy;
+  duration?:  number;
   toolsUsed?: number;
   validated?: boolean;
 }
 
 export interface AgentInfo {
-  status: AgentStatus;
+  status:   AgentStatus;
   version?: string;
 }
 
 export interface AppState {
-  messages: Message[];
-  isRunning: boolean;
-  currentStrategy: ExecutionStrategy;
-  graphStats: GraphStats;
+  messages:       Message[];
+  isRunning:      boolean;
+  currentStrategy:ExecutionStrategy;
+  graphStats:     GraphStats;
   agentStatus: {
     opencode: AgentInfo;
-    gemini: AgentInfo;
+    gemini:   AgentInfo;
   };
-  lastPrompt: string;
-  showGraphPanel: boolean;
+  lastPrompt:      string;
+  showGraphPanel:  boolean;
   executionStart?: number;
-  terminalWidth: number;
-  terminalHeight: number;
+  terminalWidth:   number;
+  terminalHeight:  number;
 }

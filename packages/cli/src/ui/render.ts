@@ -1,70 +1,127 @@
 /**
- * Pure text renderer.
- * Every "row" is a plain string that gets written to a blessed text element
- * in a single full-screen box.  No nested boxes, no borders anywhere.
+ * EamilOS TUI — render.ts  (v2)
+ *
+ * What changed from OpenCode study:
+ *   1. Sidebar panel: live agent status, callsign registry, graph stats, session info.
+ *      OpenCode uses a right panel for file tree / diff. EamilOS uses it for
+ *      agent identity + execution state — the unique thing EamilOS knows about.
+ *   2. Section headers: ╸── LABEL ─── HH:MM:SS  (borrowed from OpenCode's
+ *      clean turn-divider pattern, adapted with heavy end-caps for identity).
+ *   3. Arbiter message type: new 'arbiter' section renders conflict resolution
+ *      events with a ⊕ tool-style row and diff3 / vote / identical resolution.
+ *   4. Run summary: two-column receipt at the bottom of a completed run.
+ *   5. Centering fix: plain-text measurement for all centered strings.
+ *      Hex tags ({#rrggbb-fg}) with hyphens can confuse blessed's width counter.
+ *      We track visible length separately so centering is always pixel-perfect.
+ *   6. Status bar: plain-text gap calculation to avoid tag miscounting.
  */
 
-import type { Message, ToolCall, AgentInfo, GraphStats, ExecutionStrategy } from './types/ui.js';
+import type {
+  Message, ToolCall, AgentInfo, GraphStats, ExecutionStrategy,
+} from './types/ui.js';
 
-// ─── Palette (xterm-256 / basic names that blessed understands) ────────────
+// ─── Palette ───────────────────────────────────────────────────────────────
+// Named blessed colors avoid the hex-hyphen tag parsing bug.
 
-export const C = {
-  reset:    '{/}',
-  // agent colours
-  cyan:     '{cyan-fg}',
-  mag:      '{magenta-fg}',
-  // ui chrome
-  green:    '{green-fg}',
-  yellow:   '{yellow-fg}',
-  blue:     '{#5f87ff-fg}',
-  red:      '{red-fg}',
-  // neutral
-  white:    '{white-fg}',
-  gray:     '{#606060-fg}',
-  dimgray:  '{#404040-fg}',
-  // bold helpers
-  bold:     '{bold}',
-  boldEnd:  '{/bold}',
+const K = {
+  teal:   'cyan',           // EamilOS brand (nearest named)
+  oc:     'cyan',           // opencode
+  gem:    'magenta',        // gemini
+  amber:  'yellow',         // user
+  ok:     'green',
+  warn:   'yellow',
+  err:    'red',
+  g0:     'white',
+  g1:     '#d4d4d4',
+  g2:     '#737373',
+  g3:     '#404040',
+  g4:     '#262626',
 } as const;
 
-function c(color: string, text: string): string {
+// ─── Tag helpers ───────────────────────────────────────────────────────────
+
+function fg(color: string, text: string): string {
   return `{${color}-fg}${text}{/}`;
 }
-function bold(text: string): string { return `{bold}${text}{/bold}`; }
-function dim(text:  string): string { return c('240', text); }
+function bold(t: string): string { return `{bold}${t}{/bold}`; }
 
-// ─── Time ──────────────────────────────────────────────────────────────────
-
-function ts(timestamp: number): string {
-  const d  = new Date(timestamp);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return dim(`${hh}:${mm}`);
-}
-
-// ─── Layout helpers ────────────────────────────────────────────────────────
-
-/** Repeat a character n times */
 export function rep(ch: string, n: number): string {
-  return n > 0 ? ch.repeat(n) : '';
+  const count = Math.max(0, Math.floor(n));
+  return count > 0 ? ch.repeat(count) : '';
 }
 
-/** Strip all {tag} sequences to measure visible length */
-function visLen(s: string): number {
+/** Visible length: strip all blessed {tag} sequences */
+function vl(s: string): number {
   return s.replace(/\{[^}]*\}/g, '').length;
 }
 
-/** Right-align `right` so total visible width = w, given `left` is already placed */
-function rightAlign(left: string, right: string, w: number): string {
-  const gap = w - visLen(left) - visLen(right);
-  return left + rep(' ', Math.max(gap, 1)) + right;
+/** Timestamp HH:MM:SS */
+function stamp(ts: number): string {
+  const d  = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return fg(K.g3, `${hh}:${mm}:${ss}`);
 }
 
-/** Wrap plain text to width, return array of lines */
-function wrap(text: string, w: number): string[] {
+// ─── Spinner ───────────────────────────────────────────────────────────────
+
+const SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+let _spinIdx = 0;
+export function tickSpinner(): void { _spinIdx = (_spinIdx + 1) % SPIN.length; }
+export function spinChar(frame?: number): string {
+  const i = frame !== undefined ? frame % SPIN.length : _spinIdx;
+  return SPIN[i] ?? '⠋';
+}
+
+// ─── Section header ────────────────────────────────────────────────────────
+// ╸── LABEL ──────────────────────── HH:MM:SS
+
+function sectionRule(label: string, labelPlain: string, accent: string, ts: number, w: number): string {
+  const tsStr = stamp(ts);
+  const tsLen = 8 + 2; // HH:MM:SS + spaces
+  const left  = fg(K.g3, '╸── ') + bold(fg(accent, label)) + ' ';
+  const leftLen = 4 + labelPlain.length + 1;
+  const ruleLen = Math.max(w - leftLen - tsLen - 1, 2);
+  return left + fg(K.g3, rep('─', ruleLen)) + ' ' + tsStr;
+}
+
+// ─── Tool rows ────────────────────────────────────────────────────────────
+
+const TOOL_DOT: Record<string, string> = {
+  pending: fg(K.g3,   '○'),
+  running: fg(K.warn, '◐'),
+  done:    fg(K.ok,   '●'),
+  failed:  fg(K.err,  '✗'),
+};
+
+function renderTool(tool: ToolCall, w: number): string[] {
+  const dot    = TOOL_DOT[tool.status] ?? fg(K.g3, '○');
+  const name   = fg(K.g0, tool.name.padEnd(12).slice(0, 12));
+  const argMax = Math.max(w - 20, 10);
+  const args   = fg(K.g2, tool.args.slice(0, argMax));
+  const lines  = tool.lines != null ? fg(K.g3, ` +${tool.lines}`) : '';
+  const first  = `  ${dot}  ${name}  ${args}${lines}`;
+  const out    = [first];
+  if (tool.result && (tool.status === 'done' || tool.status === 'failed')) {
+    const r = fg(tool.status === 'done' ? K.g2 : K.err, tool.result.slice(0, w - 10));
+    out.push(`        ${fg(K.g3, '└─')} ${r}`);
+  }
+  return out;
+}
+
+// ─── User message ──────────────────────────────────────────────────────────
+
+export function renderUser(msg: Message, w: number): string[] {
+  const rule = sectionRule('you', 'you', K.amber, msg.timestamp, w);
+  const lines = wrapText(msg.content, w - 4);
+  return [rule, ...lines.map(l => `   ${fg(K.amber, l)}`), ''];
+}
+
+function wrapText(text: string, w: number): string[] {
   const out: string[] = [];
   for (const raw of text.split('\n')) {
-    if (raw.length === 0) { out.push(''); continue; }
+    if (!raw) { out.push(''); continue; }
     let s = raw;
     while (s.length > w) { out.push(s.slice(0, w)); s = s.slice(w); }
     out.push(s);
@@ -72,273 +129,350 @@ function wrap(text: string, w: number): string[] {
   return out;
 }
 
-// ─── Message → lines ──────────────────────────────────────────────────────
-
-const TOOL_ICON: Record<string, string> = {
-  pending: dim('[ ]'),
-  running: c('yellow', '[~]'),
-  done:    c('green',  '[+]'),
-  failed:  c('red',    '[-]'),
-};
-
-function renderTool(tool: ToolCall, indent: number, w: number): string[] {
-  const icon    = TOOL_ICON[tool.status] ?? dim('[ ]');
-  const name    = c('white', tool.name.slice(0, 10).padEnd(10));
-  const suffix  = tool.lines != null ? dim(` (${tool.lines}L)`) : '';
-  const maxArgs = w - indent - 16 - (tool.lines != null ? 8 : 0);
-  const args    = dim(tool.args.slice(0, Math.max(maxArgs, 10)));
-  return [rep(' ', indent) + icon + ' ' + name + ' ' + args + suffix];
-}
-
-// ── user ───────────────────────────────────────────────────────────────────
-
-export function renderUser(msg: Message, w: number): string[] {
-  const ruler = dim(rep('\u2500', Math.max(w - 12, 4)));
-  const header = rightAlign(bold(c('green', 'you')) + '  ' + ruler, ts(msg.timestamp), w);
-  const lines  = wrap(msg.content, w - 4);
-  return [
-    header,
-    ...lines.map((l) => '    ' + c('white', l)),
-    '',
-  ];
-}
-
-// ── agent ──────────────────────────────────────────────────────────────────
-
-const SPINNER_FRAMES = ['|', '/', '-', '\\'];
-let spinIdx = 0;
-export function tickSpinner(): void { spinIdx = (spinIdx + 1) % 4; }
-export function spinnerChar(): string { return SPINNER_FRAMES[spinIdx] ?? '|'; }
-/** Alias for index.tsx compatibility */
-export function spinChar(frame?: number): string {
-  const idx = frame !== undefined ? frame % 4 : spinIdx;
-  return SPINNER_FRAMES[idx] ?? '|';
-}
+// ─── Agent message ─────────────────────────────────────────────────────────
 
 export function renderAgent(msg: Message, w: number, frame: number): string[] {
-  const isOC   = msg.agent === 'opencode' || msg.type === 'opencode' || msg.type === 'eamilos';
-  const isEamilOS = msg.type === 'eamilos' || msg.agent === 'EamilOS';
-  const color  = isEamilOS ? 'cyan' : (isOC ? 'cyan' : 'magenta');
-  const label  = isEamilOS ? 'EamilOS' : (isOC ? 'opencode' : 'gemini');
-  const ruler  = dim(rep('\u2500', Math.max(w - label.length - 10, 4)));
-  const header = rightAlign(bold(c(color, label)) + '  ' + ruler, ts(msg.timestamp), w);
-
-  const out: string[] = [header];
+  const isOC   = msg.agent === 'opencode' || msg.type === 'opencode';
+  const accent = isOC ? K.oc : K.gem;
+  const label  = isOC ? 'opencode' : 'gemini';
+  const rule   = sectionRule(label, label, accent, msg.timestamp, w);
+  const out: string[] = [rule];
 
   if (msg.content.trim()) {
-    const lines = wrap(msg.content, w - 4);
-    out.push(...lines.map((l) => '    ' + c('white', l)));
+    out.push(...wrapText(msg.content, w - 4).map(l => `   ${fg(K.g1, l)}`));
   }
-
   for (const tool of msg.tools ?? []) {
-    out.push(...renderTool(tool, 4, w));
+    out.push(...renderTool(tool, w));
   }
-
   if (msg.isStreaming) {
-    const sp = SPINNER_FRAMES[frame % 4] ?? '|';
-    out.push('    ' + dim(sp + ' ' + sp + ' ' + sp) + '  ' + dim(label + ' working...'));
+    out.push(`   ${fg(accent, spinChar(frame))} ${fg(K.g2, 'processing...')}`);
   }
-
   out.push('');
   return out;
 }
 
-// ── system / error ─────────────────────────────────────────────────────────
+// ─── Arbiter message — conflict resolution event ───────────────────────────
+//
+// Emitted by DualOrchestrator when ConflictArbiter resolves a file conflict.
+// msg.content is JSON: { path, method, callsign, reason }
+
+export interface ArbiterPayload {
+  path:      string;
+  method:    'identical' | 'auto-merge' | 'vote' | 'sole';
+  callsign?: string;
+  reason?:   string;
+}
+
+export function renderArbiter(msg: Message, w: number): string[] {
+  let p: ArbiterPayload = { path: '?', method: 'sole' };
+  try { p = JSON.parse(msg.content) as ArbiterPayload; } catch { /* ok */ }
+
+  const rule = sectionRule('arbiter', 'arbiter', K.g2, msg.timestamp, w);
+
+  const methodLabel: Record<string, string> = {
+    identical:  'identical — single write',
+    'auto-merge': 'auto-merge',
+    vote:       'quality vote',
+    sole:       'sole candidate',
+  };
+
+  const icon     = fg(K.g3, '⊕');
+  const pathStr  = fg(K.g2, p.path.slice(0, Math.max(w - 24, 10)));
+  const mLabel   = fg(K.g3, methodLabel[p.method] ?? p.method);
+  const first    = `  ${icon}  ${fg(K.g0, 'conflict'.padEnd(10))}  ${pathStr}  ${mLabel}`;
+  const out      = [rule, first];
+
+  if (p.reason) {
+    const r = fg(K.g2, p.reason.slice(0, w - 10));
+    out.push(`        ${fg(K.g3, '└─')} ${r}`);
+  }
+  out.push('');
+  return out;
+}
+
+// ─── System / error ────────────────────────────────────────────────────────
 
 export function renderSystem(msg: Message, w: number): string[] {
   const isErr  = msg.type === 'error';
-  const color  = isErr ? 'red' : 'yellow';
-  const label  = isErr ? 'err' : 'sys';
-  const ruler  = dim(rep('\u2500', Math.max(w - label.length - 10, 4)));
-  const header = rightAlign(bold(c(color, label)) + '  ' + ruler, ts(msg.timestamp), w);
+  const accent = isErr ? K.err : K.g2;
+  const label  = isErr ? 'error' : 'sys';
+  const rule   = sectionRule(label, label, accent, msg.timestamp, w);
+  return [rule, ...wrapText(msg.content, w - 4).map(l => `   ${fg(isErr ? K.err : K.g2, l)}`), ''];
+}
 
-  const lines  = wrap(msg.content, w - 4);
-  return [
-    header,
-    ...lines.map((l) => '    ' + (isErr ? c('red', l) : dim(l))),
-    '',
+// ─── Run summary (graph-stats) ─────────────────────────────────────────────
+
+interface SummaryPayload {
+  strategy:    string;
+  duration:    string;
+  toolsUsed:   number;
+  nodes:       number;
+  edges:       number;
+  validated:   boolean;
+  agentUsed?:  string;
+  conflicts?:  number;
+}
+
+export function renderSummary(msg: Message, w: number): string[] {
+  let p: SummaryPayload = {
+    strategy: '?', duration: '?', toolsUsed: 0,
+    nodes: 0, edges: 0, validated: false,
+  };
+  try { p = JSON.parse(msg.content) as SummaryPayload; } catch { /* ok */ }
+
+  const rule = sectionRule('run complete', 'run complete', K.teal, msg.timestamp, w);
+
+  const ok = bold(fg(K.ok,  '✓')) + fg(K.g1, ' validated');
+  const no = bold(fg(K.err, '✗')) + fg(K.g1, ' not validated');
+  const resultMark = p.validated ? ok : no;
+
+  const kv = (k: string, v: string) =>
+    `   ${fg(K.g2, k.padEnd(12))}${v}`;
+
+  const conflictsLabel = p.conflicts
+    ? fg(K.ok, `${p.conflicts} resolved`)
+    : fg(K.g3, 'none');
+
+  const rows: string[] = [
+    kv('strategy',   fg(K.g1, p.strategy)),
+    kv('agents',     fg(K.g1, p.agentUsed ?? '—')),
+    kv('duration',   fg(K.g1, p.duration)),
+    kv('files',      fg(K.g1, String(p.toolsUsed))),
+    kv('conflicts',  conflictsLabel),
+    kv('graph',      fg(K.g1, `${p.nodes} nodes`) + fg(K.g3, '  ·  ') + fg(K.g1, `${p.edges} edges`)),
+    kv('result',     resultMark),
   ];
+
+  // Two-column layout at width >= 90
+  if (w >= 90) {
+    const packed: string[] = [];
+    const half = Math.floor(w / 2);
+    for (let i = 0; i < rows.length; i += 2) {
+      const l = rows[i]! + rep(' ', Math.max(half - vl(rows[i]!), 0));
+      const r = rows[i + 1] ?? '';
+      packed.push(l + r);
+    }
+    return [rule, ...packed, ''];
+  }
+  return [rule, ...rows, ''];
 }
 
-// ── graph stats ─────────────────────────────────────────────────────────────
+// ─── Welcome screen ────────────────────────────────────────────────────────
+// Uses ctrPlain() to avoid hex-tag centering bugs.
 
-interface StatPayload {
-  strategy: string; duration: string; toolsUsed: number;
-  nodes: number; edges: number; validated: boolean;
+function ctrPlain(plain: string, tagged: string, w: number): string {
+  const pad = Math.max(Math.floor((w - plain.length) / 2), 0);
+  return rep(' ', pad) + tagged;
 }
-
-export function renderGraphStats(msg: Message, w: number): string[] {
-  let p: StatPayload = { strategy: '?', duration: '?', toolsUsed: 0, nodes: 0, edges: 0, validated: false };
-  try { p = JSON.parse(msg.content) as StatPayload; } catch { /* ok */ }
-
-  const ruler  = dim(rep('\u2500', Math.max(w - 12, 4)));
-  const header = bold(c('blue', 'summary')) + '  ' + ruler;
-
-  const row = (label: string, value: string, vc: string) =>
-    '    ' + dim(label.padEnd(14)) + c(vc, value);
-
-  return [
-    header,
-    row('strategy',    p.strategy,                    'white'),
-    row('duration',    p.duration,                    'white'),
-    row('tools used',  String(p.toolsUsed),           'white'),
-    row('graph nodes', String(p.nodes),               'cyan'),
-    row('graph edges', String(p.edges),               'cyan'),
-    row('result',      p.validated ? 'validated' : 'not validated',
-                       p.validated ? 'green' : 'red'),
-    '',
-  ];
-}
-
-// ── welcome ─────────────────────────────────────────────────────────────────
 
 export function renderWelcome(w: number, h: number): string[] {
   const lines: string[] = [];
-  const padTop = Math.max(Math.floor(h / 2) - 8, 0);
-
+  const padTop = Math.max(Math.floor(h / 2) - 11, 1);
   for (let i = 0; i < padTop; i++) lines.push('');
 
-  const centre = (s: string) => {
-    const vl = visLen(s);
-    const pad = Math.max(Math.floor((w - vl) / 2), 0);
-    return rep(' ', pad) + s;
-  };
+  lines.push(ctrPlain('EamilOS',
+    bold(fg('cyan', 'E')) + bold(fg('white', 'amil')) + bold(fg('cyan', 'OS')), w));
+  lines.push(ctrPlain('multi-agent AI execution kernel',
+    fg('gray', 'multi-agent AI execution kernel'), w));
+  lines.push('');
 
-  lines.push(centre(bold(c('cyan', 'EamilOS'))));
-  lines.push(centre(dim('multi-agent AI orchestrator')));
+  const rLen = Math.min(w - 8, 48);
+  lines.push(ctrPlain(rep('─', rLen), fg(K.g4, rep('─', rLen)), w));
   lines.push('');
-  lines.push(centre(dim(rep('\u2500', Math.min(w - 4, 50)))));
+
+  lines.push(ctrPlain('◆ opencode   ╱   ◆ gemini cli',
+    fg('cyan', '◆') + fg(K.g2, ' opencode') +
+    fg(K.g3, '   ╱   ') +
+    fg('magenta', '◆') + fg(K.g2, ' gemini cli'), w));
   lines.push('');
-  lines.push(centre(c('cyan',    'opencode') + dim('  +  ') + c('magenta', 'gemini cli')));
+
+  lines.push(ctrPlain('strategies', fg(K.g3, 'strategies'), w));
   lines.push('');
-  lines.push(centre(dim('strategies')));
+
+  lines.push(ctrPlain('[1] opencode-first   [2] gemini-first',
+    fg(K.g3, '[1]') + fg(K.g2, ' opencode-first   ') +
+    fg(K.g3, '[2]') + fg(K.g2, ' gemini-first'), w));
+  lines.push(ctrPlain('[3] parallel         [4] swarm',
+    fg(K.g3, '[3]') + fg(K.g2, ' parallel         ') +
+    fg(K.g3, '[4]') + fg(K.g2, ' swarm'), w));
   lines.push('');
-  lines.push(centre(c('cyan', '[1]') + dim(' opencode-first   ') + c('cyan', '[2]') + dim(' gemini-first')));
-  lines.push(centre(c('cyan', '[3]') + dim(' parallel         ') + c('cyan', '[4]') + dim(' swarm')));
+  lines.push(ctrPlain('──────────────────────────────', fg(K.g4, '──────────────────────────────'), w));
   lines.push('');
-  lines.push(centre(dim('type a task and press enter')));
+  lines.push(ctrPlain('describe your goal and press enter',
+    fg(K.g2, 'describe your goal and press ') + fg('white', 'enter'), w));
 
   return lines;
 }
 
-// ── status bar (single line) ────────────────────────────────────────────────
+// ─── Status bar ────────────────────────────────────────────────────────────
 
-function agentTag(info: AgentInfo, name: string, color: string): string {
-  const dot = info.status === 'offline' ? dim('[-]')
-            : info.status === 'busy'    ? c('yellow', '[~]')
-            : c('green', '[+]');
-  const ver = info.version ? dim(' ' + info.version) : '';
-  return dot + ' ' + c(color, name) + ver;
+function agentBadge(info: AgentInfo, name: string, accent: string): string {
+  const dot = info.status === 'offline' ? fg(K.g3,   '◇')
+            : info.status === 'busy'    ? fg('yellow', '◈')
+            :                            fg(accent,   '◆');
+  const ver = info.version ? fg(K.g3, ' ' + info.version.slice(0, 8)) : '';
+  return dot + ' ' + fg(accent, name) + ver;
 }
 
 export function renderStatusBar(
-  w: number,
-  oc: AgentInfo, gem: AgentInfo,
-  strategy: ExecutionStrategy,
+  w:          number,
+  oc:         AgentInfo,
+  gem:        AgentInfo,
+  strategy:   ExecutionStrategy,
   graphStats: GraphStats,
-  isRunning: boolean,
-  version: string,
+  isRunning:  boolean,
+  version:    string,
 ): string {
-  const left = bold(c('cyan', 'EamilOS')) + '  ' + dim(version)
-    + '  ' + dim(rep('\u2502', 1)) + '  '
-    + (isRunning ? c('yellow', 'running') : c('green', 'ready'));
+  const sep = fg(K.g4, '  │  ');
 
-  const centre = agentTag(oc, 'opencode', 'cyan')
-    + '   ' + agentTag(gem, 'gemini', 'magenta');
+  const mark   = bold(fg('cyan', 'EamilOS')) + fg(K.g3, ` v${version}`);
+  const agents = agentBadge(oc, 'opencode', K.oc) + fg(K.g4, '   ') + agentBadge(gem, 'gemini', K.gem);
+  const strat  = fg(K.g4, 'mode:') + fg('cyan', strategy);
+  const state  = isRunning
+    ? fg('yellow', spinChar()) + fg('yellow', ' running')
+    : fg('green',  '●') + fg(K.g2, ' ready');
+  const graph  = graphStats.nodes > 0
+    ? sep + fg(K.g3, 'g:') + fg(K.g2, `${graphStats.nodes}n ${graphStats.edges}e`)
+    : '';
 
-  const right = dim('strategy:') + c('cyan', strategy)
-    + '  ' + dim('nodes:') + c('white', String(graphStats.nodes))
-    + '  ' + dim('edges:') + c('white', String(graphStats.edges));
+  // Plain-text measurement avoids hex-tag miscounting in gap calculation
+  const leftPlain  = ` EamilOS v${version}  │  ◆ opencode${oc.version ? ' ' + oc.version.slice(0,8) : ''}   ◆ gemini${gem.version ? ' ' + gem.version.slice(0,8) : ''}`;
+  const rightPlain = `mode:${strategy}  │  ● ready${graphStats.nodes > 0 ? `  │  g:${graphStats.nodes}n ${graphStats.edges}e` : ''} `;
+  const gap        = Math.max(w - leftPlain.length - rightPlain.length, 2);
 
-  // Place left, centre (roughly), right
-  const leftLen   = visLen(left);
-  const centreLen = visLen(centre);
-  const rightLen  = visLen(right);
-  const mid       = Math.max(Math.floor((w - centreLen) / 2) - leftLen, 2);
-  const after     = Math.max(w - leftLen - mid - centreLen - rightLen, 2);
-
-  return left + rep(' ', mid) + centre + rep(' ', after) + right;
+  const left  = ' ' + mark + sep + agents;
+  const right = strat + sep + state + graph + ' ';
+  return left + rep(' ', gap) + right;
 }
 
-// ── strategy bar (single line) ──────────────────────────────────────────────
+// ─── Sidebar content (right panel) ─────────────────────────────────────────
+//
+// OpenCode's right panel shows file tree / diff.
+// EamilOS's right panel shows agent identity, callsigns, live session stats.
+// Returns an array of lines for the sidebar box.
 
-const STRATS: ExecutionStrategy[] = ['opencode-first', 'gemini-first', 'parallel', 'swarm'];
+export interface CallsignMap { [callsign: string]: string }
+
+export interface SidebarData {
+  oc:           AgentInfo;
+  gem:          AgentInfo;
+  callsigns:    CallsignMap;
+  graphStats:   GraphStats;
+  messageCount: number;
+  toolCount:    number;
+  conflictCount:number;
+  strategy:     ExecutionStrategy;
+}
+
+export function renderSidebar(data: SidebarData, w: number): string[] {
+  const sec = (title: string) => [
+    fg(K.g3, title.toUpperCase().slice(0, w).padEnd(w, ' ')),
+  ];
+  const kv  = (k: string, v: string, vc: string) =>
+    fg(K.g2, k.slice(0, 10).padEnd(10)) + fg(vc, v.slice(0, Math.max(w - 11, 4)));
+  const sep = () => [fg(K.g4, rep('─', w))];
+
+  const lines: string[] = [];
+
+  // agents
+  lines.push(...sec('agents'));
+  const ocDot  = data.oc.status  === 'offline' ? fg(K.g3, '◇') : data.oc.status  === 'busy' ? fg('yellow', '◈') : fg('cyan', '◆');
+  const gemDot = data.gem.status === 'offline' ? fg(K.g3, '◇') : data.gem.status === 'busy' ? fg('yellow', '◈') : fg('magenta', '◆');
+  lines.push(ocDot  + ' ' + kv('opencode', data.oc.status,  data.oc.status  === 'busy' ? 'yellow' : data.oc.status  === 'offline' ? K.g3 : 'green'));
+  lines.push(gemDot + ' ' + kv('gemini',   data.gem.status, data.gem.status === 'busy' ? 'yellow' : data.gem.status === 'offline' ? K.g3 : 'green'));
+  lines.push(...sep());
+
+  // callsigns — the EamilOS-unique feature
+  const signs = Object.entries(data.callsigns);
+  if (signs.length > 0) {
+    lines.push(...sec('callsigns'));
+    for (const [sign, id] of signs.slice(0, 4)) {
+      const accentColor = id.includes('opencode') ? K.oc : id.includes('gemini') ? K.gem : K.g2;
+      lines.push(fg(K.g3, sign.padEnd(6)) + ' ' + fg(accentColor, id.slice(0, Math.max(w - 8, 4))));
+    }
+    lines.push(...sep());
+  }
+
+  // graph
+  lines.push(...sec('graph'));
+  lines.push(kv('nodes',    String(data.graphStats.nodes),   'white'));
+  lines.push(kv('edges',    String(data.graphStats.edges),   'white'));
+  lines.push(...sep());
+
+  // session
+  lines.push(...sec('session'));
+  lines.push(kv('messages', String(data.messageCount),       'white'));
+  lines.push(kv('tools',    String(data.toolCount),          'white'));
+  lines.push(kv('conflicts',data.conflictCount > 0 ? String(data.conflictCount) + ' ok' : 'none',
+    data.conflictCount > 0 ? 'green' : K.g3));
+  lines.push(kv('mode',     data.strategy,                   'cyan'));
+
+  return lines;
+}
+
+// ─── Strategy bar ──────────────────────────────────────────────────────────
+
+const ALL_STRATS: ExecutionStrategy[] = [
+  'opencode-first', 'gemini-first', 'parallel', 'swarm',
+];
 
 export function renderStrategyBar(current: ExecutionStrategy): string {
-  const parts = STRATS.map((s, i) => {
-    const tag = `[${i + 1}] ${s}`;
-    return s === current ? bold(c('cyan', tag)) : dim(tag);
-  });
-  return dim('strategy  ') + parts.join(dim('   '));
+  return ALL_STRATS.map((s, i) => {
+    const key   = fg(K.g3, `[${i + 1}]`);
+    const label = s === current ? bold(fg('cyan', s)) : fg(K.g2, s);
+    return key + ' ' + label;
+  }).join(fg(K.g3, '   '));
 }
 
-// ── running bar ─────────────────────────────────────────────────────────────
+// ─── Running bar ───────────────────────────────────────────────────────────
 
 export function renderRunningBar(frame: number): string {
-  const sp = SPINNER_FRAMES[frame % 4] ?? '|';
-  return ' ' + c('yellow', sp) + '  ' + dim('agents working') + dim('   \u00b7   ') + dim('ctrl+c to cancel');
+  return (
+    ' ' + fg('yellow', spinChar(frame)) + '  ' +
+    fg(K.g2, 'agents working') +
+    fg(K.g3, '   ·   ') +
+    fg(K.g3, 'ctrl+c') + fg(K.g3, ' to cancel')
+  );
 }
 
-// ── graph panel ─────────────────────────────────────────────────────────────
-
-export function renderGraphPanel(stats: GraphStats, w: number): string[] {
-  const header = bold(c('blue', 'graphify')) + '  ' + dim(rep('\u2500', Math.max(w - 16, 4)));
-  const kv = (label: string, value: string, vc: string) =>
-    '    ' + dim(label.padEnd(14)) + c(vc, value);
-  const rows = [
-    kv('nodes',    String(stats.nodes),                    'cyan'),
-    kv('edges',    String(stats.edges),                    'cyan'),
-    kv('strategy', stats.strategy,                         'white'),
-  ];
-  if (stats.toolsUsed != null) rows.push(kv('tools used', String(stats.toolsUsed), 'white'));
-  if (stats.duration != null) rows.push(kv('duration', (stats.duration / 1000).toFixed(1) + 's', 'white'));
-  if (stats.validated != null) rows.push(kv('result',
-    stats.validated ? 'validated' : 'not validated',
-    stats.validated ? 'green' : 'red'));
-  while (rows.length < 4) rows.push('');
-  return [header, ...rows];
-}
-
-// ── graph line (single line, legacy compat) ─────────────────────────────────
-
-export function renderGraphLine(stats: GraphStats): string {
-  const parts: string[] = [
-    bold(c('blue', 'graphify')),
-    dim('nodes:')    + c('cyan',  String(stats.nodes)),
-    dim('edges:')    + c('cyan',  String(stats.edges)),
-    dim('strategy:') + c('white', stats.strategy),
-  ];
-  if (stats.toolsUsed != null)
-    parts.push(dim('tools:') + c('white', String(stats.toolsUsed)));
-  if (stats.duration != null)
-    parts.push(dim('duration:') + c('white', (stats.duration / 1000).toFixed(1) + 's'));
-  return parts.join(dim('   |   '));
-}
-
-// ── hint bar ────────────────────────────────────────────────────────────────
+// ─── Hint bar ──────────────────────────────────────────────────────────────
 
 export function renderHintBar(): string {
-  const sep = dim('  |  ');
-  return [
-    dim('up') + ' repeat',
-    dim('1-4') + ' strategy',
-    dim('ctrl+g') + ' graph',
-    dim('ctrl+l') + ' clear',
-    dim('ctrl+c') + ' exit',
-  ].join(sep);
+  const pair = (k: string, v: string) => fg(K.g3, k) + fg(K.g4, ':') + fg(K.g3, v);
+  const dot  = fg(K.g4, '  ·  ');
+  return ' ' + [
+    pair('↑',      'recall'),
+    pair('1–4',    'strategy'),
+    pair('ctrl+g', 'sidebar'),
+    pair('ctrl+l', 'clear'),
+    pair('ctrl+c', 'exit'),
+    pair('pg↑↓',  'scroll'),
+  ].join(dot);
 }
 
-// ── message dispatcher ───────────────────────────────────────────────────────
+// ─── Graph line (legacy compat) ────────────────────────────────────────────
+
+export function renderGraphLine(stats: GraphStats): string {
+  return [
+    bold(fg('cyan', 'graph')),
+    fg(K.g2, 'nodes:') + fg('white', String(stats.nodes)),
+    fg(K.g2, 'edges:') + fg('white', String(stats.edges)),
+    fg(K.g2, 'strategy:') + fg('white', stats.strategy),
+  ].join(fg(K.g3, '   │   '));
+}
+
+// ─── Message dispatcher ────────────────────────────────────────────────────
 
 export function messageToLines(msg: Message, w: number, spinFrame: number): string[] {
   switch (msg.type) {
     case 'user':        return renderUser(msg, w);
-    case 'eamilos':
     case 'opencode':
-    case 'gemini':      return renderAgent(msg, w, spinFrame);
+    case 'gemini':
+    case 'eamilos':     return renderAgent(msg, w, spinFrame);
+    case 'arbiter':     return renderArbiter(msg, w);
     case 'system':
     case 'error':       return renderSystem(msg, w);
-    case 'graph-stats': return renderGraphStats(msg, w);
+    case 'graph-stats': return renderSummary(msg, w);
     default:            return [];
   }
 }

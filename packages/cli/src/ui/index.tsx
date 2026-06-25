@@ -1,446 +1,462 @@
 /**
- * EamilOS TUI — Borderless, plain text output
+ * EamilOS TUI — index.tsx  (v2)
+ *
+ * Layout (OpenCode-inspired):
+ *
+ *   ┌ status bar ────────────────────────────────────────────────────────┐
+ *   ├ thin rule ─────────────────────────────────────────────────────────┤
+ *   │                                         │                          │
+ *   │  message feed (scrollable)              │  sidebar (200px)         │
+ *   │                                         │  agents / callsigns /    │
+ *   │                                         │  graph / session stats   │
+ *   │                                         │                          │
+ *   ├ strategy bar ──────────────────────────────────────────────────────┤
+ *   ├ prompt row  ▸ textbox ─────────────────────────────────────────── [enter] │
+ *   └ hint bar ──────────────────────────────────────────────────────────┘
+ *
+ * Key OpenCode lessons applied:
+ *   - Sidebar for context-panel info (they use file tree; we use agent state)
+ *   - Tab to cycle strategy (they use Tab to cycle agent; same slot)
+ *   - ctrl+g toggles the sidebar (they use sidebar_toggle keybind)
+ *   - Section headers have timestamp flush-right (they show timestamps below msgs)
+ *   - Running state disables input and shows a spinner bar (same pattern)
+ *   - Delayed second render for dimension accuracy on startup
+ *   - No console.log while blessed owns stdout
  */
-import pkg from 'blessed';
-const { screen, box, text, textbox } = pkg;
-import { useStore } from './state/store.js';
-import { run, cancel } from './hooks/useOrchestrator.js';
+
+import blessed from 'blessed';
+import { useStore }          from './state/store.js';
+import { run, cancel }       from './hooks/useOrchestrator.js';
+import { checkAgentStatus }  from './hooks/useAgentStatus.js';
+import {
+  messageToLines,
+  renderStatusBar,
+  renderStrategyBar,
+  renderHintBar,
+  renderSidebar,
+  renderWelcome,
+  renderRunningBar,
+  renderGraphLine,
+  tickSpinner,
+  spinChar,
+  rep,
+  type SidebarData,
+  type CallsignMap,
+} from './render.js';
 import type { ExecutionStrategy } from './types/ui.js';
-import { renderGraphLine } from './render.js';
 
-// ─── Screen ────────────────────────────────────────────────────────────────────
+const VERSION = '1.6.0';
+const SIDEBAR_W = 22;   // chars; sidebar visible width
+const CHROME_TOP = 2;   // status + rule
+const CHROME_BOT = 3;   // strategy + prompt + hint
 
-const mainScreen = screen({
-  autoPadding: false,
-  smartCSR: true,
-  resizeTimeout: 100,
-  fullUnicode: true,
-  title: 'EamilOS',
-  dockBorders: false,
-  ignoreLocked: ['C-c'],
+const STRATS: ExecutionStrategy[] = [
+  'opencode-first', 'gemini-first', 'parallel', 'swarm',
+];
+
+// ─── Screen ────────────────────────────────────────────────────────────────
+
+const screen = blessed.screen({
+  smartCSR:      true,
+  fullUnicode:   true,
+  autoPadding:   false,
+  title:         'EamilOS',
+  resizeTimeout: 60,
+  dockBorders:   false,
+  ignoreLocked:  ['C-c'],
 });
 
-process.stdin.resume();
-process.stdin.setRawMode?.(true);
+let W = (screen.width  as number) || 120;
+let H = (screen.height as number) || 30;
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const STRATEGIES: ExecutionStrategy[] = [
-  'opencode-first',
-  'gemini-first',
-  'parallel',
-  'swarm',
-];
-const SPINNER = ['|', '/', '-', '\\'];
-const VERSION = '1.6.0';
-
-let spinnerFrame = 0;
-let spinnerTimer: ReturnType<typeof setInterval> | null = null;
-
-// ─── Utilities ────────────────────────────────────────────────────────────────
-
-function fmtTime(ts: number): string {
-  const d = new Date(ts);
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
-  return h + ':' + m + ':' + s;
+// Callsign map — updated when CallsignRegistry assigns names during init
+let _callsigns: CallsignMap = {};
+export function setCallsigns(map: CallsignMap): void {
+  _callsigns = map;
+  scheduleRender();
 }
 
-function trunc(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 1) + '>';
+// ─── Layout helpers ────────────────────────────────────────────────────────
+
+function msgW(): number {
+  const state = useStore.getState();
+  return state.showGraphPanel
+    ? Math.max(W - SIDEBAR_W - 1, 40)
+    : W;
 }
 
-function pad(str: string, len: number): string {
-  return str.padEnd(len);
+function layout() {
+  const showSidebar = useStore.getState().showGraphPanel;
+  const hintRow     = H - 1;
+  const promptRow   = H - 2;
+  const stratRow    = H - 3;
+  const feedTop     = CHROME_TOP;
+  const feedH       = Math.max(stratRow - feedTop, 4);
+  const feedW       = showSidebar ? Math.max(W - SIDEBAR_W - 1, 40) : W;
+
+  return { showSidebar, hintRow, promptRow, stratRow, feedTop, feedH, feedW };
 }
 
-function wrapText(text: string, width: number): string[] {
+// ─── Blessed elements — created once, repositioned each render ─────────────
+
+function mkText(top: number | string): blessed.Widgets.TextElement {
+  return blessed.text({
+    parent: screen, top, left: 0, width: '100%', height: 1, tags: true,
+  });
+}
+
+const elStatus   = mkText(0);
+const elRule1    = mkText(1);
+const elStrat    = mkText(0);  // positioned in render()
+const elPromptBg = mkText(0);  // running bar or empty line behind textbox
+const elHint     = mkText(0);
+
+// Scrollable message feed
+const msgBox = blessed.box({
+  parent:      screen,
+  top:         CHROME_TOP,
+  left:        0,
+  width:       '100%',
+  height:      Math.max(H - CHROME_TOP - CHROME_BOT, 4),
+  tags:        true,
+  scrollable:  true,
+  alwaysScroll:true,
+  mouse:       true,
+  style:       { scrollbar: { bg: '#333333' } },
+  scrollbar:   { ch: '┃', style: { fg: '#3a3a3a' }, track: { bg: '#1a1a1a' } },
+});
+
+// Sidebar box
+const sideBox = blessed.box({
+  parent:  screen,
+  top:     CHROME_TOP,
+  left:    0,     // set in render()
+  width:   SIDEBAR_W,
+  height:  Math.max(H - CHROME_TOP - CHROME_BOT, 4),
+  tags:    true,
+  style:   { border: { fg: '#262626' } },
+  border:  { type: 'line' },
+});
+
+// Sidebar divider line between feed and sidebar
+const sideRule = blessed.text({
+  parent: screen,
+  top:    CHROME_TOP,
+  left:   0,   // set in render()
+  width:  1,
+  height: Math.max(H - CHROME_TOP - CHROME_BOT, 4),
+  tags:   true,
+  content: '',
+});
+
+// Prompt glyph
+const promptGlyph = blessed.text({
+  parent: screen, tags: true, top: 0, left: 0, width: 3, height: 1,
+  content: ' {bold}{cyan-fg}▸{/}{/bold} ',
+});
+
+// Textbox
+const textbox = blessed.textbox({
+  parent:       screen,
+  top:          0,
+  left:         3,
+  width:        '100%-13',
+  height:       1,
+  inputOnFocus: true,
+  style:        { fg: '#d4d4d4', focus: { fg: 'white' } },
+});
+
+// Enter hint
+const enterHint = blessed.text({
+  parent:  screen,
+  tags:    true,
+  top:     0,
+  left:    '100%-10',
+  width:   10,
+  height:  1,
+  content: '{#404040-fg} [enter] {/}',
+  align:   'right',
+});
+
+// ─── Spinner ───────────────────────────────────────────────────────────────
+
+let spinFrame = 0;
+let spinTimer: ReturnType<typeof setInterval> | null = null;
+
+function startSpin(): void {
+  if (spinTimer) return;
+  spinTimer = setInterval(() => {
+    spinFrame = (spinFrame + 1) % 10;
+    tickSpinner();
+    partialRefresh();
+  }, 80);
+}
+
+function stopSpin(): void {
+  if (!spinTimer) return;
+  clearInterval(spinTimer);
+  spinTimer = null;
+}
+
+// ─── Build message content ─────────────────────────────────────────────────
+
+function buildMessages(feedW: number, feedH: number): string {
+  const state = useStore.getState();
+  const msgs  = state.messages;
+  const inner = Math.max(feedW - 2, 20);
+
+  if (msgs.length === 0) {
+    return renderWelcome(inner, feedH).join('\n');
+  }
+
   const lines: string[] = [];
-  for (const raw of text.split('\n')) {
-    if (raw.length === 0) { lines.push(''); continue; }
-    let remaining = raw;
-    while (remaining.length > width) {
-      lines.push(remaining.slice(0, width));
-      remaining = remaining.slice(width);
-    }
-    if (remaining) lines.push(remaining);
+  for (const msg of msgs) {
+    lines.push(...messageToLines(msg, inner, spinFrame));
   }
-  return lines;
+  return lines.join('\n');
 }
 
-// ─── Layout dimensions ────────────────────────────────────────────────────────
+// ─── Build sidebar content ─────────────────────────────────────────────────
 
-const BOTTOM_H = 3; // strategy + input + hints
+function buildSidebar(sideW: number): string {
+  const state = useStore.getState();
+  const msgs  = state.messages;
 
-// ─── Render text lines ────────────────────────────────────────────────────────
-
-function renderTextLines(
-  container: ReturnType<typeof box>,
-  lines: Array<{ text: string; fg?: string; bold?: boolean; dim?: boolean }>,
-  startY: number,
-  width: number,
-  leftPad: number = 0
-): number {
-  let y = startY;
-  for (const line of lines) {
-    text({
-      parent: container,
-      top: y++,
-      left: leftPad,
-      width: width - leftPad,
-      content: trunc(line.text, width - leftPad),
-      style: {
-        fg: (line.fg as 'cyan' | 'white' | 'gray' | 'green' | 'magenta' | 'yellow' | 'red' | 'blue') ?? 'white',
-        bold: line.bold ?? false,
-        dim: line.dim ?? false,
-      },
-    });
+  let toolCount = 0;
+  let conflictCount = 0;
+  for (const m of msgs) {
+    toolCount += (m.tools ?? []).length;
+    if (m.type === 'arbiter') conflictCount++;
   }
-  return y;
+
+  const data: SidebarData = {
+    oc:            state.agentStatus.opencode,
+    gem:           state.agentStatus.gemini,
+    callsigns:     _callsigns,
+    graphStats:    state.graphStats,
+    messageCount:  msgs.length,
+    toolCount,
+    conflictCount,
+    strategy:      state.currentStrategy,
+  };
+
+  return renderSidebar(data, Math.max(sideW - 2, 8)).join('\n');
 }
 
-// ─── Main render ──────────────────────────────────────────────────────────────
+// ─── Full render ───────────────────────────────────────────────────────────
 
 function render(): void {
+  W = (screen.width  as number) || 120;
+  H = (screen.height as number) || 30;
+
   const state = useStore.getState();
-  const w = mainScreen.width as number;
-  const h = mainScreen.height as number;
-  const messages = state.messages;
-  const isRunning = state.isRunning;
+  const L     = layout();
 
-  // Clear
-  const children = [...(mainScreen.children ?? [])] as Array<{ destroy?: () => void; detach?: () => void }>;
-  for (const child of children) {
-    try { child.detach?.(); child.destroy?.(); } catch { /* ignore */ }
-  }
+  // Status bar
+  elStatus.setContent(renderStatusBar(
+    W, state.agentStatus.opencode, state.agentStatus.gemini,
+    state.currentStrategy, state.graphStats, state.isRunning, VERSION,
+  ));
 
-  // ── Status bar (row 0) ────────────────────────────────────────────────────
-  const dotOC = state.agentStatus.opencode.status === 'offline' ? 'O' : '*';
-  const dotGM = state.agentStatus.gemini.status === 'offline' ? 'O' : '*';
-  const ocVer = state.agentStatus.opencode.version ?? '?';
-  const gmVer = state.agentStatus.gemini.version ?? '?';
-  const runLabel = isRunning ? 'RUNNING' : 'READY';
+  // Top rule
+  elRule1.top = 1;
+  elRule1.setContent('{#262626-fg}' + rep('─', W) + '{/}');
 
-  const left = ' EamilOS ' + VERSION + ' [' + runLabel + '] ';
-  const right = ' [' + dotOC + ']OpenCode v' + ocVer + '  [' + dotGM + ']Gemini v' + gmVer + '  strategy:' + state.currentStrategy + '  nodes:' + state.graphStats.nodes + ' edges:' + state.graphStats.edges;
-  const statusLine = left + right.padStart(Math.max(w - left.length, 0), ' ');
+  // Message feed
+  msgBox.top    = L.feedTop;
+  msgBox.height = L.feedH;
+  msgBox.width  = L.feedW;
+  msgBox.setContent(buildMessages(L.feedW, L.feedH));
+  msgBox.setScrollPerc(100);
 
-  text({
-    parent: mainScreen,
-    top: 0,
-    left: 0,
-    width: w,
-    content: trunc(statusLine, w),
-    style: { fg: 'cyan', bold: true },
-  });
+  // Sidebar
+  if (L.showSidebar) {
+    const sideLeft = L.feedW;
+    sideRule.top  = L.feedTop;
+    sideRule.left = sideLeft;
+    sideRule.height = L.feedH;
+    sideRule.setContent('{#262626-fg}' + '│\n'.repeat(L.feedH) + '{/}');
+    sideRule.hidden = false;
 
-  // ── Message area (rows 1 to h-BOTTOM_H-1) ─────────────────────────────────
-  const msgEnd = h - BOTTOM_H;
-  const msgHeight = msgEnd - 1;
-
-  const msgBox = box({
-    parent: mainScreen,
-    top: 1,
-    left: 0,
-    width: w,
-    height: msgHeight,
-    scrollable: true,
-    alwaysScroll: true,
-  });
-
-  if (messages.length === 0) {
-    // Welcome screen
-    const innerW = Math.min(w - 6, 50);
-    const boxLeft = Math.max(Math.floor((w - innerW) / 2), 2);
-    const boxTop = Math.max(Math.floor((msgHeight - 14) / 2), 2);
-
-    renderTextLines(msgBox, [
-      { text: pad('', innerW), fg: 'cyan' },
-      { text: '  EamilOS  Multi-Agent Orchestrator', fg: 'cyan', bold: true },
-      { text: '  v' + VERSION, fg: 'cyan' },
-      { text: pad('', innerW), fg: 'cyan' },
-      { text: '  OpenCode Agent  +  Gemini CLI Agent', fg: 'white' },
-      { text: '  Graphify Knowledge Graph', fg: 'white' },
-      { text: pad('', innerW), fg: 'white' },
-      { text: '  Strategies:', fg: 'gray' },
-      { text: '    [1] opencode-first   [2] gemini-first', fg: 'gray' },
-      { text: '    [3] parallel         [4] swarm', fg: 'gray' },
-      { text: pad('', innerW), fg: 'white' },
-      { text: '  Type a prompt and press Enter', fg: 'gray' },
-      { text: pad('', innerW), fg: 'cyan' },
-    ], boxTop, w, boxLeft);
+    sideBox.top    = L.feedTop;
+    sideBox.left   = sideLeft + 1;
+    sideBox.width  = SIDEBAR_W;
+    sideBox.height = L.feedH;
+    sideBox.setContent(buildSidebar(SIDEBAR_W));
+    sideBox.hidden = false;
   } else {
-    let y = 0;
-    for (const msg of messages) {
-      const ts = fmtTime(msg.timestamp);
-      const innerW = w - 4;
-      const contentLines = wrapText(msg.content ?? '', innerW);
-      const tools = msg.tools ?? [];
-
-      switch (msg.type) {
-        case 'user': {
-          y = renderTextLines(msgBox, [
-            { text: ' YOU ' + '-'.repeat(innerW) + ' ' + ts, fg: 'green', bold: true },
-          ], y, w, 0);
-          for (const l of contentLines) {
-            y = renderTextLines(msgBox, [{ text: ' ' + l, fg: 'white' }], y, w, 0);
-          }
-          y++;
-          break;
-        }
-        case 'eamilos':
-        case 'opencode':
-        case 'gemini': {
-          const color = msg.type === 'gemini' ? 'magenta' : 'cyan';
-          const label = msg.agent ? msg.agent.toUpperCase() : msg.type.toUpperCase();
-          y = renderTextLines(msgBox, [
-            { text: ' ' + label + ' ' + '-'.repeat(innerW) + ' ' + ts, fg: color, bold: true },
-          ], y, w, 0);
-          for (const l of contentLines) {
-            y = renderTextLines(msgBox, [{ text: ' ' + l, fg: 'white' }], y, w, 0);
-          }
-          for (const tool of tools) {
-            const icon = tool.status === 'done' ? '[+]' : tool.status === 'failed' ? '[-]' : tool.status === 'running' ? '[~]' : '[ ]';
-            const iconFg = tool.status === 'done' ? 'green' : tool.status === 'failed' ? 'red' : tool.status === 'running' ? 'yellow' : 'gray';
-            y = renderTextLines(msgBox, [
-              { text: icon + ' ' + tool.name.padEnd(8) + trunc(tool.args, innerW - 14), fg: iconFg },
-            ], y, w, 0);
-          }
-          if (msg.isStreaming) {
-            y = renderTextLines(msgBox, [
-              { text: ' [.....] ' + msg.type + ' working...', fg: color },
-            ], y, w, 0);
-          }
-          y++;
-          break;
-        }
-        case 'system':
-        case 'error': {
-          const color = msg.type === 'error' ? 'red' : 'yellow';
-          const label = msg.type === 'error' ? 'ERROR' : 'SYS';
-          y = renderTextLines(msgBox, [
-            { text: ' ' + label + ' ' + '-'.repeat(innerW) + ' ' + ts, fg: color, bold: true },
-          ], y, w, 0);
-          for (const l of contentLines) {
-            y = renderTextLines(msgBox, [{ text: ' ' + l, fg: color }], y, w, 0);
-          }
-          y++;
-          break;
-        }
-        case 'graph-stats': {
-          let stats: Record<string, unknown> = {};
-          try { stats = JSON.parse(msg.content); } catch { /* ignore */ }
-          const dur = typeof stats.duration === 'string' ? stats.duration as string : String(((stats.duration as number) ?? 0) / 1000) + 's';
-          const result = (stats.validated as boolean) ? 'VALIDATED' : 'NOT VALIDATED';
-          const resultFg = (stats.validated as boolean) ? 'green' : 'red';
-          y = renderTextLines(msgBox, [
-            { text: ' EXECUTION SUMMARY ' + '-'.repeat(Math.max(innerW - 19, 0)), fg: 'blue', bold: true },
-          ], y, w, 0);
-          y = renderTextLines(msgBox, [
-            { text: '  Strategy   : ' + ((stats.strategy as string) ?? '?'), fg: 'white' },
-            { text: '  Duration   : ' + dur, fg: 'white' },
-            { text: '  Tools used : ' + String((stats.toolsUsed as number) ?? 0), fg: 'white' },
-            { text: '  Graph nodes: ' + String((stats.nodes as number) ?? 0), fg: 'cyan' },
-            { text: '  Graph edges: ' + String((stats.edges as number) ?? 0), fg: 'cyan' },
-            { text: '  Result     : ' + result, fg: resultFg, bold: true },
-          ], y, w, 0);
-          y++;
-          break;
-        }
-      }
-
-      if (y >= msgHeight - 2) break;
-    }
+    sideRule.hidden = true;
+    sideBox.hidden  = true;
   }
 
-  setTimeout(() => {
-    try { msgBox.setScrollPerc(100); } catch { /* ignore */ }
-  }, 50);
+  // Strategy bar
+  elStrat.top = L.stratRow;
+  elStrat.setContent(' ' + renderStrategyBar(state.currentStrategy));
 
-  // ── Strategy bar / Graph panel (row h-3) ──────────────────────────────────
-  const stratY = msgEnd;
-  if (state.showGraphPanel) {
-    text({
-      parent: mainScreen,
-      top: stratY,
-      left: 0,
-      width: w,
-      content: trunc(renderGraphLine(state.graphStats), w),
-      style: { fg: 'blue', bold: true },
-    });
+  // Prompt / running row
+  if (state.isRunning) {
+    promptGlyph.hidden = true;
+    textbox.hidden     = true;
+    enterHint.hidden   = true;
+    elPromptBg.top = L.promptRow;
+    elPromptBg.setContent(renderRunningBar(spinFrame));
+    startSpin();
   } else {
-    text({
-      parent: mainScreen,
-      top: stratY,
-      left: 0,
-      width: w,
-      content: ' Strategy: ' + STRATEGIES.map((s, i) => '[' + (i + 1) + ']' + s).join('  '),
-      style: { fg: 'gray' },
-    });
+    stopSpin();
+    promptGlyph.hidden = false;
+    textbox.hidden     = false;
+    enterHint.hidden   = false;
+    promptGlyph.top = L.promptRow;
+    textbox.top     = L.promptRow;
+    textbox.width   = Math.max(W - 14, 20) as unknown as number & `${number}%`;
+    enterHint.top   = L.promptRow;
+    elPromptBg.top  = L.promptRow;
+    elPromptBg.setContent('');
   }
 
-  // ── Input row (row h-2) ───────────────────────────────────────────────────
-  const inputY = stratY + 1;
+  // Hint bar
+  elHint.top = L.hintRow;
+  elHint.setContent(renderHintBar());
 
-  if (isRunning) {
-    text({
-      parent: mainScreen,
-      top: inputY,
-      left: 0,
-      width: w,
-      content: '  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' agents working  --  Ctrl+C to cancel',
-      style: { fg: 'yellow' },
-    });
-    if (spinnerTimer) clearInterval(spinnerTimer);
-    spinnerTimer = setInterval(() => {
-      spinnerFrame = (spinnerFrame + 1) % SPINNER.length;
-      try {
-        const kids = (mainScreen.children ?? []) as Array<{ top?: number; setContent?: (c: string) => void }>;
-        const el = kids.find(c => c.top === inputY);
-        if (el?.setContent) {
-          el.setContent('  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' agents working  --  Ctrl+C to cancel');
-        }
-      } catch {
-        if (spinnerTimer) clearInterval(spinnerTimer);
-      }
-    }, 120);
-  } else {
-    if (spinnerTimer) { clearInterval(spinnerTimer); spinnerTimer = null; }
-    text({
-      parent: mainScreen,
-      top: inputY,
-      left: 0,
-      width: w,
-      content: ' >',
-      style: { fg: 'cyan', bold: true },
-    });
-
-    const tb = textbox({
-      parent: mainScreen,
-      top: inputY,
-      left: 3,
-      width: Math.max(w - 6, 20),
-      height: 1,
-      inputOnFocus: true,
-      style: { fg: 'white' },
-    });
-
-    tb.key('enter', () => {
-      const val = tb.getValue().trim();
-      if (!val) return;
-      tb.clearValue();
-      run(val);
-    });
-
-    tb.key('up', () => {
-      const last = useStore.getState().lastPrompt;
-      if (last) tb.setValue(last);
-    });
-
-    tb.key('down', () => {
-      tb.clearValue();
-    });
-
-    STRATEGIES.forEach((s, i) => {
-      tb.key(String(i + 1), () => {
-        if (tb.getValue().length === 0) {
-          useStore.getState().setStrategy(s);
-          render();
-        }
-      });
-    });
-
-    tb.focus();
-  }
-
-  // ── Hints (row h-1) ───────────────────────────────────────────────────────
-  const hintsY = inputY + 1;
-  text({
-    parent: mainScreen,
-    top: hintsY,
-    left: 0,
-    width: w,
-    content: trunc('  Up: repeat last  |  1-4: switch strategy  |  Ctrl+L: clear  |  Ctrl+G: graph  |  Ctrl+C: cancel/exit', w),
-    style: { fg: 'gray', dim: true },
-  });
-
-  mainScreen.render();
+  screen.render();
 }
 
-// ─── Global keys ──────────────────────────────────────────────────────────────
+// ─── Partial refresh (spinner only) ────────────────────────────────────────
 
-mainScreen.key('C-c', () => {
-  const st = useStore.getState();
-  if (st.isRunning) { cancel(); render(); }
-  else { if (spinnerTimer) clearInterval(spinnerTimer); try { mainScreen.destroy(); } catch { /* ignore */ } process.exit(0); }
-});
+function partialRefresh(): void {
+  const state = useStore.getState();
+  if (state.isRunning) {
+    elPromptBg.setContent(renderRunningBar(spinFrame));
+  }
+  // Re-render message feed for streaming updates
+  const L = layout();
+  msgBox.setContent(buildMessages(L.feedW, L.feedH));
+  msgBox.setScrollPerc(100);
+  screen.render();
+}
 
-mainScreen.key('C-l', () => {
-  useStore.getState().clearMessages();
-  render();
-});
+// ─── Store subscription ────────────────────────────────────────────────────
 
-mainScreen.key('C-g', () => {
-  useStore.getState().toggleGraphPanel();
-  render();
-});
+let renderPending = false;
+function scheduleRender(): void {
+  if (renderPending) return;
+  renderPending = true;
+  setImmediate(() => { renderPending = false; render(); });
+}
 
-// ─── Store subscription ───────────────────────────────────────────────────────
+// ─── Keys ──────────────────────────────────────────────────────────────────
 
-let lastHash = '';
-let pending = false;
-
-useStore.subscribe(() => {
-  if (pending) return;
-  pending = true;
-  setImmediate(() => {
-    pending = false;
-    const st = useStore.getState();
-    const hash = [
-      st.messages.length,
-      st.messages[st.messages.length - 1]?.content?.length ?? 0,
-      st.isRunning ? 1 : 0,
-      st.showGraphPanel ? 1 : 0,
-      st.currentStrategy,
-    ].join('|');
-    if (hash !== lastHash) { lastHash = hash; render(); }
+function bindKeys(): void {
+  // Cancel / exit
+  screen.key('C-c', () => {
+    if (useStore.getState().isRunning) cancel();
+    else shutdown();
   });
-});
 
-// ─── Resize ───────────────────────────────────────────────────────────────────
+  // Clear messages
+  screen.key('C-l', () => {
+    useStore.getState().clearMessages();
+    render();
+  });
 
-mainScreen.on('resize', () => {
-  const w = mainScreen.width as number;
-  const h = mainScreen.height as number;
-  useStore.getState().setTerminalSize(w, h);
-  render();
-});
+  // Toggle sidebar (ctrl+g — same slot as OpenCode's sidebar_toggle)
+  screen.key('C-g', () => {
+    useStore.getState().toggleGraphPanel();
+    render();
+  });
 
-// ─── Shutdown ─────────────────────────────────────────────────────────────────
+  // Submit
+  textbox.key('enter', () => {
+    const val = textbox.getValue().trim();
+    if (!val) return;
+    textbox.clearValue();
+    screen.render();
+    run(val).catch((e: unknown) => {
+      useStore.getState().addMessage({ type: 'error', content: String(e) });
+      useStore.getState().setRunning(false);
+    });
+  });
 
-let _savedConsoleLog: ((...args: unknown[]) => void) | null = null;
+  // History (OpenCode: history_previous / history_next)
+  textbox.key('up', () => {
+    const last = useStore.getState().lastPrompt;
+    if (last) { textbox.setValue(last); screen.render(); }
+  });
+  textbox.key('down', () => { textbox.clearValue(); screen.render(); });
+
+  // Tab to cycle strategy (OpenCode: agent_cycle maps to Tab)
+  textbox.key('tab', () => {
+    if (textbox.getValue().length > 0) return;
+    const cur  = useStore.getState().currentStrategy;
+    const idx  = STRATS.indexOf(cur);
+    const next = STRATS[(idx + 1) % STRATS.length]!;
+    useStore.getState().setStrategy(next);
+    render();
+  });
+
+  // Number keys 1-4 for strategy
+  STRATS.forEach((strat, i) => {
+    textbox.key(String(i + 1), () => {
+      if (textbox.getValue().length === 0) {
+        useStore.getState().setStrategy(strat);
+        render();
+      }
+    });
+  });
+
+  // Scroll
+  screen.key('pageup',   () => { msgBox.scroll(-Math.floor(H / 2)); screen.render(); });
+  screen.key('pagedown', () => { msgBox.scroll( Math.floor(H / 2)); screen.render(); });
+  screen.key('home',     () => { msgBox.setScrollPerc(0);   screen.render(); });
+  screen.key('end',      () => { msgBox.setScrollPerc(100); screen.render(); });
+}
+
+// ─── Shutdown ──────────────────────────────────────────────────────────────
 
 function shutdown(): void {
-  console.log = _savedConsoleLog ?? console.log;
-  if (spinnerTimer) clearInterval(spinnerTimer);
-  try { mainScreen.destroy(); } catch { /* ignore */ }
+  stopSpin();
+  try { screen.destroy(); } catch { /* ok */ }
   process.exit(0);
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// ─── Main ──────────────────────────────────────────────────────────────────
 
-// ─── Start / Export ────────────────────────────────────────────────────────────
-
-export async function startUI(): Promise<void> {
-  _savedConsoleLog = console.log;
+function main(): void {
+  // Suppress console output — blessed owns stdout
+  const _origLog = console.log;
   console.log = () => {};
-  useStore.getState().setTerminalSize(mainScreen.width as number, mainScreen.height as number);
+  process.on('exit', () => { console.log = _origLog; });
+
+  useStore.getState().setTerminalSize(W, H);
+  useStore.subscribe(scheduleRender);
+
+  screen.on('resize', () => {
+    W = (screen.width  as number) || 120;
+    H = (screen.height as number) || 30;
+    useStore.getState().setTerminalSize(W, H);
+    render();
+  });
+
+  bindKeys();
   render();
+  // Second render after terminal reports true dimensions
+  setTimeout(render, 100);
+  textbox.focus();
+
+  // Async agent detection — doesn't block first paint
+  Promise.resolve().then(() => checkAgentStatus());
+
+  process.stdin.resume();
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT',  shutdown);
 }
 
-// Auto-start when run directly (not imported)
-const isMain = process.argv[1] && (process.argv[1].includes('eamilos-ui') || process.argv[1].includes('dist'));
+main();
+
+export function startUI(): Promise<void> {
+  return new Promise(() => {});
+}
+
+// Auto-start when run directly
+const isMain = process.argv[1]?.includes('eamilos-ui') || process.argv[1]?.includes('dist');
 if (isMain) { startUI(); }
