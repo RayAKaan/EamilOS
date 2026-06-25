@@ -1,7 +1,6 @@
 import { ChatMessage } from '../types.js';
 import { getProviderManager } from '../provider-manager.js';
-import { parseResponse, ParsedFile, ParseResult } from '../parsers/ResponseParser.js';
-import { validate } from '../validation/ArtifactValidator.js';
+import { ParsedFile, ParseResult } from '../parsers/ResponseParser.js';
 import { STRICT_SYSTEM_PROMPT } from '../prompts/system.js';
 import { getToolRegistry } from '../tools/registry.js';
 import { getLogger } from '../logger.js';
@@ -10,6 +9,11 @@ import { getConfig } from '../config.js';
 import { FeatureManager } from '../features/FeatureManager.js';
 import { FeatureContext } from '../features/types.js';
 import { TaskClassifier, TaskCategory } from '../model-router/TaskClassifier.js';
+import { extract } from '../del/extractor.js';
+import { validateSchema } from '../del/schema-validator.js';
+import { validateContent } from '../del/content-validator.js';
+import { validateSecurity } from '../del/security-validator.js';
+import { DEFAULT_DEL_CONFIG } from '../del/types.js';
 
 export interface OrchestratorConfig {
   maxRetries?: number;
@@ -187,17 +191,58 @@ export class StrictOrchestrator {
         const rawContent = response.content || '';
         logger.debug(`Raw LLM response (${rawContent.length} chars)`);
 
-        const parseResult = parseResponse(rawContent);
+        // Run DEL gauntlet: extraction → schema → content → security
+        const extractResult = extract(rawContent);
+        if (!extractResult.ok) {
+          const reason = `EXTRACTION_FAILED: ${extractResult.error.message}`;
+          failureReasons.push(`Attempt ${attempt}: ${reason}`);
+          logger.warn(reason);
+          continue;
+        }
 
+        const payload = extractResult.value;
+        const delConfig = { ...DEFAULT_DEL_CONFIG, workspaceRoot: getConfig().workspace.base_dir };
+        const schemaResult = validateSchema(payload, delConfig);
+        if (!schemaResult.ok || !schemaResult.value.valid) {
+          const reason = schemaResult.ok
+            ? `SCHEMA_FAILED: ${schemaResult.value.errors.map(e => e.message).join('; ')}`
+            : `SCHEMA_ERROR: ${schemaResult.error.message}`;
+          failureReasons.push(`Attempt ${attempt}: ${reason}`);
+          logger.warn(reason);
+          continue;
+        }
+
+        const schemaValidated = schemaResult.value.validFiles;
+        const contentResult = validateContent(schemaValidated, {
+          minCodeDensity: 0.3,
+          checkSyntax: true,
+        });
+        if (!contentResult.valid) {
+          const reason = `CONTENT_FAILED: ${contentResult.errors.map(e => e.message).join('; ')}`;
+          failureReasons.push(`Attempt ${attempt}: ${reason}`);
+          logger.warn(reason);
+          continue;
+        }
+
+        const contentValidated = contentResult.validFiles;
+        const securityResult = validateSecurity(contentValidated, delConfig);
+        if (!securityResult.valid) {
+          const reason = `SECURITY_FAILED: ${securityResult.errors.map(e => e.message).join('; ')}`;
+          failureReasons.push(`Attempt ${attempt}: ${reason}`);
+          logger.warn(reason);
+          continue;
+        }
+
+        // All DEL stages passed — execution result for feature hooks
+        const safeFiles = securityResult.safeFiles;
         ctx.executionResult = {
-          success: parseResult.success && parseResult.files.length > 0,
-          files: parseResult.files,
+          success: true,
+          files: safeFiles.map(f => ({ path: f.path, content: f.content })),
           retriesUsed: attempt,
           latencyMs: Date.now() - attemptStartTime,
           tokensUsed: 0,
-          parseSucceeded: parseResult.success,
-          validationSucceeded: parseResult.files.length > 0,
-          failureReason: parseResult.failureReason
+          parseSucceeded: true,
+          validationSucceeded: true,
         };
 
         if (this.featureManager) {
@@ -209,28 +254,9 @@ export class StrictOrchestrator {
           continue;
         }
 
-        if (!parseResult.success) {
-          const reason = parseResult.failureReason || 'PARSE_FAILED';
-          failureReasons.push(`Attempt ${attempt}: ${reason}`);
-          logger.warn(`Parse failed: ${reason}`);
-          continue;
-        }
-
-        const validationResult = validate(parseResult.files);
-
-        if (!validationResult.valid) {
-          const reason = validationResult.errors.map(e => e.reason).join('; ');
-          failureReasons.push(`Attempt ${attempt}: VALIDATION_FAILED - ${reason}`);
-          logger.warn(`Validation failed: ${reason}`);
-          if (validationResult.errors.length > 0) {
-            logger.debug(`Validation errors: ${JSON.stringify(validationResult.errors)}`);
-          }
-          continue;
-        }
-
         const artifacts: string[] = [];
 
-        for (const file of validationResult.validFiles) {
+        for (const file of safeFiles) {
           try {
             if (writeTool) {
               await writeTool.execute({
@@ -271,7 +297,7 @@ export class StrictOrchestrator {
           if (this.featureManager) {
             ctx.executionResult = {
               success: true,
-              files: validationResult.validFiles,
+              files: safeFiles.map(f => ({ path: f.path, content: f.content })),
               retriesUsed: attempt - 1,
               latencyMs: Date.now() - startTime,
               tokensUsed: 0,
@@ -286,7 +312,7 @@ export class StrictOrchestrator {
             artifacts,
             attempts: attempt,
             failureReasons,
-            files: validationResult.validFiles,
+            files: safeFiles.map(f => ({ path: f.path, content: f.content })),
             featureData: this.mapToObject(ctx.featureData)
           };
         }

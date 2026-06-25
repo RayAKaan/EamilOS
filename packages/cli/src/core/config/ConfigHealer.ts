@@ -137,6 +137,9 @@ export class ConfigHealer {
         reason: 'Added default features configuration',
       });
       rawConfig.features = {
+        distributed_comms: false,
+        callsign_registry: false,
+        conflict_arbiter: false,
         self_healing_routing: {
           enabled: true,
           failure_threshold: 3,

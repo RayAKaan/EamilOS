@@ -12,7 +12,10 @@ import { initContextBuilder } from './context-builder.js';
 import { initAgentRunner } from './agent-runner.js';
 import type { AgentExecutionResult } from './agent-runner.js';
 import { initOrchestrator, getOrchestrator } from './orchestrator/StrictOrchestrator.js';
-import { loadConfig as loadConfigFromFile } from './config.js';
+import { loadConfig as loadConfigFromFile, getConfig } from './config.js';
+import { CallsignRegistry } from './identity/CallsignRegistry.js';
+import { initDistributedCommsGround } from './comms/DistributedCommsGround.js';
+import { initDistributedCommunicator } from './comms/DistributedAgentCommunicator.js';
 
 export class EamilOS {
   private db: DatabaseManager;
@@ -42,6 +45,19 @@ export class EamilOS {
     initContextBuilder();
     initAgentRunner();
     initOrchestrator({ maxRetries: 3 });
+
+    // Config-gated subsystem wiring
+    const config = getConfig();
+    if (config.features.distributed_comms) {
+      this.logger.info('Initializing distributed comms ground');
+      initDistributedCommsGround('eamilos-main', this.eventBus as any);
+      initDistributedCommunicator('eamilos-main');
+    }
+    if (config.features.callsign_registry) {
+      this.logger.info('Initializing callsign registry');
+      // Singleton pattern — instantiated once, holds session file path
+      new CallsignRegistry('./.eamilos/callsigns.json');
+    }
 
     await this.recoverCrashedProjects();
 

@@ -4,6 +4,8 @@
  */
 import { useStore } from '../state/store.js';
 import type { ExecutionStrategy } from '../types/ui.js';
+import { DualOrchestrator } from '../../multi-agent/orchestrator/DualOrchestrator.js';
+import { initEamilOS } from '../../core/index.js';
 
 type EventHandler = (...args: unknown[]) => void;
 
@@ -18,7 +20,21 @@ function formatDuration(ms: number): string {
   return (ms / 1000).toFixed(1) + 's';
 }
 
-const agentMsgIds: { opencode?: string; gemini?: string } = {};
+function formatDisplayContent(raw: string): string {
+  if (!raw) return '';
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed.summary && Array.isArray(parsed.files)) {
+      let text = `${parsed.summary}\n`;
+      for (const f of parsed.files) {
+        text += `\n[${f.path}]\n${f.content}`;
+      }
+      return text.trim();
+    }
+  } catch {}
+  return raw;
+}
+
 let abortRef = false;
 let currentStartTime = 0;
 
@@ -28,8 +44,6 @@ export async function run(prompt: string, strategy?: ExecutionStrategy): Promise
 
   const strat = strategy ?? state.currentStrategy;
   abortRef = false;
-  agentMsgIds.opencode = undefined;
-  agentMsgIds.gemini = undefined;
 
   state.setRunning(true);
   state.setExecutionStart();
@@ -46,7 +60,6 @@ export async function run(prompt: string, strategy?: ExecutionStrategy): Promise
   });
 
   try {
-    const { initEamilOS } = await import('../../core/index.js');
     await initEamilOS();
   } catch {
     // Continue even if config file init had warnings
@@ -59,7 +72,6 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
   const state = useStore.getState();
   const handlers: Array<[string, EventHandler]> = [];
 
-  const { DualOrchestrator } = await import('../../multi-agent/orchestrator/DualOrchestrator.js');
   const orchestrator = new DualOrchestrator({
     strategy: strat,
     workingDir: process.cwd(),
@@ -105,31 +117,18 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     const result = await orchestrator.execute(prompt, strat);
     const duration = Date.now() - currentStartTime;
 
-    if (result.primaryResult || result.finalOutput) {
-      const ocId = state.addMessage({
-        type: 'opencode',
-        content: result.finalOutput ?? result.primaryResult ?? '',
-        agent: 'opencode',
+    const rawContent = result.primaryResult ?? result.finalOutput ?? '';
+    if (rawContent) {
+      const msgId = state.addMessage({
+        type: 'eamilos',
+        content: formatDisplayContent(rawContent),
+        agent: 'EamilOS',
         isStreaming: false,
       });
-      agentMsgIds.opencode = ocId;
-    }
 
-    if (result.secondaryResult && result.secondaryResult !== result.primaryResult) {
-      const gemId = state.addMessage({
-        type: 'gemini',
-        content: result.secondaryResult,
-        agent: 'gemini',
-        isStreaming: false,
-      });
-      agentMsgIds.gemini = gemId;
-    }
-
-    if (result.files && result.files.length > 0) {
-      const ocId = agentMsgIds.opencode;
-      if (ocId) {
+      if (result.files && result.files.length > 0) {
         for (const file of result.files) {
-          state.addToolToMessage(ocId, {
+          state.addToolToMessage(msgId, {
             name: file.action,
             args: file.path,
             status: 'done',

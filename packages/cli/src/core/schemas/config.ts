@@ -67,6 +67,20 @@ export const ConfigSchema = z.object({
     max_files: z.number().int().min(1).default(5),
     live: z.boolean().default(true),
   }),
+  features: z.object({
+    distributed_comms: z.boolean().default(false),
+    callsign_registry: z.boolean().default(false),
+    conflict_arbiter: z.boolean().default(false),
+    self_healing_routing: z.object({
+      enabled: z.boolean().default(true),
+      failure_threshold: z.number().int().min(1).default(3),
+      cooldown_minutes: z.number().int().min(1).default(30),
+    }).default({}),
+    adaptive_prompting: z.object({
+      enabled: z.boolean().default(true),
+      strategy: z.enum(['per_model', 'per_task', 'hybrid']).default('per_model'),
+    }).default({}),
+  }).default({}),
 });
 
 export type EamilOSConfig = z.infer<typeof ConfigSchema>;

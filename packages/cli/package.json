@@ -32,14 +32,12 @@
       "import": "./dist/multi-agent/orchestrator/index.js"
     },
     "./ui": {
-      "import": "./dist/ui/index.js"
-    },
-    "./ui/bin": "./dist/ui/bin/eamilos-ui"
+      "import": "./dist/eamilos-ui.js"
+    }
   },
   "files": [
     "dist/**/*",
     "bin/eamilos",
-    "src/ui/bin/**",
     "README.md"
   ],
   "scripts": {
@@ -47,7 +45,7 @@
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "postinstall": "exit 0",
-    "ui": "node src/ui/bundle.js && node src/ui/bin/eamilos-ui"
+    "ui": "node src/ui/bundle.js && node dist/eamilos-ui.js"
   },
   "repository": {
     "type": "git",

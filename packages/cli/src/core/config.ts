@@ -156,6 +156,20 @@ export class ConfigLoader {
         preview_mode: true,
         auto_retry: true,
       },
+      features: {
+        distributed_comms: (normalized.features?.distributed_comms as boolean) ?? false,
+        callsign_registry: (normalized.features?.callsign_registry as boolean) ?? false,
+        conflict_arbiter: (normalized.features?.conflict_arbiter as boolean) ?? false,
+        self_healing_routing: {
+          enabled: (normalized.features?.self_healing_routing as Record<string, unknown>)?.enabled as boolean ?? true,
+          failure_threshold: (normalized.features?.self_healing_routing as Record<string, unknown>)?.failure_threshold as number ?? 3,
+          cooldown_minutes: (normalized.features?.self_healing_routing as Record<string, unknown>)?.cooldown_minutes as number ?? 30,
+        },
+        adaptive_prompting: {
+          enabled: (normalized.features?.adaptive_prompting as Record<string, unknown>)?.enabled as boolean ?? true,
+          strategy: ((normalized.features?.adaptive_prompting as Record<string, unknown>)?.strategy as 'per_model' | 'per_task' | 'hybrid') ?? 'per_model',
+        },
+      },
       logging: {
         level: 'info',
         console: true,

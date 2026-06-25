@@ -20,9 +20,6 @@ const STRATEGIES: ExecutionStrategy[] = [
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
-const trunc = (str: string, max: number) =>
-  str.length > max ? str.slice(0, max - 1) + '…' : str;
-
 const TTYInput: React.FC<{
   value: string; setValue: (v: string) => void;
   handleSubmit: (v: string) => void;
@@ -40,9 +37,9 @@ const TTYInput: React.FC<{
   }, { isActive: !isRunning });
 
   return (
-    <Box flexGrow={1}>
+    <Box flexGrow={1} height={2}>
       <TextInput value={value} onChange={setValue} onSubmit={handleSubmit}
-        placeholder="Type a task..." focus />
+        placeholder={isRunning ? '' : 'Type a task...'} focus />
     </Box>
   );
 };
@@ -98,16 +95,17 @@ export const InputBox: React.FC<InputBoxProps> = ({
         </Text>
       </Box>
 
-      <Box borderStyle="single" borderColor={isRunning ? 'yellow' : 'cyan'} paddingX={1} paddingY={0}>
-        {isRunning ? (
-          <Text color="yellow">{SPINNER_FRAMES[spinnerFrame]} Agents working — Ctrl+C to cancel</Text>
-        ) : (
+      <Box borderStyle="single" borderColor={isRunning ? 'yellow' : 'cyan'} paddingX={1} paddingY={0} height={3}>
+        <Box flexDirection="column" flexGrow={1}>
+          {isRunning && (
+            <Text color="yellow">{SPINNER_FRAMES[spinnerFrame]} Running — Ctrl+C cancel</Text>
+          )}
           <Box flexGrow={1}>
             <Text color="cyan" bold>› </Text>
             {inputArea}
-            <Text dimColor>[⏎]</Text>
+            {!isRunning && <Text dimColor>[⏎]</Text>}
           </Box>
-        )}
+        </Box>
       </Box>
 
       <Box paddingX={1}>

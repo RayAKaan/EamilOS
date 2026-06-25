@@ -105,6 +105,17 @@ export async function detectAllProviders(): Promise<ProviderStatus[]> {
     installCommand: 'npm install -g opencode-ai',
   });
 
+  // 1c. Gemini CLI
+  const geminiExists = commandExists('gemini');
+  providers.push({
+    id: 'gemini-cli',
+    name: 'Gemini CLI',
+    available: geminiExists,
+    reason: geminiExists ? undefined : 'not installed',
+    priority: 2,
+    installCommand: 'npm install -g @google/gemini-cli',
+  });
+
   // 2. Codex CLI  
   const codexExists = commandExists('codex');
   providers.push({

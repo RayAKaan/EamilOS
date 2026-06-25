@@ -32,25 +32,8 @@ export class ConflictArbiter {
       return { winner: a!, method: 'identical' };
     }
 
-    const merged = await this.tryAutoMerge(a!, b!);
-    if (merged.clean && merged.candidate) {
-      return { winner: merged.candidate, method: 'auto-merge' };
-    }
-
     const vote = await this.qualityVote(a!, b!);
     return { winner: vote.winner, method: 'vote', reason: vote.reason };
-  }
-
-  private async tryAutoMerge(
-    a: ArtifactCandidate,
-    b: ArtifactCandidate
-  ): Promise<{ clean: boolean; candidate?: ArtifactCandidate }> {
-    const aLines = a.content.split('\n');
-    const bLines = b.content.split('\n');
-    if (aLines.length === bLines.length && a.content.trim() === b.content.trim()) {
-      return { clean: true, candidate: a };
-    }
-    return { clean: false };
   }
 
   private async qualityVote(
