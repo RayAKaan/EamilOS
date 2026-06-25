@@ -275,50 +275,73 @@ export function renderSummary(msg: Message, w: number): string[] {
 }
 
 // ─── Welcome screen ────────────────────────────────────────────────────────
+//
+// IMPORTANT: all strings passed to ctr() must use ONLY plain text or
+// simple named-color tags. Hex color tags like {#737373-fg} contain hyphens
+// which blessed's tag parser can miscount when measuring string width,
+// causing misaligned centering. We use a separate plain-text measure for
+// centering and keep the tagged version for display only.
+
+function ctrPlain(plain: string, tagged: string, w: number): string {
+  const pad = Math.max(Math.floor((w - plain.length) / 2), 0);
+  return rep(' ', pad) + tagged;
+}
 
 export function renderWelcome(w: number, h: number): string[] {
   const lines: string[] = [];
   const padTop = Math.max(Math.floor(h / 2) - 11, 1);
   for (let i = 0; i < padTop; i++) lines.push('');
 
-  const ctr = (s: string) => rep(' ', Math.max(Math.floor((w - vl(s)) / 2), 0)) + s;
+  // Logo: measure plain, display tagged
+  lines.push(ctrPlain('EamilOS',
+    bold('{cyan-fg}E{/}') + bold('{white-fg}amil{/}') + bold('{cyan-fg}OS{/}'),
+    w));
 
-  // Logo — the two accents side by side
-  lines.push(ctr(
-    bold(fg(K.teal, 'E')) +
-    bold(fg(K.g0,   'amil')) +
-    bold(fg(K.teal, 'OS'))
-  ));
-  lines.push(ctr(fg(K.g2, 'multi-agent AI execution kernel')));
+  lines.push(ctrPlain('multi-agent AI execution kernel',
+    '{#737373-fg}multi-agent AI execution kernel{/}',
+    w));
   lines.push('');
 
-  // Thin rule
-  lines.push(ctr(fg(K.g4, rep('─', Math.min(w - 8, 56)))));
+  // Thin rule — plain dashes, no tags needed for centering
+  const ruleLen = Math.min(w - 8, 56);
+  lines.push(ctrPlain(rep('─', ruleLen),
+    '{#262626-fg}' + rep('─', ruleLen) + '{/}',
+    w));
   lines.push('');
 
   // Agent roster
-  lines.push(ctr(
-    fg(K.ocBlue, '◆') + fg(K.g2, ' opencode') +
-    fg(K.g3,     '   ╱   ') +
-    fg(K.gemVio, '◆') + fg(K.g2, ' gemini cli')
-  ));
+  const rosterPlain = '◆ opencode   ╱   ◆ gemini cli';
+  const rosterTagged =
+    '{cyan-fg}◆{/}{#737373-fg} opencode{/}' +
+    '{#404040-fg}   ╱   {/}' +
+    '{magenta-fg}◆{/}{#737373-fg} gemini cli{/}';
+  lines.push(ctrPlain(rosterPlain, rosterTagged, w));
   lines.push('');
 
-  // Strategy legend
-  lines.push(ctr(fg(K.g3, 'strategies')));
+  // Strategies header
+  lines.push(ctrPlain('strategies', '{#404040-fg}strategies{/}', w));
   lines.push('');
-  lines.push(ctr(
-    fg(K.g3,  '[1]') + fg(K.g2, ' opencode-first   ') +
-    fg(K.g3,  '[2]') + fg(K.g2, ' gemini-first')
-  ));
-  lines.push(ctr(
-    fg(K.g3,  '[3]') + fg(K.g2, ' parallel         ') +
-    fg(K.g3,  '[4]') + fg(K.g2, ' swarm')
-  ));
+
+  const row1plain  = '[1] opencode-first   [2] gemini-first';
+  const row1tagged =
+    '{#404040-fg}[1]{/}{#737373-fg} opencode-first   {/}' +
+    '{#404040-fg}[2]{/}{#737373-fg} gemini-first{/}';
+  lines.push(ctrPlain(row1plain, row1tagged, w));
+
+  const row2plain  = '[3] parallel         [4] swarm';
+  const row2tagged =
+    '{#404040-fg}[3]{/}{#737373-fg} parallel         {/}' +
+    '{#404040-fg}[4]{/}{#737373-fg} swarm{/}';
+  lines.push(ctrPlain(row2plain, row2tagged, w));
   lines.push('');
-  lines.push(ctr(fg(K.g3, '─────────────────────────────')));
+
+  lines.push(ctrPlain('─────────────────────────────',
+    '{#404040-fg}─────────────────────────────{/}', w));
   lines.push('');
-  lines.push(ctr(fg(K.g2, 'describe your goal and press ') + fg(K.g1, 'enter')));
+
+  const promptPlain  = 'describe your goal and press enter';
+  const promptTagged = '{#737373-fg}describe your goal and press {/}{white-fg}enter{/}';
+  lines.push(ctrPlain(promptPlain, promptTagged, w));
 
   return lines;
 }
@@ -346,24 +369,33 @@ export function renderStatusBar(
   isRunning:  boolean,
   version:    string,
 ): string {
-  const sep  = fg(K.g4, '  │  ');
+  const sep  = '{#262626-fg}  │  {/}';
 
-  const mark = bold(fg(K.teal, 'EamilOS')) + fg(K.g3, ` v${version}`);
+  const mark   = '{bold}{cyan-fg}EamilOS{/}{/bold}' + '{#404040-fg} v' + version + '{/}';
   const agents = agentBadge(oc, 'opencode', K.ocBlue) +
-                 fg(K.g4, '   ') +
+                 '{#262626-fg}   {/}' +
                  agentBadge(gem, 'gemini', K.gemVio);
-  const strat  = fg(K.g3, 'mode:') + fg(K.teal, strategy);
+  const strat  = '{#404040-fg}mode:{/}' + '{cyan-fg}' + strategy + '{/}';
   const state  = isRunning
     ? fg(K.warn, spinChar()) + fg(K.warn, ' running')
-    : fg(K.ok,   '●') + fg(K.g2, ' ready');
+    : fg(K.ok,   '●') + '{#737373-fg} ready{/}';
   const graph  = graphStats.nodes > 0
-    ? sep + fg(K.g3, 'g:') + fg(K.g2, `${graphStats.nodes}n ${graphStats.edges}e`)
+    ? sep + '{#404040-fg}g:{/}' + '{#737373-fg}' + graphStats.nodes + 'n ' + graphStats.edges + 'e{/}'
     : '';
 
   const left  = ' ' + mark + sep + agents;
   const right  = strat + sep + state + graph + ' ';
-  const gap    = w - vl(left) - vl(right);
-  return left + rep(' ', Math.max(gap, 2)) + right;
+
+  // Use plain-text measurement to avoid hex tag miscounting
+  const leftPlain  = ' EamilOS v' + version + '  │  ◆ opencode' +
+    (oc.version ? ' ' + oc.version.slice(0, 8) : '') +
+    '   ◆ gemini' +
+    (gem.version ? ' ' + gem.version.slice(0, 8) : '');
+  const rightPlain = 'mode:' + strategy + '  │  ● ready' +
+    (graphStats.nodes > 0 ? '  │  g:' + graphStats.nodes + 'n ' + graphStats.edges + 'e' : '') + ' ';
+  const gap = Math.max(w - leftPlain.length - rightPlain.length, 2);
+
+  return left + rep(' ', gap) + right;
 }
 
 // ─── Graph panel — multi-line ──────────────────────────────────────────────

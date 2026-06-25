@@ -418,6 +418,8 @@ function main(): void {
 
   bindKeys();
   render();
+  // Second render after 100ms — terminal reports true dimensions after first paint
+  setTimeout(render, 100);
   textbox.focus();
 
   // Async agent detection
@@ -432,7 +434,9 @@ function main(): void {
 
 export function startUI(): Promise<void> {
   main();
-  console.log('EamilOS TUI started. Type a prompt and press Enter. Ctrl+C to exit.');
+  // NOTE: do NOT console.log here — it bleeds into the blessed alternate screen
+  // and leaves artifacts. blessed takes over stdout; any console output corrupts
+  // the display. All user-facing info must go through the store/messages.
   return new Promise(() => {});
 }
 
