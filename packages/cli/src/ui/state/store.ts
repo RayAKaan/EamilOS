@@ -29,7 +29,7 @@ interface StoreActions {
 const defaultGraphStats: GraphStats = {
   nodes: 0,
   edges: 0,
-  strategy: 'opencode-first',
+  strategy: 'swarm',
 };
 
 const defaultAgentInfo: AgentInfo = { status: 'offline', version: 'Kernel' };
@@ -37,7 +37,7 @@ const defaultAgentInfo: AgentInfo = { status: 'offline', version: 'Kernel' };
 export const useStore = create<AppState & StoreActions>((set) => ({
   messages: [],
   isRunning: false,
-  currentStrategy: 'opencode-first' as ExecutionStrategy,
+  currentStrategy: 'swarm' as ExecutionStrategy,
   graphStats: defaultGraphStats,
   agentStatus: {
     opencode: { ...defaultAgentInfo },

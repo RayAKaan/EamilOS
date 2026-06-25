@@ -442,7 +442,7 @@ export function renderHintBar(): string {
   const dot  = fg(K.g4, '  ·  ');
   return ' ' + [
     pair('↑',      'recall'),
-    pair('1–4',    'strategy'),
+    pair('tab',    'strategy'),
     pair('ctrl+g', 'sidebar'),
     pair('ctrl+l', 'clear'),
     pair('ctrl+c', 'exit'),

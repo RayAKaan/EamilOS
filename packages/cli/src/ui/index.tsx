@@ -344,6 +344,80 @@ function scheduleRender(): void {
   setImmediate(() => { renderPending = false; render(); });
 }
 
+// ─── Commands ────────────────────────────────────────────────────────────────
+
+const STRAT_NAMES: Record<string, ExecutionStrategy> = {
+  '1':                'opencode-first',
+  'opencode-first':   'opencode-first',
+  'opencode':         'opencode-first',
+  'oc':               'opencode-first',
+  '2':                'gemini-first',
+  'gemini-first':     'gemini-first',
+  'gemini':           'gemini-first',
+  'gm':               'gemini-first',
+  '3':                'parallel',
+  'parallel':         'parallel',
+  'par':              'parallel',
+  '4':                'swarm',
+  'swarm':            'swarm',
+};
+
+function handleCommand(input: string): void {
+  const parts = input.slice(1).trim().split(/\s+/);
+  const cmd   = parts[0]?.toLowerCase();
+  const arg   = parts.slice(1).join(' ');
+
+  switch (cmd) {
+    case 's':
+    case 'strategy':
+    case 'strat': {
+      if (!arg) {
+        useStore.getState().addMessage({
+          type: 'system',
+          content: 'Usage: /strategy <name>  (opencode-first, gemini-first, parallel, swarm)',
+        });
+        return;
+      }
+      const strat = STRAT_NAMES[arg.toLowerCase()];
+      if (!strat) {
+        useStore.getState().addMessage({ type: 'error', content: `Unknown strategy: ${arg}` });
+        return;
+      }
+      useStore.getState().setStrategy(strat);
+      useStore.getState().addMessage({ type: 'system', content: `Strategy → ${strat}` });
+      render();
+      break;
+    }
+    case 'clear':
+      useStore.getState().clearMessages();
+      render();
+      break;
+    case 'h':
+    case 'help':
+    default:
+      useStore.getState().addMessage({
+        type: 'system',
+        content: [
+          'Commands:',
+          '  /strategy <name>   Set strategy (opencode-first, gemini-first, parallel, swarm)',
+          '  /s <name>          Shorthand for /strategy',
+          '  /clear             Clear messages',
+          '  /help              Show this help',
+          '',
+          'Keys:',
+          '  Tab / Shift+Tab    Cycle strategy forward / backward',
+          '  Ctrl+G             Toggle sidebar',
+          '  Ctrl+L             Clear messages',
+          '  Ctrl+C             Cancel / exit',
+          '  ↑ / ↓              Recall / clear prompt',
+          '  PgUp / PgDn        Scroll messages',
+        ].join('\n'),
+      });
+      render();
+      break;
+  }
+}
+
 // ─── Keys ──────────────────────────────────────────────────────────────────
 
 function bindKeys(): void {
@@ -365,25 +439,6 @@ function bindKeys(): void {
     render();
   });
 
-  // Submit
-  textbox.key('enter', () => {
-    const val = textbox.getValue().trim();
-    if (!val) return;
-    textbox.clearValue();
-    screen.render();
-    run(val).catch((e: unknown) => {
-      useStore.getState().addMessage({ type: 'error', content: String(e) });
-      useStore.getState().setRunning(false);
-    });
-  });
-
-  // History (OpenCode: history_previous / history_next)
-  textbox.key('up', () => {
-    const last = useStore.getState().lastPrompt;
-    if (last) { textbox.setValue(last); screen.render(); }
-  });
-  textbox.key('down', () => { textbox.clearValue(); screen.render(); });
-
   // Tab to cycle strategy (OpenCode: agent_cycle maps to Tab)
   textbox.key('tab', () => {
     if (textbox.getValue().length > 0) return;
@@ -394,13 +449,35 @@ function bindKeys(): void {
     render();
   });
 
-  // Number keys 1-4 for strategy
-  STRATS.forEach((strat, i) => {
-    textbox.key(String(i + 1), () => {
-      if (textbox.getValue().length === 0) {
-        useStore.getState().setStrategy(strat);
-        render();
-      }
+  // Shift+Tab to cycle backward
+  screen.key('S-tab', () => {
+    const cur  = useStore.getState().currentStrategy;
+    const idx  = STRATS.indexOf(cur);
+    const prev = STRATS[(idx - 1 + STRATS.length) % STRATS.length]!;
+    useStore.getState().setStrategy(prev);
+    render();
+  });
+
+  // History (OpenCode: history_previous / history_next)
+  textbox.key('up', () => {
+    const last = useStore.getState().lastPrompt;
+    if (last) { textbox.setValue(last); screen.render(); }
+  });
+  textbox.key('down', () => { textbox.clearValue(); screen.render(); });
+
+  // Slash commands
+  textbox.key('enter', () => {
+    const val = textbox.getValue().trim();
+    if (!val) return;
+    textbox.clearValue();
+    screen.render();
+    if (val.startsWith('/')) {
+      handleCommand(val);
+      return;
+    }
+    run(val).catch((e: unknown) => {
+      useStore.getState().addMessage({ type: 'error', content: String(e) });
+      useStore.getState().setRunning(false);
     });
   });
 
