@@ -1,429 +1,441 @@
 /**
- * EamilOS TUI — Borderless, plain text output
+ * EamilOS TUI — index.tsx
+ *
+ * Layout map (rows, top → bottom):
+ *
+ *   0        ┌ status bar ─────────────────────────────────────────────────┐
+ *   1        ├ thin rule ──────────────────────────────────────────────────┤
+ *   2…H-6   │ scrollable message area                                     │
+ *   H-5      ├ [graph panel — 4 rows when ctrl+g, hidden otherwise] ──────┤
+ *   H-4      ├ thin rule ──────────────────────────────────────────────────┤
+ *   H-3      ├ strategy bar ───────────────────────────────────────────────┤
+ *   H-2      ├ input row (prompt ▸ textbox ▸ [enter]) / running bar ───────┤
+ *   H-1      └ hint bar ───────────────────────────────────────────────────┘
+ *
+ * Philosophy:
+ *   - All chrome is Text elements created ONCE, content swapped each frame.
+ *   - No Box borders anywhere. Dividers are plain ─ characters in text.
+ *   - Scroll via msgBox.scroll(); never destroy/recreate.
+ *   - Spinner ticks via setInterval, partial refresh only on that path.
+ *   - Full render on store change, debounced by setImmediate.
  */
-import pkg from 'blessed';
-const { screen, box, text, textbox } = pkg;
-import { useStore } from './state/store.js';
-import { run, cancel } from './hooks/useOrchestrator.js';
+
+import blessed from 'blessed';
+import { useStore }          from './state/store.js';
+import { run, cancel }       from './hooks/useOrchestrator.js';
+import { checkAgentStatus }  from './hooks/useAgentStatus.js';
+import {
+  messageToLines,
+  renderStatusBar,
+  renderStrategyBar,
+  renderHintBar,
+  renderGraphPanel,
+  renderWelcome,
+  renderRunningBar,
+  tickSpinner,
+  spinChar,
+  rep,
+} from './render.js';
 import type { ExecutionStrategy } from './types/ui.js';
 
-// ─── Screen ────────────────────────────────────────────────────────────────────
+const VERSION = '1.4.0';
+const STRATS: ExecutionStrategy[] = [
+  'opencode-first', 'gemini-first', 'parallel', 'swarm',
+];
 
-const mainScreen = screen({
-  autoPadding: false,
-  smartCSR: true,
-  resizeTimeout: 100,
-  fullUnicode: true,
-  title: 'EamilOS',
-  dockBorders: false,
-  ignoreLocked: ['C-c'],
+// ─── Screen ────────────────────────────────────────────────────────────────
+
+const screen = blessed.screen({
+  smartCSR:      true,
+  fullUnicode:   true,
+  autoPadding:   false,
+  title:         'EamilOS',
+  resizeTimeout: 60,
+  dockBorders:   false,
+  ignoreLocked:  ['C-c'],
 });
 
-process.stdin.resume();
-process.stdin.setRawMode?.(true);
+let W = (screen.width  as number) || 120;
+let H = (screen.height as number) || 30;
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Layout constants ──────────────────────────────────────────────────────
 
-const STRATEGIES: ExecutionStrategy[] = [
-  'opencode-first',
-  'gemini-first',
-  'parallel',
-  'swarm',
-];
-const SPINNER = ['|', '/', '-', '\\'];
-const VERSION = '1.4.0';
+const CHROME_TOP    = 2;
+const CHROME_BOTTOM = 4;
+const GRAPH_ROWS    = 4;
 
-let spinnerFrame = 0;
-let spinnerTimer: ReturnType<typeof setInterval> | null = null;
+// ─── Helper: make a full-width text row ───────────────────────────────────
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
-
-function fmtTime(ts: number): string {
-  const d = new Date(ts);
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
-  return h + ':' + m + ':' + s;
+function row(top: number | string): blessed.Widgets.TextElement {
+  return blessed.text({
+    parent: screen,
+    top,
+    left:   0,
+    width:  '100%',
+    height: 1,
+    tags:   true,
+    style:  { fg: 'white' },
+  });
 }
 
-function trunc(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 1) + '>';
+// ─── Chrome elements ───────────────────────────────────────────────────────
+
+const elStatus   = row(0);
+const elRule1    = row(1);
+
+const elGraph0   = row(0);
+const elGraph1   = row(0);
+const elGraph2   = row(0);
+const elGraph3   = row(0);
+const elRuleG    = row(0);
+
+const elRuleBot  = row(0);
+const elStrategy = row(0);
+const elInput    = row(0);
+const elHint     = row(0);
+
+// ─── Scrollable message area ───────────────────────────────────────────────
+
+const msgBox = blessed.box({
+  parent:      screen,
+  top:         CHROME_TOP,
+  left:        0,
+  width:       '100%',
+  tags:        true,
+  scrollable:  true,
+  alwaysScroll:true,
+  keys:        false,
+  vi:          false,
+  mouse:       true,
+  style:       { scrollbar: { bg: '#333333' } },
+  scrollbar:   {
+    ch:    '┃',
+    style: { fg: '#404040' },
+    track: { bg: '#1a1a1a' },
+  },
+});
+
+// ─── Input area ────────────────────────────────────────────────────────────
+
+const promptGlyph = blessed.text({
+  parent:  screen,
+  tags:    true,
+  top:     0,
+  left:    0,
+  width:   4,
+  height:  1,
+  content: ' {#00c8a0-fg}{bold}▸{/bold}{/} ',
+});
+
+const textbox = blessed.textbox({
+  parent:       screen,
+  top:          0,
+  left:         4,
+  width:        '100%-14',
+  height:       1,
+  inputOnFocus: true,
+  style:        {
+    fg:    '#d4d4d4',
+    focus: { fg: 'white' },
+  },
+});
+
+const enterHint = blessed.text({
+  parent:  screen,
+  tags:    true,
+  top:     0,
+  left:    '100%-10',
+  width:   10,
+  height:  1,
+  content: '{#404040-fg} [enter] {/}',
+  align:   'right',
+});
+
+// ─── Spinner ───────────────────────────────────────────────────────────────
+
+let spinFrame  = 0;
+let spinTimer: ReturnType<typeof setInterval> | null = null;
+
+function startSpin(): void {
+  if (spinTimer) return;
+  spinTimer = setInterval(() => {
+    spinFrame = (spinFrame + 1) % 10;
+    tickSpinner();
+    partialRefresh();
+  }, 80);
 }
 
-function pad(str: string, len: number): string {
-  return str.padEnd(len);
+function stopSpin(): void {
+  if (!spinTimer) return;
+  clearInterval(spinTimer);
+  spinTimer = null;
 }
 
-function wrapText(text: string, width: number): string[] {
+// ─── Layout helper ────────────────────────────────────────────────────────
+
+function layout(): {
+  msgTop:    number;
+  msgHeight: number;
+  showGraph: boolean;
+  graphTop:  number;
+  ruleBot:   number;
+  stratRow:  number;
+  inputRow:  number;
+  hintRow:   number;
+} {
+  const showGraph = useStore.getState().showGraphPanel;
+  const graphRows = showGraph ? GRAPH_ROWS : 0;
+
+  const hintRow   = H - 1;
+  const inputRow  = H - 2;
+  const stratRow  = H - 3;
+  const ruleBot   = H - 4;
+  const graphTop  = ruleBot - graphRows;
+  const msgHeight = Math.max(ruleBot - CHROME_TOP - graphRows, 4);
+
+  return {
+    msgTop:    CHROME_TOP,
+    msgHeight,
+    showGraph,
+    graphTop,
+    ruleBot,
+    stratRow,
+    inputRow,
+    hintRow,
+  };
+}
+
+// ─── Content builders ─────────────────────────────────────────────────────
+
+function buildMessages(): string {
+  const state = useStore.getState();
+  const msgs  = state.messages;
+  const inner = Math.max(W - 2, 20);
+
+  if (msgs.length === 0) {
+    return renderWelcome(inner, layout().msgHeight).join('\n');
+  }
+
   const lines: string[] = [];
-  for (const raw of text.split('\n')) {
-    if (raw.length === 0) { lines.push(''); continue; }
-    let remaining = raw;
-    while (remaining.length > width) {
-      lines.push(remaining.slice(0, width));
-      remaining = remaining.slice(width);
-    }
-    if (remaining) lines.push(remaining);
+  for (const msg of msgs) {
+    lines.push(...messageToLines(msg, inner, spinFrame));
   }
-  return lines;
+  return lines.join('\n');
 }
 
-// ─── Layout dimensions ────────────────────────────────────────────────────────
-
-const BOTTOM_H = 3; // strategy + input + hints
-
-// ─── Render text lines ────────────────────────────────────────────────────────
-
-function renderTextLines(
-  container: ReturnType<typeof box>,
-  lines: Array<{ text: string; fg?: string; bold?: boolean; dim?: boolean }>,
-  startY: number,
-  width: number,
-  leftPad: number = 0
-): number {
-  let y = startY;
-  for (const line of lines) {
-    text({
-      parent: container,
-      top: y++,
-      left: leftPad,
-      width: width - leftPad,
-      content: trunc(line.text, width - leftPad),
-      style: {
-        fg: (line.fg as 'cyan' | 'white' | 'gray' | 'green' | 'magenta' | 'yellow' | 'red' | 'blue') ?? 'white',
-        bold: line.bold ?? false,
-        dim: line.dim ?? false,
-      },
-    });
-  }
-  return y;
-}
-
-// ─── Main render ──────────────────────────────────────────────────────────────
+// ─── Full render ──────────────────────────────────────────────────────────
 
 function render(): void {
+  W = (screen.width  as number) || 120;
+  H = (screen.height as number) || 30;
+
   const state = useStore.getState();
-  const w = mainScreen.width as number;
-  const h = mainScreen.height as number;
-  const messages = state.messages;
-  const isRunning = state.isRunning;
+  const L     = layout();
 
-  // Clear
-  const children = [...(mainScreen.children ?? [])] as Array<{ destroy?: () => void; detach?: () => void }>;
-  for (const child of children) {
-    try { child.detach?.(); child.destroy?.(); } catch { /* ignore */ }
-  }
+  // Status bar
+  elStatus.setContent(
+    renderStatusBar(
+      W,
+      state.agentStatus.opencode,
+      state.agentStatus.gemini,
+      state.currentStrategy,
+      state.graphStats,
+      state.isRunning,
+      VERSION,
+    )
+  );
 
-  // ── Status bar (row 0) ────────────────────────────────────────────────────
-  const dotOC = state.agentStatus.opencode.status === 'offline' ? 'O' : '*';
-  const dotGM = state.agentStatus.gemini.status === 'offline' ? 'O' : '*';
-  const ocVer = state.agentStatus.opencode.version ?? '?';
-  const gmVer = state.agentStatus.gemini.version ?? '?';
-  const runLabel = isRunning ? 'RUNNING' : 'READY';
+  // Top divider
+  elRule1.top = 1;
+  elRule1.setContent('{#262626-fg}' + rep('─', W) + '{/}');
 
-  const left = ' EamilOS ' + VERSION + ' [' + runLabel + '] ';
-  const right = ' [' + dotOC + ']OpenCode v' + ocVer + '  [' + dotGM + ']Gemini v' + gmVer + '  strategy:' + state.currentStrategy + '  nodes:' + state.graphStats.nodes + ' edges:' + state.graphStats.edges;
-  const statusLine = left + right.padStart(w - left.length, ' ');
+  // Message area
+  msgBox.top    = L.msgTop;
+  msgBox.height = L.msgHeight;
+  msgBox.width  = W;
+  msgBox.setContent(buildMessages());
+  msgBox.setScrollPerc(100);
 
-  text({
-    parent: mainScreen,
-    top: 0,
-    left: 0,
-    width: w,
-    content: trunc(statusLine, w),
-    style: { fg: 'cyan', bold: true },
-  });
+  // Graph panel
+  if (L.showGraph) {
+    const gLines = renderGraphPanel(state.graphStats, W);
+    while (gLines.length < 4) gLines.push('');
 
-  // ── Message area (rows 1 to h-BOTTOM_H-1) ─────────────────────────────────
-  const msgEnd = h - BOTTOM_H;
-  const msgHeight = msgEnd - 1;
+    elGraph0.top = L.graphTop;     elGraph0.hidden = false;
+    elGraph1.top = L.graphTop + 1; elGraph1.hidden = false;
+    elGraph2.top = L.graphTop + 2; elGraph2.hidden = false;
+    elGraph3.top = L.graphTop + 3; elGraph3.hidden = false;
+    elRuleG.top  = L.ruleBot - 1;  elRuleG.hidden  = false;
 
-  const msgBox = box({
-    parent: mainScreen,
-    top: 1,
-    left: 0,
-    width: w,
-    height: msgHeight,
-    scrollable: true,
-    alwaysScroll: true,
-  });
-
-  if (messages.length === 0) {
-    // Welcome screen
-    const innerW = Math.min(w - 6, 50);
-    const boxLeft = Math.max(Math.floor((w - innerW) / 2), 2);
-    const boxTop = Math.max(Math.floor((msgHeight - 14) / 2), 2);
-
-    renderTextLines(msgBox, [
-      { text: pad('', innerW), fg: 'cyan' },
-      { text: '  EamilOS  Multi-Agent Orchestrator', fg: 'cyan', bold: true },
-      { text: '  v' + VERSION, fg: 'cyan' },
-      { text: pad('', innerW), fg: 'cyan' },
-      { text: '  OpenCode Agent  +  Gemini CLI Agent', fg: 'white' },
-      { text: '  Graphify Knowledge Graph', fg: 'white' },
-      { text: pad('', innerW), fg: 'white' },
-      { text: '  Strategies:', fg: 'gray' },
-      { text: '    [1] opencode-first   [2] gemini-first', fg: 'gray' },
-      { text: '    [3] parallel         [4] swarm', fg: 'gray' },
-      { text: pad('', innerW), fg: 'white' },
-      { text: '  Type a prompt and press Enter', fg: 'gray' },
-      { text: pad('', innerW), fg: 'cyan' },
-    ], boxTop, w, boxLeft);
+    elGraph0.setContent(gLines[0] ?? '');
+    elGraph1.setContent(gLines[1] ?? '');
+    elGraph2.setContent(gLines[2] ?? '');
+    elGraph3.setContent(gLines[3] ?? '');
+    elRuleG.setContent('{#262626-fg}' + rep('─', W) + '{/}');
   } else {
-    let y = 0;
-    for (const msg of messages) {
-      const ts = fmtTime(msg.timestamp);
-      const innerW = w - 4;
-      const contentLines = wrapText(msg.content ?? '', innerW);
-      const tools = msg.tools ?? [];
-
-      switch (msg.type) {
-        case 'user': {
-          y = renderTextLines(msgBox, [
-            { text: ' YOU ' + '-'.repeat(innerW) + ' ' + ts, fg: 'green', bold: true },
-          ], y, w, 0);
-          for (const l of contentLines) {
-            y = renderTextLines(msgBox, [{ text: ' ' + l, fg: 'white' }], y, w, 0);
-          }
-          y++;
-          break;
-        }
-        case 'opencode':
-        case 'gemini': {
-          const color = msg.type === 'opencode' ? 'cyan' : 'magenta';
-          const label = msg.type.toUpperCase();
-          y = renderTextLines(msgBox, [
-            { text: ' ' + label + ' ' + '-'.repeat(innerW) + ' ' + ts, fg: color, bold: true },
-          ], y, w, 0);
-          for (const l of contentLines) {
-            y = renderTextLines(msgBox, [{ text: ' ' + l, fg: 'white' }], y, w, 0);
-          }
-          for (const tool of tools) {
-            const icon = tool.status === 'done' ? '[+]' : tool.status === 'failed' ? '[-]' : tool.status === 'running' ? '[~]' : '[ ]';
-            const iconFg = tool.status === 'done' ? 'green' : tool.status === 'failed' ? 'red' : tool.status === 'running' ? 'yellow' : 'gray';
-            y = renderTextLines(msgBox, [
-              { text: icon + ' ' + tool.name.padEnd(8) + trunc(tool.args, innerW - 14), fg: iconFg },
-            ], y, w, 0);
-          }
-          if (msg.isStreaming) {
-            y = renderTextLines(msgBox, [
-              { text: ' [.....] ' + msg.type + ' working...', fg: color },
-            ], y, w, 0);
-          }
-          y++;
-          break;
-        }
-        case 'system':
-        case 'error': {
-          const color = msg.type === 'error' ? 'red' : 'yellow';
-          const label = msg.type === 'error' ? 'ERROR' : 'SYS';
-          y = renderTextLines(msgBox, [
-            { text: ' ' + label + ' ' + '-'.repeat(innerW) + ' ' + ts, fg: color, bold: true },
-          ], y, w, 0);
-          for (const l of contentLines) {
-            y = renderTextLines(msgBox, [{ text: ' ' + l, fg: color }], y, w, 0);
-          }
-          y++;
-          break;
-        }
-        case 'graph-stats': {
-          let stats: Record<string, unknown> = {};
-          try { stats = JSON.parse(msg.content); } catch { /* ignore */ }
-          const dur = typeof stats.duration === 'string' ? stats.duration as string : String(((stats.duration as number) ?? 0) / 1000) + 's';
-          const result = (stats.validated as boolean) ? 'VALIDATED' : 'NOT VALIDATED';
-          const resultFg = (stats.validated as boolean) ? 'green' : 'red';
-          y = renderTextLines(msgBox, [
-            { text: ' EXECUTION SUMMARY ' + '-'.repeat(Math.max(innerW - 19, 0)), fg: 'blue', bold: true },
-          ], y, w, 0);
-          y = renderTextLines(msgBox, [
-            { text: '  Strategy   : ' + ((stats.strategy as string) ?? '?'), fg: 'white' },
-            { text: '  Duration   : ' + dur, fg: 'white' },
-            { text: '  Tools used : ' + String((stats.toolsUsed as number) ?? 0), fg: 'white' },
-            { text: '  Graph nodes: ' + String((stats.nodes as number) ?? 0), fg: 'cyan' },
-            { text: '  Graph edges: ' + String((stats.edges as number) ?? 0), fg: 'cyan' },
-            { text: '  Result     : ' + result, fg: resultFg, bold: true },
-          ], y, w, 0);
-          y++;
-          break;
-        }
-      }
-
-      if (y >= msgHeight - 2) break;
-    }
+    elGraph0.hidden = true;
+    elGraph1.hidden = true;
+    elGraph2.hidden = true;
+    elGraph3.hidden = true;
+    elRuleG.hidden  = true;
   }
 
-  setTimeout(() => {
-    try { msgBox.setScrollPerc(100); } catch { /* ignore */ }
-  }, 50);
+  // Bottom rule
+  elRuleBot.top = L.ruleBot;
+  elRuleBot.setContent('{#262626-fg}' + rep('─', W) + '{/}');
 
-  // ── Strategy bar (row h-3) ────────────────────────────────────────────────
-  const stratY = msgEnd;
-  text({
-    parent: mainScreen,
-    top: stratY,
-    left: 0,
-    width: w,
-    content: ' Strategy: ' + STRATEGIES.map((s, i) => '[' + (i + 1) + ']' + s).join('  '),
-    style: { fg: 'gray' },
-  });
+  // Strategy bar
+  elStrategy.top = L.stratRow;
+  elStrategy.setContent(' ' + renderStrategyBar(state.currentStrategy));
 
-  // ── Input row (row h-2) — always visible ──────────────────────────────────
-  const inputY = stratY + 1;
-
-  if (spinnerTimer) { clearInterval(spinnerTimer); spinnerTimer = null; }
-
-  if (isRunning) {
-    text({
-      parent: mainScreen,
-      top: inputY,
-      left: 0,
-      width: w,
-      content: '  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + '  >',
-      style: { fg: 'yellow' },
-    });
-    spinnerTimer = setInterval(() => {
-      spinnerFrame = (spinnerFrame + 1) % SPINNER.length;
-      try {
-        const kids = (mainScreen.children ?? []) as Array<{ top?: number; setContent?: (c: string) => void }>;
-        const el = kids.find(c => c.top === inputY);
-        if (el?.setContent) {
-          el.setContent('  ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + ' ' + SPINNER[spinnerFrame] + '  >');
-        }
-      } catch {
-        if (spinnerTimer) clearInterval(spinnerTimer);
-      }
-    }, 120);
+  // Input row
+  if (state.isRunning) {
+    promptGlyph.hidden = true;
+    textbox.hidden     = true;
+    enterHint.hidden   = true;
+    elInput.top = L.inputRow;
+    elInput.setContent(renderRunningBar(spinFrame));
+    startSpin();
   } else {
-    text({
-      parent: mainScreen,
-      top: inputY,
-      left: 0,
-      width: w,
-      content: ' >',
-      style: { fg: 'cyan', bold: true },
-    });
+    stopSpin();
+    promptGlyph.hidden = false;
+    textbox.hidden     = false;
+    enterHint.hidden   = false;
+    promptGlyph.top  = L.inputRow;
+    textbox.top      = L.inputRow;
+    enterHint.top    = L.inputRow;
+    textbox.width    = Math.max(W - 14, 20);
+    elInput.top = L.inputRow;
+    elInput.setContent('');
   }
 
-  const tb = textbox({
-    parent: mainScreen,
-    top: inputY,
-    left: 4,
-    width: Math.max(w - 8, 20),
-    height: 1,
-    inputOnFocus: true,
-    style: { fg: 'white' },
+  // Hint bar
+  elHint.top = L.hintRow;
+  elHint.setContent(renderHintBar());
+
+  screen.render();
+}
+
+// ─── Partial refresh — spinner tick only ──────────────────────────────────
+
+function partialRefresh(): void {
+  const state = useStore.getState();
+  if (state.isRunning) {
+    elInput.setContent(renderRunningBar(spinFrame));
+  }
+  msgBox.setContent(buildMessages());
+  msgBox.setScrollPerc(100);
+  screen.render();
+}
+
+// ─── Store subscription — debounced by setImmediate ───────────────────────
+
+let renderPending = false;
+function scheduleRender(): void {
+  if (renderPending) return;
+  renderPending = true;
+  setImmediate(() => {
+    renderPending = false;
+    render();
+  });
+}
+
+// ─── Key bindings ─────────────────────────────────────────────────────────
+
+function bindKeys(): void {
+  screen.key('C-c', () => {
+    if (useStore.getState().isRunning) cancel();
+    else shutdown();
+  });
+  screen.key('C-l', () => {
+    useStore.getState().clearMessages();
+    render();
+  });
+  screen.key('C-g', () => {
+    useStore.getState().toggleGraphPanel();
+    render();
   });
 
-  tb.key('enter', () => {
-    const val = tb.getValue().trim();
-    if (!val || isRunning) return;
-    tb.clearValue();
-    run(val);
+  textbox.key('enter', () => {
+    const val = textbox.getValue().trim();
+    if (!val) return;
+    textbox.clearValue();
+    screen.render();
+    run(val).catch((e: unknown) => {
+      useStore.getState().addMessage({
+        type: 'error',
+        content: String(e),
+      });
+      useStore.getState().setRunning(false);
+    });
   });
 
-  tb.key('up', () => {
+  textbox.key('up', () => {
     const last = useStore.getState().lastPrompt;
-    if (last) tb.setValue(last);
+    if (last) { textbox.setValue(last); screen.render(); }
   });
+  textbox.key('down', () => { textbox.clearValue(); screen.render(); });
 
-  tb.key('down', () => {
-    tb.clearValue();
-  });
-
-  STRATEGIES.forEach((s, i) => {
-    tb.key(String(i + 1), () => {
-      if (tb.getValue().length === 0) {
-        useStore.getState().setStrategy(s);
+  // Strategy quick-select (1-4, only when input is empty)
+  STRATS.forEach((strat, i) => {
+    textbox.key(String(i + 1), () => {
+      if (textbox.getValue().length === 0) {
+        useStore.getState().setStrategy(strat);
         render();
       }
     });
   });
 
-  tb.focus();
-
-  // ── Hints (row h-1) ───────────────────────────────────────────────────────
-  const hintsY = inputY + 1;
-  text({
-    parent: mainScreen,
-    top: hintsY,
-    left: 0,
-    width: w,
-    content: trunc('  Up: repeat last  |  1-4: switch strategy  |  Ctrl+L: clear  |  Ctrl+G: graph  |  Ctrl+C: cancel/exit', w),
-    style: { fg: 'gray', dim: true },
-  });
-
-  mainScreen.render();
+  // Scroll
+  screen.key('pageup',   () => { msgBox.scroll(-Math.floor(H / 2)); screen.render(); });
+  screen.key('pagedown', () => { msgBox.scroll( Math.floor(H / 2)); screen.render(); });
+  screen.key('home',     () => { msgBox.setScrollPerc(0);   screen.render(); });
+  screen.key('end',      () => { msgBox.setScrollPerc(100); screen.render(); });
 }
 
-// ─── Global keys ──────────────────────────────────────────────────────────────
-
-mainScreen.key('C-c', () => {
-  const st = useStore.getState();
-  if (st.isRunning) { cancel(); render(); }
-  else { if (spinnerTimer) clearInterval(spinnerTimer); try { mainScreen.destroy(); } catch { /* ignore */ } process.exit(0); }
-});
-
-mainScreen.key('C-l', () => {
-  useStore.getState().clearMessages();
-  render();
-});
-
-mainScreen.key('C-g', () => {
-  useStore.getState().toggleGraphPanel();
-  render();
-});
-
-// ─── Store subscription ───────────────────────────────────────────────────────
-
-let lastHash = '';
-let pending = false;
-
-useStore.subscribe(() => {
-  if (pending) return;
-  pending = true;
-  setImmediate(() => {
-    pending = false;
-    const st = useStore.getState();
-    const hash = [
-      st.messages.length,
-      st.messages[st.messages.length - 1]?.content?.length ?? 0,
-      st.isRunning ? 1 : 0,
-      st.showGraphPanel ? 1 : 0,
-      st.currentStrategy,
-    ].join('|');
-    if (hash !== lastHash) { lastHash = hash; render(); }
-  });
-});
-
-// ─── Resize ───────────────────────────────────────────────────────────────────
-
-mainScreen.on('resize', () => {
-  const w = mainScreen.width as number;
-  const h = mainScreen.height as number;
-  useStore.getState().setTerminalSize(w, h);
-  render();
-});
-
-// ─── Shutdown ─────────────────────────────────────────────────────────────────
+// ─── Shutdown ─────────────────────────────────────────────────────────────
 
 function shutdown(): void {
-  if (spinnerTimer) clearInterval(spinnerTimer);
-  try { mainScreen.destroy(); } catch { /* ignore */ }
+  stopSpin();
+  try { screen.destroy(); } catch { /* ok */ }
   process.exit(0);
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// ─── Main ─────────────────────────────────────────────────────────────────
 
-// ─── Start / Export ────────────────────────────────────────────────────────────
+function main(): void {
+  useStore.getState().setTerminalSize(W, H);
 
-export async function startUI(): Promise<void> {
-  useStore.getState().setTerminalSize(mainScreen.width as number, mainScreen.height as number);
+  // Subscribe to store
+  useStore.subscribe(scheduleRender);
+
+  screen.on('resize', () => {
+    W = (screen.width  as number) || 120;
+    H = (screen.height as number) || 30;
+    useStore.getState().setTerminalSize(W, H);
+    render();
+  });
+
+  bindKeys();
   render();
-  console.log('EamilOS TUI started. Type a prompt and press Enter. Ctrl+C to exit.');
+  textbox.focus();
+
+  // Async agent detection
+  Promise.resolve().then(() => checkAgentStatus());
+
+  process.stdin.resume();
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT',  shutdown);
 }
 
-// Auto-start when run directly (not imported)
-const isMain = process.argv[1] && (process.argv[1].includes('eamilos-ui') || process.argv[1].includes('dist'));
+// ─── Start / Export ────────────────────────────────────────────────────────
+
+export function startUI(): Promise<void> {
+  main();
+  console.log('EamilOS TUI started. Type a prompt and press Enter. Ctrl+C to exit.');
+  return new Promise(() => {});
+}
+
+// Auto-start when run directly
+const isMain = process.argv[1]?.includes('eamilos-ui') || process.argv[1]?.includes('dist');
 if (isMain) { startUI(); }
