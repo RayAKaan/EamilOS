@@ -57,6 +57,10 @@ export class Logger {
     this.correlationId = id;
   }
 
+  setConsoleEnabled(enabled: boolean): void {
+    this.consoleEnabled = enabled;
+  }
+
   private shouldLog(level: LogLevel): boolean {
     return this.levelPriority[level] >= this.levelPriority[this.level];
   }

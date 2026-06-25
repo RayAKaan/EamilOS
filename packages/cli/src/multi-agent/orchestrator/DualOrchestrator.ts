@@ -1,12 +1,7 @@
 import { EventEmitter } from 'events';
-import { writeFileSync, renameSync, mkdirSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
-import { nanoid } from 'nanoid';
 import { OpenCodeAgent } from '../agents/OpenCodeAgent.js';
 import { GeminiCliAgent } from '../agents/GeminiCliAgent.js';
 import { Graphify, KGNode } from '../graph/Graphify.js';
-import { CallsignRegistry } from '../../core/identity/CallsignRegistry.js';
-import { DistributedCommsGround } from '../../core/comms/DistributedCommsGround.js';
 
 export function isErrorResponse(content: string): boolean {
   if (!content || content.length > 5000) return false;
@@ -18,17 +13,18 @@ export function isErrorResponse(content: string): boolean {
 
   const lower = content.toLowerCase();
   const errorPatterns = [
-    'command not found', 'enoent', 'enode',
-    'not available', 'permission denied',
-    'not installed', 'google_api_key',
-    'fallback failed', 'fetch failed',
+    'authentication', 'auth method', 'api.key', 'not configured',
+    'command not found', 'enoent', 'spawn', 'enode',
+    'not available', 'timeout', 'permission denied',
+    'not installed', 'google_api_key', 'invalid',
+    'fallback failed', 'fetch failed', 'error:',
   ];
 
   return errorPatterns.some(pattern => lower.includes(pattern.toLowerCase()));
 }
 
 export const EAMILOS_SWARM_SYSTEM_PROMPT = `
-[EamilOS 1.4.0 — Unified Autonomous Multi-Agent Kernel]
+[EamilOS 1.6.0 — Unified Autonomous Multi-Agent Kernel]
 You are operating as a specialized intelligence node within EamilOS, pooling the collective execution power of OpenCode AI (75+ models & code synthesis) and Gemini CLI (multimodal long-context research) into a single unified agent system.
 Your supreme directive is to generate verified, validated, production-ready working code.
 Guaranteed Execution Protocols:
@@ -95,8 +91,6 @@ export class DualOrchestrator extends EventEmitter {
   private geminiAgent: GeminiCliAgent;
   private graph: Graphify;
   private config: OrchestratorConfig;
-  private callsigns: CallsignRegistry;
-  private blackboard: DistributedCommsGround;
 
   constructor(config: OrchestratorConfig) {
     super();
@@ -120,10 +114,6 @@ export class DualOrchestrator extends EventEmitter {
     });
 
     this.graph = new Graphify();
-    this.callsigns = new CallsignRegistry();
-    this.blackboard = new DistributedCommsGround('orchestrator', this, { maxMessagesPerTask: 200 });
-
-    this.callsigns.assign(['opencode', 'gemini-cli']);
 
     // Forward chunk events from agents
     this.geminiAgent.on('chunk', (agent: string, chunk: string) => {
@@ -139,45 +129,6 @@ export class DualOrchestrator extends EventEmitter {
     this.graph.createAgentNode('gemini-cli', 'Gemini CLI Agent', [
       'research', 'analysis', 'fast-iteration', 'web-search', 'long-context',
     ]);
-  }
-
-  private buildAgentPrompt(task: string): string {
-    const blackboard = this.getBlackboardContext();
-    return `${EAMILOS_SWARM_SYSTEM_PROMPT}\n\n## Active Blackboard Context\n${blackboard}\n\n## Goal Instruction\n${task}`;
-  }
-
-  private getBlackboardContext(): string {
-    const messages = this.blackboard.getTaskTranscript('orchestrator');
-    if (messages.length === 0) return '(empty — no prior agent output)';
-    return messages.slice(-5).map(m => `[${m.from} @ ${new Date(m.timestamp).toISOString()}]: ${m.content.slice(0, 500)}`).join('\n');
-  }
-
-  private publishToBlackboard(agentId: string, content: string, messageType: string): void {
-    this.blackboard.publish('orchestrator', {
-      from: agentId,
-      content,
-      type: messageType,
-      subject: messageType,
-      priority: 'normal',
-      target: { type: 'broadcast' },
-    });
-  }
-
-  private atomicWriteFiles(files: { path: string; content?: string }[], baseDir: string): string[] {
-    const written: string[] = [];
-    for (const file of files) {
-      if (!file.content) continue;
-      const fullPath = file.path.startsWith('/') || file.path.match(/^[A-Z]:\\/i)
-        ? file.path
-        : join(baseDir, file.path);
-      const dir = dirname(fullPath);
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      const tmpPath = fullPath + '.tmp.' + nanoid();
-      writeFileSync(tmpPath, file.content, 'utf-8');
-      renameSync(tmpPath, fullPath);
-      written.push(fullPath);
-    }
-    return written;
   }
 
   async healthCheck(): Promise<HealthCheckResult> {
@@ -364,15 +315,9 @@ Task: "${task}"`
 
           this.emit('validation.passed', {});
 
-          const writtenFiles = this.atomicWriteFiles(validationResult.files, this.config.workingDir);
-
           for (const file of result.files) {
             this.graph.trackFile(file.path, file.content || '', usedAgent, file.action as 'created' | 'modified' | 'deleted');
             this.graph.recordValidation(file.path, 'eamilos-validation', 'passed', 'File validated');
-          }
-
-          if (writtenFiles.length > 0) {
-            this.emit('system.event', `[Gauntlet] Atomically wrote ${writtenFiles.length} files to ${this.config.workingDir}`);
           }
 
           this.graph.completeTask(taskNode.id, result.finalOutput || '');
@@ -417,10 +362,9 @@ Task: "${task}"`
     analysis: TaskAnalysis
   ): Promise<{ output: { primary: string; secondary: string; files: any[] }; agent: string }> {
 
-    const fullPrompt = this.buildAgentPrompt(task);
     const researchPrompt = analysis.requiresResearch
-      ? `${fullPrompt}\n\nResearch and plan this task. Provide a clear plan with specific steps, files to create, and key considerations.`
-      : fullPrompt;
+      ? `Research and plan: ${task}\n\nProvide a clear plan with specific steps, any files that need to be created/modified, and key considerations. Be specific and actionable.`
+      : task;
 
     let research = '';
     let researchSuccess = false;
@@ -455,17 +399,16 @@ Task: "${task}"`
       }
     }
 
-    this.publishToBlackboard('gemini-cli', research, 'research');
+    let contextStr = this.graph.buildContextString('opencode');
 
     const implementationPrompt = analysis.requiresCodeGeneration
-      ? `${fullPrompt}\n\n## Research\n${research}\n\nNow implement the solution. Return JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`
+      ? `${research}\n\n## Previous Context\n${contextStr}\n\nNow implement the solution. Create actual working files with real code. Return JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`
       : research;
 
     let implementation = '';
     try {
       const implResponse = await this.openCodeAgent.send(implementationPrompt);
       implementation = implResponse.content;
-      this.publishToBlackboard('opencode', implementation, 'implementation');
       this.graph.recordAgentAction('opencode', 'implementation', implementation);
     } catch (err) {
       implementation = `Implementation failed: ${(err as Error).message}`;
@@ -485,8 +428,9 @@ Task: "${task}"`
     analysis: TaskAnalysis
   ): Promise<{ output: { primary: string; secondary: string; files: any[] }; agent: string }> {
 
-    const fullPrompt = this.buildAgentPrompt(task);
-    const implPrompt = `${fullPrompt}\n\nReturn JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
+    let contextStr = this.graph.buildContextString('opencode');
+
+    const implPrompt = `${task}\n\n## Context\n${contextStr}\n\nImplement the solution. Return JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
 
     let implementation = '';
     let implementationSuccess = false;
@@ -506,8 +450,6 @@ Task: "${task}"`
       implementation = gemRes.content;
     }
 
-    this.publishToBlackboard('opencode', implementation, 'implementation');
-
     const files = this.extractFiles(implementation, 'opencode');
 
     for (const file of files) {
@@ -525,17 +467,16 @@ Task: "${task}"`
 
       if (!isErrorResponse(reviewResponse.content)) {
         review = reviewResponse.content;
-        this.publishToBlackboard('gemini-cli', review, 'review');
         this.graph.recordAgentAction('gemini-cli', 'review', review);
 
         if (review.includes('fix') || review.includes('should be') || review.includes('incorrect')) {
           this.graph.recordConcept('Code Review', 'gemini-cli', review.slice(0, 300));
         }
       } else {
-        review = `Review skipped: ${reviewResponse.content}`;
+        review = '(Gemini review unavailable)';
       }
-    } catch (err) {
-      review = `Review unavailable: ${(err as Error).message}`;
+    } catch {
+      review = '(Gemini review unavailable)';
     }
 
     return {
@@ -549,9 +490,10 @@ Task: "${task}"`
     _analysis: TaskAnalysis
   ): Promise<{ output: { primary: string; secondary: string; files: any[] }; agent: string }> {
 
-    const fullPrompt = this.buildAgentPrompt(task);
-    const geminiPrompt = `${fullPrompt}\n\nProvide a brief plan and any critical considerations. Be concise.`;
-    const opencodePrompt = `${fullPrompt}\n\nReturn JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
+    const contextStr = this.graph.buildContextString('opencode');
+
+    const geminiPrompt = `Quick analysis: ${task}\n\nProvide a brief plan and any critical considerations. Be concise.`;
+    const opencodePrompt = `Implement: ${task}\n\n## Context\n${contextStr}\n\nReturn JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
 
     const [researchPromise, implementationPromise] = await Promise.allSettled([
       this.geminiAgent.send(geminiPrompt),
@@ -561,14 +503,12 @@ Task: "${task}"`
     let research = '';
     if (researchPromise.status === 'fulfilled' && !isErrorResponse(researchPromise.value.content)) {
       research = researchPromise.value.content;
-      this.publishToBlackboard('gemini-cli', research, 'research');
       this.graph.recordAgentAction('gemini-cli', 'research', research);
     }
 
     let implementation = '';
     if (implementationPromise.status === 'fulfilled') {
       implementation = implementationPromise.value.content;
-      this.publishToBlackboard('opencode', implementation, 'implementation');
       this.graph.recordAgentAction('opencode', 'implementation', implementation);
     }
 
@@ -593,9 +533,10 @@ Task: "${task}"`
     _analysis: TaskAnalysis
   ): Promise<{ output: { primary: string; secondary: string; files: any[] }; agent: string }> {
 
-    const fullPrompt = this.buildAgentPrompt(task);
-    const geminiPrompt = `${fullPrompt}\n\nCreate working code files with real implementation.`;
-    const opencodePrompt = `${fullPrompt}\n\nReturn JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
+    const contextStr = this.graph.buildContextString('opencode');
+
+    const geminiPrompt = `Implement: ${task}\n\nCreate working code files. Be specific and precise. Return the code directly.`;
+    const opencodePrompt = `Implement: ${task}\n\n## Context\n${contextStr}\n\nReturn JSON:\n{"files": [{"path": "filename.ext", "content": "..."}]}`;
 
     const [geminiResult, opencodeResult] = await Promise.allSettled([
       this.geminiAgent.send(geminiPrompt),
@@ -612,14 +553,11 @@ Task: "${task}"`
     const worstContent = geminiScore >= opencodeScore ? opencodeContent : geminiContent;
     const winner = geminiScore >= opencodeScore ? 'gemini-cli' : 'opencode';
 
-    this.publishToBlackboard(winner, bestContent, 'swarm-winner');
-
     this.graph.recordAgentAction(winner, 'swarm-winner', bestContent, {
       score: Math.max(geminiScore, opencodeScore)
     });
 
     if (worstContent) {
-      this.publishToBlackboard(winner === 'gemini-cli' ? 'opencode' : 'gemini-cli', worstContent, 'swarm-runner-up');
       this.graph.recordAgentAction(
         winner === 'gemini-cli' ? 'opencode' : 'gemini-cli',
         'swarm-runner-up',

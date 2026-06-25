@@ -1,4 +1,4 @@
-import { execSync, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
 
@@ -56,7 +56,7 @@ export class OpenCodeAgent extends BaseAgent {
 
   async checkInstalled(): Promise<{ available: boolean; version?: string; error?: string }> {
     if (this.checkedInstalled) {
-      return { available: true, version: this.isInstalledBinary ? 'CLI' : 'Kernel' };
+      return { available: this.isInstalledBinary, version: this.isInstalledBinary ? 'CLI' : undefined };
     }
     this.checkedInstalled = true;
     try {
@@ -65,19 +65,8 @@ export class OpenCodeAgent extends BaseAgent {
       return { available: true, version: 'CLI' };
     } catch {
       this.isInstalledBinary = false;
-      return { available: true, version: 'Kernel' };
+      return { available: false, version: undefined, error: 'opencode-ai not installed. Run: npm install -g opencode-ai' };
     }
-  }
-
-  private extractVersion(output: string): string {
-    const lines = output.split('\n');
-    for (const line of lines) {
-      const match = line.match(/(\d+\.\d+\.\d+)/);
-      if (match) return match[1];
-      const scopeMatch = line.match(/@[\w-]+\/[\w-]+@(\d+\.\d+\.\d+)/);
-      if (scopeMatch) return scopeMatch[1];
-    }
-    return output.trim().split('\n').filter(l => l.includes('.')).find(l => l) || 'unknown';
   }
 
   async startServer(port = 4096): Promise<void> {
@@ -177,7 +166,7 @@ export class OpenCodeAgent extends BaseAgent {
   async send(message: string): Promise<TerminalMessage> {
     const id = this.generateId();
     const startTime = Date.now();
-    return await this.executeKernelFallback(message, id, startTime);
+    return await this.sendOneShot(message, id, startTime);
   }
 
   private async callServer(prompt: string): Promise<string> {
@@ -208,13 +197,9 @@ export class OpenCodeAgent extends BaseAgent {
 
   private sendOneShot(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
     return new Promise((resolve) => {
-      const timeout = setTimeout(async () => {
-        clearTimeout(timeout);
-        try { proc.kill(); } catch {}
-        resolve(await this.executeKernelFallback(prompt, id, startTime));
-      }, this.config.timeoutMs);
-
-      const args: string[] = ['opencode-ai', 'run', prompt];
+      const args = [
+        'run', prompt,
+      ];
 
       if (this.config.model) {
         args.push('--model', this.config.model);
@@ -222,11 +207,11 @@ export class OpenCodeAgent extends BaseAgent {
 
       let output = '';
       let stderr = '';
-      let resolved = false;
+      let timedOut = false;
 
-      const proc = crossSpawn(this.command, args, {
+      const proc = crossSpawn(this.command, ['--yes', 'opencode-ai', ...args], {
         cwd: this.config.workingDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
+        stdio: ['ignore', 'pipe', 'pipe'],
         env: {
           ...process.env,
           NO_COLOR: 'true',
@@ -234,14 +219,12 @@ export class OpenCodeAgent extends BaseAgent {
         },
       });
 
-      const handleError = async () => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(timeout);
-        resolve(await this.executeKernelFallback(prompt, id, startTime));
-      };
-
-      proc.on('error', handleError);
+      proc.on('error', async (err) => {
+        if (!timedOut) {
+          clearTimeout(timeout);
+          resolve(await this.executeKernelFallback(prompt, id, startTime));
+        }
+      });
 
       proc.stdout?.on('data', (data: Buffer) => {
         const chunk = data.toString();
@@ -255,9 +238,14 @@ export class OpenCodeAgent extends BaseAgent {
         this.emitChunk('opencode', chunk);
       });
 
+      const timeout = setTimeout(async () => {
+        timedOut = true;
+        try { proc.kill(); } catch {}
+        resolve(this.createMessage(id, 'Agent timed out after 15s', stderr || 'timeout', [], { duration: Date.now() - startTime }));
+      }, 15000);
+
       proc.on('close', async (code) => {
-        if (resolved) return;
-        resolved = true;
+        if (timedOut) return;
         clearTimeout(timeout);
         const duration = Date.now() - startTime;
 
@@ -271,7 +259,8 @@ export class OpenCodeAgent extends BaseAgent {
             { exitCode: code, duration, files: parsed.files, stats: parsed.stats }
           ));
         } else {
-          resolve(await this.executeKernelFallback(prompt, id, startTime));
+          const errMsg = stderr.trim() || `opencode-ai exited with code ${code}`;
+          resolve(this.createMessage(id, `opencode-ai failed: ${errMsg}`, output || errMsg, [], { duration, exitCode: code }));
         }
       });
     });
@@ -285,53 +274,8 @@ export class OpenCodeAgent extends BaseAgent {
       const parsed = this.parseResponse(res.content, id);
       return this.createMessage(id, parsed.output || res.content, res.content, parsed.tools, { duration, files: parsed.files });
     } catch {
-      const fallback = this.generateKernelResponse(prompt);
-      const parsed = this.parseResponse(fallback, id);
-      return this.createMessage(id, parsed.output || fallback, fallback, parsed.tools, { duration, files: parsed.files });
+      return this.createMessage(id, 'EamilOS: no AI provider available. Configure a provider or install opencode-ai.', '', [], { duration, files: [] });
     }
-  }
-
-  private generateKernelResponse(prompt: string): string {
-    const firstLine = prompt.split('\n')[0].trim();
-    const fLower = firstLine.toLowerCase();
-    const isGreeting = /^(hello|hi|hey|greetings|howdy|what'?s up)/i.test(fLower) || fLower === 'hello' || fLower === 'hi';
-
-    if (isGreeting && !fLower.includes('code') && !fLower.includes('build') && !fLower.includes('create')) {
-      return "Hello! I am EamilOS 1.4.0 (AI Execution Kernel). Ready to guarantee verified code outputs. Tell me what coding project or goal you'd like to build today!";
-    }
-
-    const pLower = prompt.toLowerCase();
-
-    if (pLower.includes('calc')) {
-      return JSON.stringify({
-        summary: "Created complete Python calculator CLI application",
-        files: [{
-          path: "calculator.py",
-          content: "import argparse\n\ndef add(a, b):\n    return a + b\n\ndef subtract(a, b):\n    return a - b\n\ndef multiply(a, b):\n    return a * b\n\ndef divide(a, b):\n    if b == 0:\n        raise ValueError('Cannot divide by zero')\n    return a / b\n\ndef main():\n    parser = argparse.ArgumentParser(description='Calculator CLI')\n    parser.add_argument('op', choices=['add', 'subtract', 'multiply', 'divide'])\n    parser.add_argument('a', type=float)\n    parser.add_argument('b', type=float)\n    args = parser.parse_args()\n    ops = {'add': add, 'subtract': subtract, 'multiply': multiply, 'divide': divide}\n    print(f'Result: {ops[args.op](args.a, args.b)}')\n\nif __name__ == '__main__':\n    main()",
-          language: "python"
-        }]
-      });
-    }
-
-    if (pLower.includes('todo')) {
-      return JSON.stringify({
-        summary: "Created CLI Todo list application",
-        files: [{
-          path: "todo.py",
-          content: "import json\nimport sys\nimport os\n\nTODO_FILE = 'todos.json'\n\ndef load_todos():\n    if not os.path.exists(TODO_FILE):\n        return []\n    with open(TODO_FILE, 'r') as f:\n        return json.load(f)\n\ndef save_todos(todos):\n    with open(TODO_FILE, 'w') as f:\n        json.dump(todos, f, indent=2)\n\ndef add_todo(task):\n    todos = load_todos()\n    todos.append({'task': task, 'done': False})\n    save_todos(todos)\n    print(f'Added: {task}')\n\ndef list_todos():\n    todos = load_todos()\n    for idx, t in enumerate(todos, 1):\n        status = '[x]' if t['done'] else '[ ]'\n        print(f'{idx}. {status} {t[\"task\"]}')\n\nif __name__ == '__main__':\n    if len(sys.argv) > 1 and sys.argv[1] == 'add':\n        add_todo(' '.join(sys.argv[2:]))\n    else:\n        list_todos()",
-          language: "python"
-        }]
-      });
-    }
-
-    return JSON.stringify({
-      summary: `Verified code implementation for: ${prompt.slice(0, 40)}`,
-      files: [{
-        path: "index.js",
-        content: `// Verified implementation for: ${prompt.replace(/\n/g, ' ')}\nconsole.log('EamilOS Execution Kernel: Project ready');\n`,
-        language: "javascript"
-      }]
-    });
   }
 
   private parseResponse(raw: string, _id: string): OpenCodeResult {
@@ -417,19 +361,6 @@ export class OpenCodeAgent extends BaseAgent {
     }
 
     return { output: output.trim(), tools, files, stats };
-  }
-
-  private createErrorMessage(id: string, content: string, startTime: number, extra: Record<string, unknown> = {}): TerminalMessage {
-    return {
-      id,
-      timestamp: Date.now(),
-      content,
-      metadata: {
-        duration: Date.now() - startTime,
-        error: true,
-        ...extra,
-      },
-    };
   }
 
   async terminate(): Promise<void> {

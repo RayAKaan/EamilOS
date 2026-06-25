@@ -1,7 +1,7 @@
 import { execSync, ChildProcess } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
-import { isGreeting } from '../../core/utils/greeting.js';
+
 
 export interface GeminiResult {
   response: string;
@@ -60,7 +60,7 @@ export class GeminiCliAgent extends BaseAgent {
 
   async checkInstalled(): Promise<{ available: boolean; version?: string; error?: string }> {
     if (GeminiCliAgent.installChecked) {
-      return { available: true, version: GeminiCliAgent.isInstalled ? 'CLI' : 'Kernel' };
+      return { available: GeminiCliAgent.isInstalled, version: GeminiCliAgent.isInstalled ? 'CLI' : undefined };
     }
     GeminiCliAgent.installChecked = true;
     try {
@@ -69,7 +69,7 @@ export class GeminiCliAgent extends BaseAgent {
       return { available: true, version: 'CLI' };
     } catch {
       GeminiCliAgent.isInstalled = false;
-      return { available: true, version: 'Kernel' };
+      return { available: false, version: undefined, error: '@google/gemini-cli not installed. Run: npm install -g @google/gemini-cli' };
     }
   }
 
@@ -85,13 +85,55 @@ export class GeminiCliAgent extends BaseAgent {
   async send(message: string): Promise<TerminalMessage> {
     const id = this.generateId();
     const startTime = Date.now();
-    return await this.executeKernelFallback(message, id, startTime);
+    return await this.sendOneShot(message, id, startTime);
   }
 
   async sendWithInput(prompt: string, inputContent: string): Promise<TerminalMessage> {
     const id = this.generateId();
     const startTime = Date.now();
-    return await this.executeKernelFallback(`${prompt}\n\n${inputContent}`, id, startTime);
+    return await this.sendOneShot(`${prompt}\n\n${inputContent}`, id, startTime);
+  }
+
+  private sendOneShot(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
+    return new Promise((resolve) => {
+      const args = ['run', prompt];
+
+      let output = '';
+      let stderr = '';
+      let timedOut = false;
+
+      const proc = crossSpawn(this.command, ['--yes', '@google/gemini-cli', ...args], {
+        cwd: this.config.workingDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, NO_COLOR: 'true', ...this.config.env },
+      });
+
+      proc.on('error', async () => {
+        if (!timedOut) { clearTimeout(timeout); resolve(this.createMessage(id, '@google/gemini-cli: spawn failed', '', [], { duration: Date.now() - startTime })); }
+      });
+
+      proc.stdout?.on('data', (data: Buffer) => { output += data.toString(); });
+      proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+      const timeout = setTimeout(async () => {
+        timedOut = true;
+        try { proc.kill(); } catch {}
+        resolve(this.createMessage(id, 'Agent timed out after 15s', stderr || 'timeout', [], { duration: Date.now() - startTime }));
+      }, 15000);
+
+      proc.on('close', async (code) => {
+        if (timedOut) return;
+        clearTimeout(timeout);
+        const duration = Date.now() - startTime;
+        if (code === 0 && output.trim()) {
+          const parsed = this.parseResponse(output.trim(), id);
+          resolve(this.createMessage(id, parsed.response || output.trim(), output, parsed.tools, { exitCode: code, duration, files: parsed.files }));
+        } else {
+          const errMsg = stderr.trim() || `@google/gemini-cli exited with code ${code}`;
+          resolve(this.createMessage(id, `@google/gemini-cli failed: ${errMsg}`, output || errMsg, [], { duration, exitCode: code }));
+        }
+      });
+    });
   }
 
   private async executeKernelFallback(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
@@ -102,32 +144,8 @@ export class GeminiCliAgent extends BaseAgent {
       const parsed = this.parseResponse(res.content, id);
       return this.createMessage(id, parsed.response || res.content, res.content, parsed.tools, { duration, files: parsed.files });
     } catch {
-      const fallback = this.generateKernelResponse(prompt);
-      const parsed = this.parseResponse(fallback, id);
-      return this.createMessage(id, parsed.response || fallback, fallback, parsed.tools, { duration, files: parsed.files });
+      return this.createMessage(id, 'EamilOS: no AI provider available. Configure a provider or install opencode-ai.', '', [], { duration, files: [] });
     }
-  }
-
-  private generateKernelResponse(prompt: string): string {
-    if (prompt.includes('Analyze this task') || prompt.includes('"type":')) {
-      const isCode = /\b(build|create|implement|write|generate|code|function|class|api|app|file|script|program)\b/i.test(prompt);
-      const isResearch = /\b(analyze|research|explain|find|search|compare|review)\b/i.test(prompt);
-      return JSON.stringify({
-        type: isCode ? "code" : isResearch ? "research" : "general",
-        complexity: "low",
-        requiresResearch: isResearch,
-        requiresCodeGeneration: isCode,
-        estimatedAgents: isCode ? ["opencode", "gemini-cli"] : ["opencode"],
-        suggestedStrategy: isResearch ? "gemini-first" : "opencode-first",
-        reasoning: "Kernel task classification"
-      });
-    }
-
-    if (isGreeting(prompt)) {
-      return "Greeting recognized. Ready for EamilOS task execution.";
-    }
-
-    return "Analysis verified against system structure and security guidelines.";
   }
 
   private parseResponse(raw: string, _id: string): GeminiResult {

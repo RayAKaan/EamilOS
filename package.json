@@ -1,7 +1,7 @@
 {
   "name": "eamilos",
-  "version": "1.4.0",
-  "description": "AI execution kernel — Multi-agent orchestration with OpenCode + Gemini CLI, knowledge graph, React Ink TUI, and intelligent model routing",
+  "version": "1.6.0",
+  "description": "EamilOS v1.6.0 — AI execution kernel with OpenCode + Gemini CLI, knowledge graph, blessed TUI, and intelligent model routing",
   "type": "module",
   "private": true,
   "workspaces": [
