@@ -1,66 +1,86 @@
 /**
- * Pure text renderer.
- * Every "row" is a plain string that gets written to a blessed text element
- * in a single full-screen box.  No nested boxes, no borders anywhere.
+ * EamilOS TUI — render.ts
+ *
+ * Design language:
+ *   Surgical. Dense but breathable. Every pixel earns its place.
+ *   Inspired by tools that professionals pay for because they respect their time.
+ *   Not a chat app wearing a terminal costume — a real orchestration surface.
+ *
+ * Colour logic:
+ *   One warm accent (amber) for the user's own input.
+ *   One cool accent (teal) for the EamilOS kernel / system chrome.
+ *   Violet for agent output — distinct from both, never confused.
+ *   Everything else lives in a four-stop gray ramp.
+ *   No RGB rainbows. No green "success" banners. Status via shape, not colour.
  */
 
-import type { Message, ToolCall, AgentInfo, GraphStats, ExecutionStrategy } from './types/ui.js';
+import type {
+  Message,
+  ToolCall,
+  AgentInfo,
+  GraphStats,
+  ExecutionStrategy,
+} from './types/ui.js';
 
-// ─── Palette (xterm-256 / basic names that blessed understands) ────────────
+// ─── Colour palette ────────────────────────────────────────────────────────
 
-export const C = {
-  reset:    '{/}',
-  // agent colours
-  cyan:     '{cyan-fg}',
-  mag:      '{magenta-fg}',
-  // ui chrome
-  green:    '{green-fg}',
-  yellow:   '{yellow-fg}',
-  blue:     '{#5f87ff-fg}',
-  red:      '{red-fg}',
-  // neutral
-  white:    '{white-fg}',
-  gray:     '{#606060-fg}',
-  dimgray:  '{#404040-fg}',
-  // bold helpers
-  bold:     '{bold}',
-  boldEnd:  '{/bold}',
+const K = {
+  // Kernel / chrome
+  teal:    '#00c8a0',   // EamilOS brand — teal-green
+  tealDim: '#006e58',   // dimmed teal for rules
+
+  // Agent voices
+  ocBlue:  '#38bdf8',   // opencode — sky blue
+  gemVio:  '#a78bfa',   // gemini   — violet
+
+  // User input
+  amber:   '#fbbf24',   // user prompt — warm amber
+  amberDim:'#78530a',
+
+  // Semantic
+  ok:      '#34d399',   // subtle mint — validation pass
+  warn:    '#fb923c',   // orange — warning / running
+  err:     '#f87171',   // soft red — error
+
+  // Neutral ramp
+  g0:      'white',     // primary content
+  g1:      '#d4d4d4',   // secondary
+  g2:      '#737373',   // tertiary / labels
+  g3:      '#404040',   // dividers / very dim
+  g4:      '#262626',   // near-invisible chrome
 } as const;
 
-function c(color: string, text: string): string {
-  return `{${color}-fg}${text}{/}`;
-}
-function bold(text: string): string { return `{bold}${text}{/bold}`; }
-function dim(text:  string): string { return c('240', text); }
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
-// ─── Time ──────────────────────────────────────────────────────────────────
-
-function ts(timestamp: number): string {
-  const d  = new Date(timestamp);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return dim(`${hh}:${mm}`);
+function fg(hex: string, text: string): string {
+  return `{${hex}-fg}${text}{/}`;
 }
 
-// ─── Layout helpers ────────────────────────────────────────────────────────
+function bold(t: string): string { return `{bold}${t}{/bold}`; }
 
-/** Repeat a character n times */
 export function rep(ch: string, n: number): string {
-  return n > 0 ? ch.repeat(n) : '';
+  const count = Math.max(0, Math.floor(n));
+  return count > 0 ? ch.repeat(count) : '';
 }
 
-/** Strip all {tag} sequences to measure visible length */
-function visLen(s: string): number {
+/** Visible length — strip all blessed {tag} sequences */
+function vl(s: string): number {
   return s.replace(/\{[^}]*\}/g, '').length;
 }
 
-/** Right-align `right` so total visible width = w, given `left` is already placed */
+/** Pad string to visible width with trailing spaces */
+function padTo(s: string, w: number): string {
+  const gap = w - vl(s);
+  return s + rep(' ', Math.max(gap, 0));
+}
+
+/** Place right-hand content flush to terminal edge */
 function rightAlign(left: string, right: string, w: number): string {
-  const gap = w - visLen(left) - visLen(right);
+  const gap = w - vl(left) - vl(right);
   return left + rep(' ', Math.max(gap, 1)) + right;
 }
 
-/** Wrap plain text to width, return array of lines */
+/** Wrap plain text at visible width w */
 function wrap(text: string, w: number): string[] {
   const out: string[] = [];
   for (const raw of text.split('\n')) {
@@ -72,230 +92,354 @@ function wrap(text: string, w: number): string[] {
   return out;
 }
 
-// ─── Message → lines ──────────────────────────────────────────────────────
-
-const TOOL_ICON: Record<string, string> = {
-  pending: dim('[ ]'),
-  running: c('yellow', '[~]'),
-  done:    c('green',  '[+]'),
-  failed:  c('red',    '[-]'),
-};
-
-function renderTool(tool: ToolCall, indent: number, w: number): string[] {
-  const icon    = TOOL_ICON[tool.status] ?? dim('[ ]');
-  const name    = c('white', tool.name.slice(0, 10).padEnd(10));
-  const suffix  = tool.lines != null ? dim(` (${tool.lines}L)`) : '';
-  const maxArgs = w - indent - 16 - (tool.lines != null ? 8 : 0);
-  const args    = dim(tool.args.slice(0, Math.max(maxArgs, 10)));
-  return [rep(' ', indent) + icon + ' ' + name + ' ' + args + suffix];
+/** HH:MM:SS timestamp — dim */
+function stamp(ts: number): string {
+  const d  = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return fg(K.g3, `${hh}:${mm}:${ss}`);
 }
 
-// ── user ───────────────────────────────────────────────────────────────────
+// ─── Spinner ───────────────────────────────────────────────────────────────
+
+// Braille-based — smoother than ASCII, unmistakably "computing"
+const SPIN_FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+let _spinIdx = 0;
+export function tickSpinner(): void { _spinIdx = (_spinIdx + 1) % SPIN_FRAMES.length; }
+export function spinChar(frame?: number): string {
+  const idx = frame !== undefined ? frame % SPIN_FRAMES.length : _spinIdx;
+  return SPIN_FRAMES[idx] ?? '⠋';
+}
+
+// ─── Section header ────────────────────────────────────────────────────────
+//
+// ╸ LABEL ─────────────────────────────────────── HH:MM:SS ╺
+//
+// The heavy end-caps (╸╺) anchor the ruler visually.
+// Label gets bold + its accent colour.
+// Timestamp is dim-gray, flush right.
+
+function sectionRule(
+  label: string,
+  accent: string,
+  ts: number,
+  w: number,
+): string {
+  const tsStr  = stamp(ts);
+  const left   = fg(K.g3, '╸') + ' ' + bold(fg(accent, label)) + ' ';
+  const right  = ' ' + tsStr + ' ' + fg(K.g3, '╺');
+  const rLen   = Math.max(w - vl(left) - vl(right), 2);
+  const rule   = fg(K.g3, rep('─', rLen));
+  return left + rule + right;
+}
+
+// ─── Tool call rows ────────────────────────────────────────────────────────
+//
+//   ○  read_file      src/index.ts
+//   ◐  write_file     src/auth.ts                        +142
+//   ●  run_command    npm test                   (done)
+//   ✗  lint           eslint failed
+
+const TOOL_DOT: Record<string, string> = {
+  pending: fg(K.g3,   '○'),
+  running: fg(K.warn, '◐'),
+  done:    fg(K.ok,   '●'),
+  failed:  fg(K.err,  '✗'),
+};
+
+function renderTool(tool: ToolCall, w: number): string[] {
+  const dot    = TOOL_DOT[tool.status] ?? fg(K.g3, '○');
+  const name   = fg(K.g1, tool.name.padEnd(14).slice(0, 14));
+  const argMax = Math.max(w - 22, 10);
+  const args   = fg(K.g2, tool.args.slice(0, argMax));
+  const lines  = tool.lines != null ? fg(K.g3, ` +${tool.lines}`) : '';
+  const first  = `   ${dot}  ${name}  ${args}${lines}`;
+  const out    = [first];
+  if (tool.result && (tool.status === 'done' || tool.status === 'failed')) {
+    const r = fg(tool.status === 'done' ? K.g2 : K.err, tool.result.slice(0, w - 10));
+    out.push(`        ${fg(K.g3, '└─')} ${r}`);
+  }
+  return out;
+}
+
+// ─── User message ──────────────────────────────────────────────────────────
 
 export function renderUser(msg: Message, w: number): string[] {
-  const ruler = dim(rep('\u2500', Math.max(w - 12, 4)));
-  const header = rightAlign(bold(c('green', 'you')) + '  ' + ruler, ts(msg.timestamp), w);
-  const lines  = wrap(msg.content, w - 4);
+  const rule  = sectionRule('you', K.amber, msg.timestamp, w);
+  const lines = wrap(msg.content, w - 4);
   return [
-    header,
-    ...lines.map((l) => '    ' + c('white', l)),
+    rule,
+    ...lines.map(l => `   ${fg(K.amber, l)}`),
     '',
   ];
 }
 
-// ── agent ──────────────────────────────────────────────────────────────────
-
-const SPINNER_FRAMES = ['|', '/', '-', '\\'];
-let spinIdx = 0;
-export function tickSpinner(): void { spinIdx = (spinIdx + 1) % 4; }
-export function spinnerChar(): string { return SPINNER_FRAMES[spinIdx] ?? '|'; }
+// ─── Agent message ─────────────────────────────────────────────────────────
 
 export function renderAgent(msg: Message, w: number, frame: number): string[] {
-  const isOC   = msg.agent === 'opencode' || msg.type === 'opencode';
-  const color  = isOC ? 'cyan' : 'magenta';
-  const label  = isOC ? 'opencode' : 'gemini';
-  const ruler  = dim(rep('\u2500', Math.max(w - label.length - 10, 4)));
-  const header = rightAlign(bold(c(color, label)) + '  ' + ruler, ts(msg.timestamp), w);
+  const isOC    = msg.agent === 'opencode' || msg.type === 'opencode';
+  const accent  = isOC ? K.ocBlue : K.gemVio;
+  const label   = isOC ? 'opencode' : 'gemini';
 
-  const out: string[] = [header];
+  const rule = sectionRule(label, accent, msg.timestamp, w);
+  const out: string[] = [rule];
 
   if (msg.content.trim()) {
     const lines = wrap(msg.content, w - 4);
-    out.push(...lines.map((l) => '    ' + c('white', l)));
+    out.push(...lines.map(l => `   ${fg(K.g1, l)}`));
   }
 
   for (const tool of msg.tools ?? []) {
-    out.push(...renderTool(tool, 4, w));
+    out.push(...renderTool(tool, w));
   }
 
   if (msg.isStreaming) {
-    const sp = SPINNER_FRAMES[frame % 4] ?? '|';
-    out.push('    ' + dim(sp + ' ' + sp + ' ' + sp) + '  ' + dim(label + ' working...'));
+    const sp = spinChar(frame);
+    out.push(`   ${fg(accent, sp)} ${fg(K.g2, 'processing...')}`);
   }
 
   out.push('');
   return out;
 }
 
-// ── system / error ─────────────────────────────────────────────────────────
+// ─── System / error message ────────────────────────────────────────────────
 
 export function renderSystem(msg: Message, w: number): string[] {
   const isErr  = msg.type === 'error';
-  const color  = isErr ? 'red' : 'yellow';
-  const label  = isErr ? 'err' : 'sys';
-  const ruler  = dim(rep('\u2500', Math.max(w - label.length - 10, 4)));
-  const header = rightAlign(bold(c(color, label)) + '  ' + ruler, ts(msg.timestamp), w);
+  const accent = isErr ? K.err : K.g2;
+  const label  = isErr ? 'error' : 'sys';
 
-  const lines  = wrap(msg.content, w - 4);
+  const rule  = sectionRule(label, accent, msg.timestamp, w);
+  const lines = wrap(msg.content, w - 4);
   return [
-    header,
-    ...lines.map((l) => '    ' + (isErr ? c('red', l) : dim(l))),
+    rule,
+    ...lines.map(l => `   ${fg(isErr ? K.err : K.g2, l)}`),
     '',
   ];
 }
 
-// ── graph stats ─────────────────────────────────────────────────────────────
+// ─── Execution summary ─────────────────────────────────────────────────────
+//
+// Rendered as a compact receipt at the end of each run.
+// Two-column when terminal >= 90 wide.
 
-interface StatPayload {
-  strategy: string; duration: string; toolsUsed: number;
-  nodes: number; edges: number; validated: boolean;
+interface SummaryPayload {
+  strategy:   string;
+  duration:   string;
+  toolsUsed:  number;
+  nodes:      number;
+  edges:      number;
+  validated:  boolean;
+  agentUsed?: string;
 }
 
-export function renderGraphStats(msg: Message, w: number): string[] {
-  let p: StatPayload = { strategy: '?', duration: '?', toolsUsed: 0, nodes: 0, edges: 0, validated: false };
-  try { p = JSON.parse(msg.content) as StatPayload; } catch { /* ok */ }
+export function renderSummary(msg: Message, w: number): string[] {
+  let p: SummaryPayload = {
+    strategy: '?', duration: '?', toolsUsed: 0,
+    nodes: 0, edges: 0, validated: false,
+  };
+  try { p = JSON.parse(msg.content) as SummaryPayload; } catch { /* ok */ }
 
-  const ruler  = dim(rep('\u2500', Math.max(w - 12, 4)));
-  const header = bold(c('blue', 'summary')) + '  ' + ruler;
+  const rule = sectionRule('run complete', K.teal, msg.timestamp, w);
 
-  const row = (label: string, value: string, vc: string) =>
-    '    ' + dim(label.padEnd(14)) + c(vc, value);
+  const resultMark = p.validated
+    ? bold(fg(K.ok,  '✓')) + fg(K.g1, ' validated')
+    : bold(fg(K.err, '✗')) + fg(K.g1, ' not validated');
 
-  return [
-    header,
-    row('strategy',    p.strategy,                    'white'),
-    row('duration',    p.duration,                    'white'),
-    row('tools used',  String(p.toolsUsed),           'white'),
-    row('graph nodes', String(p.nodes),               'cyan'),
-    row('graph edges', String(p.edges),               'cyan'),
-    row('result',      p.validated ? 'validated' : 'not validated',
-                       p.validated ? 'green' : 'red'),
-    '',
+  const kv = (k: string, v: string) =>
+    `   ${fg(K.g2, k.padEnd(12))}${v}`;
+
+  const rows: string[] = [
+    kv('strategy',   fg(K.g1, p.strategy)),
+    kv('agent',      fg(K.g1, p.agentUsed ?? '—')),
+    kv('duration',   fg(K.g1, p.duration)),
+    kv('files',      fg(K.g1, String(p.toolsUsed))),
+    kv('graph',      fg(K.g1, `${p.nodes} nodes`) + fg(K.g3, '  ·  ') + fg(K.g1, `${p.edges} edges`)),
+    kv('result',     resultMark),
   ];
+
+  // Two-column layout if wide enough
+  if (w >= 90) {
+    const packed: string[] = [];
+    const half = Math.floor(w / 2);
+    for (let i = 0; i < rows.length; i += 2) {
+      const l = padTo(rows[i]!, half);
+      const r = rows[i + 1] ?? '';
+      packed.push(l + r);
+    }
+    return [rule, ...packed, ''];
+  }
+
+  return [rule, ...rows, ''];
 }
 
-// ── welcome ─────────────────────────────────────────────────────────────────
+// ─── Welcome screen ────────────────────────────────────────────────────────
 
 export function renderWelcome(w: number, h: number): string[] {
   const lines: string[] = [];
-  const padTop = Math.max(Math.floor(h / 2) - 8, 0);
-
+  const padTop = Math.max(Math.floor(h / 2) - 11, 1);
   for (let i = 0; i < padTop; i++) lines.push('');
 
-  const centre = (s: string) => {
-    const vl = visLen(s);
-    const pad = Math.max(Math.floor((w - vl) / 2), 0);
-    return rep(' ', pad) + s;
-  };
+  const ctr = (s: string) => rep(' ', Math.max(Math.floor((w - vl(s)) / 2), 0)) + s;
 
-  lines.push(centre(bold(c('cyan', 'EamilOS'))));
-  lines.push(centre(dim('multi-agent AI orchestrator')));
+  // Logo — the two accents side by side
+  lines.push(ctr(
+    bold(fg(K.teal, 'E')) +
+    bold(fg(K.g0,   'amil')) +
+    bold(fg(K.teal, 'OS'))
+  ));
+  lines.push(ctr(fg(K.g2, 'multi-agent AI execution kernel')));
   lines.push('');
-  lines.push(centre(dim(rep('\u2500', Math.min(w - 4, 50)))));
+
+  // Thin rule
+  lines.push(ctr(fg(K.g4, rep('─', Math.min(w - 8, 56)))));
   lines.push('');
-  lines.push(centre(c('cyan',    'opencode') + dim('  +  ') + c('magenta', 'gemini cli')));
+
+  // Agent roster
+  lines.push(ctr(
+    fg(K.ocBlue, '◆') + fg(K.g2, ' opencode') +
+    fg(K.g3,     '   ╱   ') +
+    fg(K.gemVio, '◆') + fg(K.g2, ' gemini cli')
+  ));
   lines.push('');
-  lines.push(centre(dim('strategies')));
+
+  // Strategy legend
+  lines.push(ctr(fg(K.g3, 'strategies')));
   lines.push('');
-  lines.push(centre(c('cyan', '[1]') + dim(' opencode-first   ') + c('cyan', '[2]') + dim(' gemini-first')));
-  lines.push(centre(c('cyan', '[3]') + dim(' parallel         ') + c('cyan', '[4]') + dim(' swarm')));
+  lines.push(ctr(
+    fg(K.g3,  '[1]') + fg(K.g2, ' opencode-first   ') +
+    fg(K.g3,  '[2]') + fg(K.g2, ' gemini-first')
+  ));
+  lines.push(ctr(
+    fg(K.g3,  '[3]') + fg(K.g2, ' parallel         ') +
+    fg(K.g3,  '[4]') + fg(K.g2, ' swarm')
+  ));
   lines.push('');
-  lines.push(centre(dim('type a task and press enter')));
+  lines.push(ctr(fg(K.g3, '─────────────────────────────')));
+  lines.push('');
+  lines.push(ctr(fg(K.g2, 'describe your goal and press ') + fg(K.g1, 'enter')));
 
   return lines;
 }
 
-// ── status bar (single line) ────────────────────────────────────────────────
+// ─── Status bar — top chrome ───────────────────────────────────────────────
+//
+//  EamilOS v1.4  │  ◆ opencode kernel   ◆ gemini kernel  │  swarm  │  ● ready
 
-function agentTag(info: AgentInfo, name: string, color: string): string {
-  const dot = info.status === 'offline' ? dim('[-]')
-            : info.status === 'busy'    ? c('yellow', '[~]')
-            : c('green', '[+]');
-  const ver = info.version ? dim(' ' + info.version) : '';
-  return dot + ' ' + c(color, name) + ver;
+function agentBadge(info: AgentInfo, name: string, accent: string): string {
+  const dot = info.status === 'offline' ? fg(K.g3,   '◇')
+            : info.status === 'busy'    ? fg(K.warn,  '◈')
+            :                            fg(accent,   '◆');
+  const ver = info.version
+    ? fg(K.g3, ' ' + info.version.slice(0, 8))
+    : '';
+  return dot + ' ' + fg(accent, name) + ver;
 }
 
 export function renderStatusBar(
-  w: number,
-  oc: AgentInfo, gem: AgentInfo,
-  strategy: ExecutionStrategy,
+  w:          number,
+  oc:         AgentInfo,
+  gem:        AgentInfo,
+  strategy:   ExecutionStrategy,
   graphStats: GraphStats,
-  isRunning: boolean,
-  version: string,
+  isRunning:  boolean,
+  version:    string,
 ): string {
-  const left = bold(c('cyan', 'EamilOS')) + '  ' + dim(version)
-    + '  ' + dim(rep('\u2502', 1)) + '  '
-    + (isRunning ? c('yellow', 'running') : c('green', 'ready'));
+  const sep  = fg(K.g4, '  │  ');
 
-  const centre = agentTag(oc, 'opencode', 'cyan')
-    + '   ' + agentTag(gem, 'gemini', 'magenta');
+  const mark = bold(fg(K.teal, 'EamilOS')) + fg(K.g3, ` v${version}`);
+  const agents = agentBadge(oc, 'opencode', K.ocBlue) +
+                 fg(K.g4, '   ') +
+                 agentBadge(gem, 'gemini', K.gemVio);
+  const strat  = fg(K.g3, 'mode:') + fg(K.teal, strategy);
+  const state  = isRunning
+    ? fg(K.warn, spinChar()) + fg(K.warn, ' running')
+    : fg(K.ok,   '●') + fg(K.g2, ' ready');
+  const graph  = graphStats.nodes > 0
+    ? sep + fg(K.g3, 'g:') + fg(K.g2, `${graphStats.nodes}n ${graphStats.edges}e`)
+    : '';
 
-  const right = dim('strategy:') + c('cyan', strategy)
-    + '  ' + dim('nodes:') + c('white', String(graphStats.nodes))
-    + '  ' + dim('edges:') + c('white', String(graphStats.edges));
-
-  // Place left, centre (roughly), right
-  const leftLen   = visLen(left);
-  const centreLen = visLen(centre);
-  const rightLen  = visLen(right);
-  const mid       = Math.max(Math.floor((w - centreLen) / 2) - leftLen, 2);
-  const after     = Math.max(w - leftLen - mid - centreLen - rightLen, 2);
-
-  return left + rep(' ', mid) + centre + rep(' ', after) + right;
+  const left  = ' ' + mark + sep + agents;
+  const right  = strat + sep + state + graph + ' ';
+  const gap    = w - vl(left) - vl(right);
+  return left + rep(' ', Math.max(gap, 2)) + right;
 }
 
-// ── strategy bar (single line) ──────────────────────────────────────────────
+// ─── Graph panel — multi-line ──────────────────────────────────────────────
 
-const STRATS: ExecutionStrategy[] = ['opencode-first', 'gemini-first', 'parallel', 'swarm'];
+export function renderGraphPanel(stats: GraphStats, w: number): string[] {
+  const header = fg(K.g3, '╸') + ' ' + bold(fg(K.teal, 'graph')) + ' ' +
+    fg(K.g3, rep('─', Math.max(w - 12, 2))) + fg(K.g3, '╺');
+
+  const kv = (k: string, v: string) =>
+    `   ${fg(K.g2, k.padEnd(11))}${fg(K.g1, v)}`;
+
+  const rows = [
+    kv('nodes',    String(stats.nodes)),
+    kv('edges',    String(stats.edges)),
+    kv('strategy', stats.strategy),
+  ];
+  if (stats.toolsUsed != null) rows.push(kv('files',   String(stats.toolsUsed)));
+  if (stats.duration   != null) rows.push(kv('time',    (stats.duration / 1000).toFixed(2) + 's'));
+  if (stats.validated  != null) rows.push(kv('result',
+    stats.validated ? fg(K.ok, '✓ validated') : fg(K.err, '✗ not validated')
+  ));
+
+  return [header, ...rows];
+}
+
+// For backwards compat with the single-line graph in old index.ts
+export function renderGraphLine(stats: GraphStats): string {
+  return renderGraphPanel(stats, 80).join('  ');
+}
+
+// ─── Strategy bar — bottom chrome ─────────────────────────────────────────
+
+const ALL_STRATS: ExecutionStrategy[] = [
+  'opencode-first', 'gemini-first', 'parallel', 'swarm',
+];
 
 export function renderStrategyBar(current: ExecutionStrategy): string {
-  const parts = STRATS.map((s, i) => {
-    const tag = `[${i + 1}] ${s}`;
-    return s === current ? bold(c('cyan', tag)) : dim(tag);
-  });
-  return dim('strategy  ') + parts.join(dim('   '));
+  return ALL_STRATS.map((s, i) => {
+    const key   = fg(K.g3, `[${i + 1}]`);
+    const label = s === current
+      ? bold(fg(K.teal, s))
+      : fg(K.g2, s);
+    return key + ' ' + label;
+  }).join(fg(K.g3, '   '));
 }
 
-// ── hint bar ────────────────────────────────────────────────────────────────
+// ─── Running state bar ─────────────────────────────────────────────────────
+
+export function renderRunningBar(frame: number): string {
+  const sp = spinChar(frame);
+  return (
+    ' ' + fg(K.warn, sp) + '  ' +
+    fg(K.g2, 'agents working') +
+    fg(K.g3, '   ·   ') +
+    fg(K.g3, 'ctrl+c') + fg(K.g3, ' to cancel')
+  );
+}
+
+// ─── Hint bar ─────────────────────────────────────────────────────────────
 
 export function renderHintBar(): string {
-  const sep = dim('  |  ');
-  return [
-    dim('up') + ' repeat',
-    dim('1-4') + ' strategy',
-    dim('ctrl+g') + ' graph',
-    dim('ctrl+l') + ' clear',
-    dim('ctrl+c') + ' exit',
-  ].join(sep);
+  const key = (k: string, v: string) => fg(K.g3, k) + fg(K.g4, ':') + fg(K.g3, v);
+  const dot = fg(K.g4, '  ·  ');
+  return (
+    ' ' + [
+      key('↑',       'recall'),
+      key('1–4',     'strategy'),
+      key('ctrl+g',  'graph'),
+      key('ctrl+l',  'clear'),
+      key('ctrl+c',  'exit'),
+      key('pg↑↓',   'scroll'),
+    ].join(dot)
+  );
 }
 
-// ── graph panel (single line) ────────────────────────────────────────────────
-
-export function renderGraphLine(stats: GraphStats): string {
-  const parts: string[] = [
-    bold(c('blue', 'graphify')),
-    dim('nodes:')    + c('cyan',  String(stats.nodes)),
-    dim('edges:')    + c('cyan',  String(stats.edges)),
-    dim('strategy:') + c('white', stats.strategy),
-  ];
-  if (stats.toolsUsed != null)
-    parts.push(dim('tools:') + c('white', String(stats.toolsUsed)));
-  if (stats.duration != null)
-    parts.push(dim('duration:') + c('white', (stats.duration / 1000).toFixed(1) + 's'));
-  return parts.join(dim('   |   '));
-}
-
-// ── message dispatcher ───────────────────────────────────────────────────────
+// ─── Message dispatcher ────────────────────────────────────────────────────
 
 export function messageToLines(msg: Message, w: number, spinFrame: number): string[] {
   switch (msg.type) {
@@ -304,7 +448,7 @@ export function messageToLines(msg: Message, w: number, spinFrame: number): stri
     case 'gemini':      return renderAgent(msg, w, spinFrame);
     case 'system':
     case 'error':       return renderSystem(msg, w);
-    case 'graph-stats': return renderGraphStats(msg, w);
+    case 'graph-stats': return renderSummary(msg, w);
     default:            return [];
   }
 }

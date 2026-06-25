@@ -1,45 +1,71 @@
 /**
- * EamilOS TUI  ·  blessed  ·  flat layout  ·  no boxes
+ * EamilOS TUI — index.ts
+ *
+ * Layout map (rows, top → bottom):
+ *
+ *   0        ┌ status bar ─────────────────────────────────────────────────┐
+ *   1        ├ thin rule ──────────────────────────────────────────────────┤
+ *   2…H-6   │ scrollable message area                                     │
+ *   H-5      ├ [graph panel — 3 rows when ctrl+g, hidden otherwise] ──────┤
+ *   H-4      ├ thin rule ──────────────────────────────────────────────────┤
+ *   H-3      ├ strategy bar ───────────────────────────────────────────────┤
+ *   H-2      ├ input row (prompt ▸ textbox ▸ [enter]) / running bar ───────┤
+ *   H-1      └ hint bar ───────────────────────────────────────────────────┘
+ *
+ * Philosophy:
+ *   - All chrome is Text elements created ONCE, content swapped each frame.
+ *   - No Box borders anywhere. Dividers are plain ─ characters in text.
+ *   - Scroll via msgBox.scroll(); never destroy/recreate.
+ *   - Spinner ticks via setInterval, partial refresh only on that path.
+ *   - Full render on store change, debounced by setImmediate.
  */
 
 import blessed from 'blessed';
-import { useStore }        from './state/store.js';
-import { run, cancel }     from './hooks/useOrchestrator.js';
-import { checkAgentStatus} from './hooks/useAgentStatus.js';
+import { useStore }          from './state/store.js';
+import { run, cancel }       from './hooks/useOrchestrator.js';
+import { checkAgentStatus }  from './hooks/useAgentStatus.js';
 import {
   messageToLines,
   renderStatusBar,
   renderStrategyBar,
   renderHintBar,
-  renderGraphLine,
+  renderGraphPanel,
   renderWelcome,
+  renderRunningBar,
   tickSpinner,
+  spinChar,
   rep,
 } from './render.js';
 import type { ExecutionStrategy } from './types/ui.js';
 
 const VERSION = '1.4.0';
-const STRATS: ExecutionStrategy[] = ['opencode-first', 'gemini-first', 'parallel', 'swarm'];
+const STRATS: ExecutionStrategy[] = [
+  'opencode-first', 'gemini-first', 'parallel', 'swarm',
+];
 
 // ─── Screen ────────────────────────────────────────────────────────────────
 
 const screen = blessed.screen({
-  smartCSR:     true,
-  fullUnicode:  true,
-  autoPadding:  false,
-  title:        'EamilOS',
+  smartCSR:      true,
+  fullUnicode:   true,
+  autoPadding:   false,
+  title:         'EamilOS',
   resizeTimeout: 60,
+  dockBorders:   false,
 });
 
-// ─── Static layout elements ─────────────────────────────────────────────────
-// We create these ONCE and update their content each frame.
-// This avoids the destroy/recreate cycle entirely.
+let W = (screen.width  as number) || 120;
+let H = (screen.height as number) || 30;
 
-function makeLine(
-  top: number | string,
-  fg: string = 'white',
-  bold = false,
-): blessed.Widgets.TextElement {
+// ─── Layout constants ──────────────────────────────────────────────────────
+
+const CHROME_TOP    = 2;   // rows consumed at top (status + rule)
+const CHROME_BOTTOM = 4;   // rows consumed at bottom (rule + strategy + input + hint)
+const GRAPH_ROWS    = 4;   // rows used by expanded graph panel (+1 rule)
+
+// ─── Helper: make a full-width text row ───────────────────────────────────
+
+function row(top: number | string): blessed.Widgets.TextElement {
   return blessed.text({
     parent: screen,
     top,
@@ -47,135 +73,173 @@ function makeLine(
     width:  '100%',
     height: 1,
     tags:   true,
-    style:  { fg, bold },
+    style:  { fg: 'white' },
   });
 }
 
-// We'll size these after we know the terminal dimensions.
-let W = (screen.width  as number) || 120;
-let H = (screen.height as number) || 30;
+// ─── Chrome elements — created once, content swapped each frame ────────────
 
-// ── chrome elements (always visible) ───────────────────────────────────────
+const elStatus   = row(0);          // status bar
+const elRule1    = row(1);          // top divider
 
-const elStatus   = makeLine(0);                    // row 0  : status bar
-const elDivider1 = makeLine(1, '240');             // row 1  : thin divider
-const elStrategy = makeLine('100%-4', 'gray');     // 3rd from bottom
-const elDivider2 = makeLine('100%-3', '240');      // 2nd from bottom (thin)
-const elInput    = makeLine('100%-2');             // 2nd from bottom : input row
-const elHint     = makeLine('100%-1', '240');      // very bottom: hints
+// Graph panel — 3 text rows + 1 rule, hidden unless ctrl+g
+const elGraph0   = row(0);          // graph header — position set in render()
+const elGraph1   = row(0);          // graph rows
+const elGraph2   = row(0);
+const elGraph3   = row(0);
+const elRuleG    = row(0);          // rule below graph
 
-// optional graph panel — shown just above strategy
-const elGraph    = makeLine('100%-5', 'blue');
-const elDivGraph = makeLine('100%-4', '240');      // divider below graph
+const elRuleBot  = row(0);          // rule above strategy
+const elStrategy = row(0);          // strategy bar
+const elInput    = row(0);          // running bar OR blank row behind textbox
+const elHint     = row(0);          // hint bar
 
-// ── scrollable message area ─────────────────────────────────────────────────
+// ─── Scrollable message area ───────────────────────────────────────────────
 
 const msgBox = blessed.box({
   parent:      screen,
-  top:         2,
+  top:         CHROME_TOP,
   left:        0,
   width:       '100%',
   tags:        true,
   scrollable:  true,
   alwaysScroll:true,
-  keys:        true,
+  keys:        false,
   vi:          false,
   mouse:       true,
-  style:       { scrollbar: { bg: 'gray' } },
-  scrollbar:   { ch: '\u2502', style: { fg: 'gray' } },
+  style:       { scrollbar: { bg: '#333333' } },
+  scrollbar:   {
+    ch:    '┃',
+    style: { fg: '#404040' },
+    track: { bg: '#1a1a1a' },
+  },
 });
 
-// ── input textbox ───────────────────────────────────────────────────────────
+// ─── Input area — textbox + decorators ────────────────────────────────────
+//
+//  ▸  █cursor█___________________________________________  enter
+//
+// ▸ is the prompt glyph; the enter hint floats flush-right.
 
-const promptEl = blessed.text({
-  parent: screen,
-  tags:   true,
-  top:    '100%-2',
-  left:   0,
-  width:  3,
-  height: 1,
-  content: '{cyan-fg}{bold}>{/bold}{/}',
+const promptGlyph = blessed.text({
+  parent:  screen,
+  tags:    true,
+  top:     0,          // set in render()
+  left:    0,
+  width:   4,
+  height:  1,
+  content: ' {#00c8a0-fg}{bold}▸{/bold}{/} ',
 });
 
 const textbox = blessed.textbox({
   parent:       screen,
-  top:          '100%-2',
-  left:         3,
-  width:        '100%-12',
+  top:          0,         // set in render()
+  left:         4,
+  width:        '100%-14',
   height:       1,
   inputOnFocus: true,
-  style:        { fg: 'white' },
+  style:        {
+    fg:    '#d4d4d4',
+    focus: { fg: 'white' },
+  },
 });
 
 const enterHint = blessed.text({
   parent:  screen,
   tags:    true,
-  top:     '100%-2',
-  left:    '100%-9',
-  width:   9,
+  top:     0,         // set in render()
+  left:    '100%-10',
+  width:   10,
   height:  1,
-  content: '{#404040-fg}[enter]{/}',
+  content: '{#404040-fg} [enter] {/}',
   align:   'right',
 });
 
-// ── spinner state ───────────────────────────────────────────────────────────
+// ─── Spinner ───────────────────────────────────────────────────────────────
 
-let spinFrame   = 0;
-let spinTimer:   ReturnType<typeof setInterval> | null = null;
+let spinFrame  = 0;
+let spinTimer: ReturnType<typeof setInterval> | null = null;
 
 function startSpin(): void {
   if (spinTimer) return;
   spinTimer = setInterval(() => {
-    spinFrame = (spinFrame + 1) % 4;
+    spinFrame = (spinFrame + 1) % 10;
     tickSpinner();
     partialRefresh();
-  }, 120);
+  }, 80);
 }
 
 function stopSpin(): void {
-  if (spinTimer) { clearInterval(spinTimer); spinTimer = null; }
+  if (!spinTimer) return;
+  clearInterval(spinTimer);
+  spinTimer = null;
 }
 
-// ─── Rendering ──────────────────────────────────────────────────────────────
+// ─── Layout helper ────────────────────────────────────────────────────────
 
-function getLayout(): {
-  msgTop: number; msgH: number;
+function layout(): {
+  msgTop:    number;
+  msgHeight: number;
   showGraph: boolean;
+  graphTop:  number;
+  ruleBot:   number;
+  stratRow:  number;
+  inputRow:  number;
+  hintRow:   number;
 } {
   const showGraph = useStore.getState().showGraphPanel;
-  const graphRows = showGraph ? 2 : 0;
-  const msgTop    = 2;
-  const msgH      = Math.max(H - 2 - graphRows - 1, 4);
-  return { msgTop, msgH, showGraph };
+  const graphRows = showGraph ? GRAPH_ROWS : 0;
+
+  const hintRow   = H - 1;
+  const inputRow  = H - 2;
+  const stratRow  = H - 3;
+  const ruleBot   = H - 4;
+  const graphTop  = ruleBot - graphRows;   // = H-4-GRAPH_ROWS when shown, ignored when hidden
+  const msgHeight = Math.max(ruleBot - CHROME_TOP - graphRows, 4);
+
+  return {
+    msgTop:    CHROME_TOP,
+    msgHeight,
+    showGraph,
+    graphTop,
+    ruleBot,
+    stratRow,
+    inputRow,
+    hintRow,
+  };
 }
 
-function buildMsgContent(): string {
-  const state  = useStore.getState();
-  const msgs   = state.messages;
-  const inner  = Math.max(W - 2, 20);
+// ─── Content builders ─────────────────────────────────────────────────────
+
+function buildMessages(): string {
+  const state = useStore.getState();
+  const msgs  = state.messages;
+  const inner = Math.max(W - 2, 20);
 
   if (msgs.length === 0) {
-    return renderWelcome(inner, getLayout().msgH).join('\n');
+    return renderWelcome(inner, layout().msgHeight).join('\n');
   }
 
-  const allLines: string[] = [];
+  const lines: string[] = [];
   for (const msg of msgs) {
-    allLines.push(...messageToLines(msg, inner, spinFrame));
+    lines.push(...messageToLines(msg, inner, spinFrame));
   }
-  return allLines.join('\n');
+  return lines.join('\n');
 }
 
-/** Full re-render of every element */
+// ─── Full render ──────────────────────────────────────────────────────────
+
 function render(): void {
   W = (screen.width  as number) || 120;
   H = (screen.height as number) || 30;
 
-  const state   = useStore.getState();
-  const layout  = getLayout();
+  const state = useStore.getState();
+  const L     = layout();
 
-  // ── status bar
+  // ── Status bar
   elStatus.setContent(
-    renderStatusBar(W,
+    renderStatusBar(
+      W,
       state.agentStatus.opencode,
       state.agentStatus.gemini,
       state.currentStrategy,
@@ -184,126 +248,144 @@ function render(): void {
       VERSION,
     )
   );
-  elDivider1.setContent('{#282828-fg}' + rep('\u2500', W) + '{/}');
-  elDivider1.top = 1;
 
-  // ── message box bounds
-  msgBox.top    = layout.msgTop;
-  msgBox.height = layout.msgH;
+  // ── Top divider
+  elRule1.top = 1;
+  elRule1.setContent('{#262626-fg}' + rep('─', W) + '{/}');
+
+  // ── Message area
+  msgBox.top    = L.msgTop;
+  msgBox.height = L.msgHeight;
   msgBox.width  = W;
-  msgBox.setContent(buildMsgContent());
+  msgBox.setContent(buildMessages());
   msgBox.setScrollPerc(100);
 
-  // ── graph panel
-  if (layout.showGraph) {
-    elGraph.top    = H - 5;
-    elDivGraph.top = H - 4;
-    elGraph.hidden    = false;
-    elDivGraph.hidden = false;
-    elGraph.setContent('  ' + renderGraphLine(state.graphStats));
-    elDivGraph.setContent('{#282828-fg}' + rep('\u2500', W) + '{/}');
+  // ── Graph panel
+  if (L.showGraph) {
+    const gLines = renderGraphPanel(state.graphStats, W);
+    // Pad to 4 rows
+    while (gLines.length < 4) gLines.push('');
+
+    elGraph0.top = L.graphTop;     elGraph0.hidden = false;
+    elGraph1.top = L.graphTop + 1; elGraph1.hidden = false;
+    elGraph2.top = L.graphTop + 2; elGraph2.hidden = false;
+    elGraph3.top = L.graphTop + 3; elGraph3.hidden = false;
+    elRuleG.top  = L.ruleBot - 1;  elRuleG.hidden  = false;
+
+    elGraph0.setContent(gLines[0] ?? '');
+    elGraph1.setContent(gLines[1] ?? '');
+    elGraph2.setContent(gLines[2] ?? '');
+    elGraph3.setContent(gLines[3] ?? '');
+    elRuleG.setContent('{#262626-fg}' + rep('─', W) + '{/}');
   } else {
-    elGraph.hidden    = true;
-    elDivGraph.hidden = true;
+    elGraph0.hidden = true;
+    elGraph1.hidden = true;
+    elGraph2.hidden = true;
+    elGraph3.hidden = true;
+    elRuleG.hidden  = true;
   }
 
-  // ── strategy bar and divider
-  elDivider2.top = H - 4;
-  elDivider2.setContent('{#282828-fg}' + rep('\u2500', W) + '{/}');
-  elStrategy.top = H - 3;
-  elStrategy.setContent('  ' + renderStrategyBar(state.currentStrategy));
+  // ── Bottom rule
+  elRuleBot.top = L.ruleBot;
+  elRuleBot.setContent('{#262626-fg}' + rep('─', W) + '{/}');
 
-  // ── input area
+  // ── Strategy bar
+  elStrategy.top = L.stratRow;
+  elStrategy.setContent(' ' + renderStrategyBar(state.currentStrategy));
+
+  // ── Input row
   if (state.isRunning) {
-    promptEl.hidden  = true;
-    textbox.hidden   = true;
-    enterHint.hidden = true;
-    elInput.top = H - 2;
-    elInput.setContent(
-      '  {yellow-fg}' + ['|', '/', '-', '\\'][spinFrame] + '{/}  ' +
-      '{#606060-fg}agents working   ctrl+c to cancel{/}'
-    );
+    // Hide interactive elements, show running bar
+    promptGlyph.hidden = true;
+    textbox.hidden     = true;
+    enterHint.hidden   = true;
+    elInput.top = L.inputRow;
+    elInput.setContent(renderRunningBar(spinFrame));
     startSpin();
   } else {
     stopSpin();
-    elInput.top = H - 2;
+    promptGlyph.hidden = false;
+    textbox.hidden     = false;
+    enterHint.hidden   = false;
+    promptGlyph.top  = L.inputRow;
+    textbox.top      = L.inputRow;
+    enterHint.top    = L.inputRow;
+    textbox.width    = Math.max(W - 14, 20);
+    elInput.top = L.inputRow;
     elInput.setContent('');
-    promptEl.top  = H - 2;
-    textbox.top   = H - 2;
-    enterHint.top = H - 2;
-    promptEl.hidden  = false;
-    textbox.hidden   = false;
-    enterHint.hidden = false;
-    textbox.width = Math.max(W - 12, 20);
   }
 
-  // ── hint bar
-  elHint.top = H - 1;
-  elHint.setContent('  ' + renderHintBar());
+  // ── Hint bar
+  elHint.top = L.hintRow;
+  elHint.setContent(renderHintBar());
 
   screen.render();
 }
 
-/** Cheap refresh during spinner — only updates streaming content */
+// ─── Partial refresh — spinner tick only ──────────────────────────────────
+
 function partialRefresh(): void {
   const state = useStore.getState();
-
   if (state.isRunning) {
-    elInput.setContent(
-      '  {yellow-fg}' + ['|', '/', '-', '\\'][spinFrame] + '{/}  ' +
-      '{#606060-fg}agents working   ctrl+c to cancel{/}'
-    );
+    elInput.setContent(renderRunningBar(spinFrame));
   }
-
-  msgBox.setContent(buildMsgContent());
+  msgBox.setContent(buildMessages());
   msgBox.setScrollPerc(100);
-
   screen.render();
 }
 
-// ─── Store subscription ─────────────────────────────────────────────────────
+// ─── Store subscription — debounced by setImmediate ───────────────────────
 
-let pending = false;
+let renderPending = false;
 function scheduleRender(): void {
-  if (pending) return;
-  pending = true;
+  if (renderPending) return;
+  renderPending = true;
   setImmediate(() => {
-    pending = false;
+    renderPending = false;
     render();
   });
 }
 
-// ─── Key bindings ───────────────────────────────────────────────────────────
+// ─── Key bindings ─────────────────────────────────────────────────────────
 
 function bindKeys(): void {
-  // Global
+  // ── Global
   screen.key('C-c', () => {
     if (useStore.getState().isRunning) cancel();
     else shutdown();
   });
-  screen.key('C-l', () => { useStore.getState().clearMessages(); render(); });
-  screen.key('C-g', () => { useStore.getState().toggleGraphPanel(); render(); });
+  screen.key('C-l', () => {
+    useStore.getState().clearMessages();
+    render();
+  });
+  screen.key('C-g', () => {
+    useStore.getState().toggleGraphPanel();
+    render();
+  });
 
-  // Textbox
+  // ── Submit
   textbox.key('enter', () => {
     const val = textbox.getValue().trim();
     if (!val) return;
     textbox.clearValue();
     screen.render();
     run(val).catch((e: unknown) => {
-      useStore.getState().addMessage({ type: 'error', content: String(e) });
+      useStore.getState().addMessage({
+        type: 'error',
+        content: String(e),
+      });
       useStore.getState().setRunning(false);
     });
   });
 
+  // ── History recall
   textbox.key('up', () => {
     const last = useStore.getState().lastPrompt;
     if (last) { textbox.setValue(last); screen.render(); }
   });
-
   textbox.key('down', () => { textbox.clearValue(); screen.render(); });
 
-  // Strategy shortcuts (only when textbox is empty)
+  // ── Strategy quick-select (1-4, only when input is empty)
   STRATS.forEach((strat, i) => {
     textbox.key(String(i + 1), () => {
       if (textbox.getValue().length === 0) {
@@ -313,12 +395,14 @@ function bindKeys(): void {
     });
   });
 
-  // Page scroll in message area
+  // ── Scroll
   screen.key('pageup',   () => { msgBox.scroll(-Math.floor(H / 2)); screen.render(); });
   screen.key('pagedown', () => { msgBox.scroll( Math.floor(H / 2)); screen.render(); });
+  screen.key('home',     () => { msgBox.setScrollPerc(0);   screen.render(); });
+  screen.key('end',      () => { msgBox.setScrollPerc(100); screen.render(); });
 }
 
-// ─── Shutdown ───────────────────────────────────────────────────────────────
+// ─── Shutdown ─────────────────────────────────────────────────────────────
 
 function shutdown(): void {
   stopSpin();
@@ -326,10 +410,12 @@ function shutdown(): void {
   process.exit(0);
 }
 
-// ─── Main ───────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────
 
 function main(): void {
   useStore.getState().setTerminalSize(W, H);
+
+  // Subscribe to store — full render on any state change
   useStore.subscribe(scheduleRender);
 
   screen.on('resize', () => {
@@ -343,7 +429,8 @@ function main(): void {
   render();
   textbox.focus();
 
-  checkAgentStatus();
+  // Async agent detection — won't block initial render
+  Promise.resolve().then(() => checkAgentStatus());
 
   process.stdin.resume();
   process.on('SIGTERM', shutdown);
