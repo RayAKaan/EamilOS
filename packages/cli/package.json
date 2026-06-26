@@ -41,8 +41,10 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc && node src/ui/bundle.js",
+    "build": "npm run typecheck && node src/ui/bundle.js",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.ui.json --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "postinstall": "exit 0",

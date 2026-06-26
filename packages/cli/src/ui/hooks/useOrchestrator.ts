@@ -153,7 +153,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
       const msgId = state.addMessage({
         type: 'eamilos',
         content: formatDisplayContent(rawContent),
-        agent: result.agentUsed || 'EamilOS',
+        agent: (result.agentUsed || 'EamilOS') as any,
         isStreaming: false,
       });
 

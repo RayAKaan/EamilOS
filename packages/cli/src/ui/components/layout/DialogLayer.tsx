@@ -24,9 +24,6 @@ export const DialogLayer: React.FC = () => {
 
   return (
     <Box
-      position="absolute"
-      top={0}
-      left={0}
       width="100%"
       height="100%"
       justifyContent="center"
@@ -38,7 +35,7 @@ export const DialogLayer: React.FC = () => {
         paddingX={2}
         paddingY={1}
         minWidth={40}
-        maxWidth={80}
+        width={80}
       >
         {dialog[overlay] ?? null}
       </Box>

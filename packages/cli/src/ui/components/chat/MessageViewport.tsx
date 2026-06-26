@@ -19,7 +19,7 @@ export const MessageViewport: React.FC<Props> = ({ messages }) => {
   }
 
   return (
-    <Box flexDirection="column" flexGrow={1} overflowY="auto">
+    <Box flexDirection="column" flexGrow={1}>
       {messages.map((msg) => (
         <MessageRenderer key={msg.id} message={msg} />
       ))}

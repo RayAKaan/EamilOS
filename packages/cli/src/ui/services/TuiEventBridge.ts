@@ -4,7 +4,12 @@ import { useStore } from '../state/store.js';
 export function createSessionEventBridge(orchestrator: SessionOrchestrator): () => void {
   const unsubs: (() => void)[] = [];
 
-  const sessionStarted = orchestrator.on('session.started', ({ goal, strategy, mode }) => {
+  const on = (event: string, handler: (...args: any[]) => void): void => {
+    (orchestrator as any).on(event, handler);
+    unsubs.push(() => { (orchestrator as any).off(event, handler); });
+  };
+
+  on('session.started', ({ goal, strategy, mode }) => {
     const store = useStore.getState();
     store.addMessage({ type: 'system', content: `Session started: ${goal}` });
     store.setRunning(true);
@@ -13,7 +18,7 @@ export function createSessionEventBridge(orchestrator: SessionOrchestrator): () 
     store.setMode(mode);
   });
 
-  const agentOutput = orchestrator.on('agent.output', ({ agentId, content }) => {
+  on('agent.output', ({ agentId, content }) => {
     const store = useStore.getState();
     const messages = store.messages;
     const lastAgentMsg = [...messages].reverse().find(
@@ -26,7 +31,7 @@ export function createSessionEventBridge(orchestrator: SessionOrchestrator): () 
     }
   });
 
-  const agentCompleted = orchestrator.on('agent.completed', ({ agentId }) => {
+  on('agent.completed', ({ agentId }) => {
     const store = useStore.getState();
     const messages = store.messages;
     const lastAgentMsg = [...messages].reverse().find(
@@ -37,12 +42,12 @@ export function createSessionEventBridge(orchestrator: SessionOrchestrator): () 
     }
   });
 
-  const agentError = orchestrator.on('agent.error', ({ agentId, error }) => {
+  on('agent.error', ({ agentId, error }) => {
     const store = useStore.getState();
     store.addMessage({ type: 'error', content: `[${agentId}] ${error}` });
   });
 
-  const sessionCompleted = orchestrator.on('session.completed', ({ success, duration }) => {
+  on('session.completed', ({ success, duration }) => {
     const store = useStore.getState();
     store.setRunning(false);
     store.addMessage({
@@ -52,19 +57,19 @@ export function createSessionEventBridge(orchestrator: SessionOrchestrator): () 
     store.addLog(`Session completed: success=${success} duration=${duration}ms`);
   });
 
-  const sessionError = orchestrator.on('session.error', ({ error }) => {
+  on('session.error', ({ error }) => {
     const store = useStore.getState();
     store.setRunning(false);
     store.addMessage({ type: 'error', content: `Session error: ${error}` });
   });
 
-  const validationFailed = orchestrator.on('validation.failed', ({ errors }) => {
+  on('validation.failed', ({ errors }) => {
     const store = useStore.getState();
     store.addMessage({ type: 'system', content: `Validation failed: ${errors.length} error(s)` });
-    errors.forEach((e) => store.addLog(`VALIDATION: ${e}`));
+    errors.forEach((e: string) => store.addLog(`VALIDATION: ${e}`));
   });
 
-  const changesApplied = orchestrator.on('changes.applied', ({ applied, failed }) => {
+  on('changes.applied', ({ applied, failed }) => {
     const store = useStore.getState();
     if (applied.length > 0) {
       store.addMessage({ type: 'system', content: `Applied ${applied.length} change(s)` });
@@ -74,14 +79,11 @@ export function createSessionEventBridge(orchestrator: SessionOrchestrator): () 
     }
   });
 
-  const permissionRequested = orchestrator.on('permission.requested', ({ agentId, action, details }) => {
+  on('permission.requested', ({ agentId, action, details }) => {
     const store = useStore.getState();
     store.addPermissionRequest({ agentId, action, details });
     store.addLog(`PERMISSION: ${agentId} requested ${action} — ${details}`);
   });
-
-  unsubs.push(sessionStarted, agentOutput, agentCompleted, agentError);
-  unsubs.push(sessionCompleted, sessionError, validationFailed, changesApplied, permissionRequested);
 
   return () => { unsubs.forEach((fn) => fn()); };
 }
