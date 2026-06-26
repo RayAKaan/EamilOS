@@ -16,6 +16,7 @@ import type { FileChange } from '../changes/ChangeCollector.js';
 
 export interface SessionEventMap {
   'session.started': { goal: string; strategy: ExecutionStrategy; mode: AgentMode };
+  'agent.started': { agentId: string };
   'agent.output': { agentId: string; content: string };
   'agent.fallback': { from: string; to: string; reason: string };
   'agent.completed': { agentId: string; result: AgentResponse };
@@ -316,6 +317,7 @@ export class SessionOrchestrator extends EventEmitter {
   }
 
   private async executeAgentSafely(agent: EamilOSAgent, prompt: string): Promise<AgentResponse> {
+    this.emit('agent.started', { agentId: agent.id });
     this.emit('agent.output', { agentId: agent.id, content: `Starting ${agent.id}...` });
 
     const request: AgentRequest = {

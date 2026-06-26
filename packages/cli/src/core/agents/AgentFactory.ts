@@ -5,6 +5,11 @@ import { ClaudeCodeAgent } from '../../multi-agent/agents/ClaudeCodeAgent.js';
 import { GeminiCliAgent } from '../../multi-agent/agents/GeminiCliAgent.js';
 import { AiderAgent } from '../../multi-agent/agents/AiderAgent.js';
 import { GooseAgent } from '../../multi-agent/agents/GooseAgent.js';
+import { CodexCliAgent } from '../../multi-agent/agents/CodexCliAgent.js';
+import { OpenAIAgentAdapter } from './adapters/OpenAIAgentAdapter.js';
+import { AnthropicAgentAdapter } from './adapters/AnthropicAgentAdapter.js';
+import { OllamaAgentAdapter } from './adapters/OllamaAgentAdapter.js';
+import { GoogleAgentAdapter } from './adapters/GoogleAgentAdapter.js';
 
 const BASE_CAPABILITIES: Record<string, AgentCapabilities> = {
   opencode: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: true, cloud: true, multimodal: false },
@@ -12,6 +17,7 @@ const BASE_CAPABILITIES: Record<string, AgentCapabilities> = {
   'gemini-cli': { codeGeneration: false, fileEditing: false, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: true },
   aider: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
   goose: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
+  'codex-cli': { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
 };
 
 const AGENT_KINDS: Record<string, AgentKind> = {
@@ -20,6 +26,7 @@ const AGENT_KINDS: Record<string, AgentKind> = {
   'gemini-cli': 'cli',
   aider: 'cli',
   goose: 'cli',
+  'codex-cli': 'cli',
 };
 
 export class AgentFactory {
@@ -35,6 +42,16 @@ export class AgentFactory {
         return new AiderAgentAdapter(config);
       case 'goose':
         return new GooseAgentAdapter(config);
+      case 'codex-cli':
+        return new CodexCliAgentAdapter(config);
+      case 'openai-api':
+        return new OpenAIAgentAdapter();
+      case 'anthropic-api':
+        return new AnthropicAgentAdapter();
+      case 'ollama':
+        return new OllamaAgentAdapter();
+      case 'google-api':
+        return new GoogleAgentAdapter();
       default:
         return null;
     }
@@ -253,6 +270,66 @@ class AiderAgentAdapter implements EamilOSAgent {
       capabilities: this.capabilities,
       supportedModes: ['execution'],
       priority: 4,
+      error: result.error,
+    };
+  }
+
+  async run(request: AgentRequest): Promise<AgentResponse> {
+    const start = Date.now();
+    try {
+      const msg = await this.inner.send(request.prompt);
+      return {
+        agentId: this.id,
+        success: true,
+        content: msg.content,
+        fileChanges: [],
+        rawOutput: msg.raw,
+        durationMs: Date.now() - start,
+      };
+    } catch (err) {
+      return {
+        agentId: this.id,
+        success: false,
+        content: '',
+        fileChanges: [],
+        error: err instanceof Error ? err.message : String(err),
+        errorType: 'unknown',
+        durationMs: Date.now() - start,
+      };
+    }
+  }
+
+  async stop(): Promise<void> {
+    await this.inner.terminate();
+  }
+}
+
+class CodexCliAgentAdapter implements EamilOSAgent {
+  id = 'codex-cli';
+  name = 'Codex CLI';
+  kind: AgentKind = 'cli';
+  capabilities: AgentCapabilities = BASE_CAPABILITIES['codex-cli'];
+  private inner: CodexCliAgent;
+
+  constructor(config?: { workingDir?: string; timeoutMs?: number }) {
+    this.inner = new CodexCliAgent({
+      workingDir: config?.workingDir,
+      timeoutMs: config?.timeoutMs ?? 180000,
+    });
+  }
+
+  async checkStatus(): Promise<RegisteredAgent> {
+    const result = await this.inner.checkInstalled();
+    return {
+      id: this.id,
+      name: this.name,
+      kind: this.kind,
+      provider: 'openai',
+      status: result.available ? 'available' : 'not_installed',
+      version: result.version,
+      capabilities: this.capabilities,
+      supportedModes: ['execution'],
+      priority: 3,
       error: result.error,
     };
   }

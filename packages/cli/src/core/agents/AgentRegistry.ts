@@ -200,6 +200,24 @@ export class AgentRegistry {
     });
 
     this.registerDetector({
+      id: 'codex-cli',
+      name: 'Codex CLI',
+      kind: 'cli',
+      provider: 'openai',
+      supportedModes: ['execution'],
+      priority: 3,
+      capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
+      detect: async () => {
+        try {
+          execSync('codex --version 2>&1', { timeout: 2000, stdio: 'pipe' });
+          return { available: true, version: 'CLI' };
+        } catch {
+          return { available: false, error: 'codex not installed. Run: npm install -g @openai/codex' };
+        }
+      },
+    });
+
+    this.registerDetector({
       id: 'ollama',
       name: 'Ollama (Local)',
       kind: 'local',

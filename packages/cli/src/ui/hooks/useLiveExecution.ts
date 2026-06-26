@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { uiController, registerStore } from '../controllers/UIController.js';
 import { useStore } from '../state/store.js';
+import { getEventBus } from '../../core/event-bus.js';
 
 interface TaskStartedEvent {
   taskId?: string;
@@ -40,8 +41,7 @@ export const useLiveExecution = () => {
     const listeners: Array<() => void> = [];
 
     try {
-      const eventBusModule = require('../../core/dist/event-bus.js');
-      const eventBus = eventBusModule.getEventBus?.();
+      const eventBus = getEventBus();
 
       if (eventBus) {
         const taskStarted = (data: TaskStartedEvent) => {
@@ -78,9 +78,9 @@ export const useLiveExecution = () => {
 
         const executionCompleted = (data: ExecutionEvent) => {
           setRunning(false);
-          addLog({ 
-            level: data.success ? 'info' : 'error', 
-            message: `Execution ${data.success ? 'completed' : 'failed'}` 
+          addLog({
+            level: data.success ? 'info' : 'error',
+            message: `Execution ${data.success ? 'completed' : 'failed'}`,
           });
         };
 
@@ -118,3 +118,81 @@ export const useLiveExecution = () => {
     };
   }, [addLog, setRunning, incrementAttempt]);
 };
+
+export function subscribeToSessionEvents(session: any, state: any, statsRef: any, handlersRef: any): void {
+  if (!session || !state || !session.on) return;
+
+  state.setRunning(true);
+  state.setExecutionStart();
+
+  session.on('session.started', (data: any) => {
+    addLog('info', `Session started: ${data.mode} mode, ${data.strategy} strategy`);
+  });
+
+  session.on('agent.output', (data: any) => {
+    if (statsRef?.current) {
+      statsRef.current.lastAgentOutput = { agentId: data.agentId, content: data.content };
+    }
+    state.addMessage({ type: 'system', content: `[${data.agentId}] ${(data.content || '').slice(0, 200)}` });
+  });
+
+  session.on('agent.fallback', (data: any) => {
+    state.setAgentStatus(data.from, { status: 'failed' });
+    state.setAgentStatus(data.to, { status: 'busy' });
+    state.addMessage({ type: 'system', content: `Fallback: ${data.from} → ${data.to} (${data.reason})` });
+  });
+
+  session.on('agent.completed', (data: any) => {
+    state.setAgentStatus(data.agentId, { status: 'ready' });
+  });
+
+  session.on('agent.error', (data: any) => {
+    state.setAgentStatus(data.agentId, { status: 'failed', error: data.error });
+  });
+
+  session.on('changes.collected', (data: any) => {
+    addLog('info', `${data.changes.length} file change(s) detected`);
+  });
+
+  session.on('validation.started', () => {
+    addLog('info', 'Validating changes...');
+  });
+
+  session.on('validation.passed', () => {
+    addLog('info', 'Validation passed');
+  });
+
+  session.on('validation.failed', (data: any) => {
+    addLog('error', `Validation failed: ${(data.errors || []).join(', ')}`);
+  });
+
+  session.on('changes.applied', (data: any) => {
+    addLog('info', `Applied ${data.applied?.length || 0} change(s), ${data.failed?.length || 0} failed`);
+  });
+
+  session.on('session.completed', (data: any) => {
+    state.setRunning(false);
+    if (data.success) {
+      addLog('info', 'Session completed successfully');
+    }
+    if (handlersRef?.current?.onComplete) {
+      handlersRef.current.onComplete(data);
+    }
+  });
+
+  session.on('session.error', (data: any) => {
+    state.setRunning(false);
+    addLog('error', `Session error: ${data.error}`);
+  });
+}
+
+function addLog(level: 'info' | 'error' | 'warn', message: string): void {
+  const state = useStore.getState();
+  if (level === 'error') {
+    state.addMessage({ type: 'error', content: message });
+  } else if (level === 'warn') {
+    state.addMessage({ type: 'system', content: `⚠ ${message}` });
+  } else {
+    state.addMessage({ type: 'system', content: message });
+  }
+}

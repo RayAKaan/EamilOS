@@ -38,14 +38,6 @@ function formatDisplayContent(raw: string): string {
   return raw;
 }
 
-const agentDefs: Record<string, { id: string; callsign: string; mode: AgentOperationalMode }> = {
-  'opencode': { id: 'opencode', callsign: 'BETA', mode: 'execution' },
-  'claude-code': { id: 'claude-code', callsign: 'ALPHA', mode: 'execution' },
-  'aider': { id: 'aider', callsign: 'DELTA', mode: 'execution' },
-  'goose': { id: 'goose', callsign: 'EPSILON', mode: 'execution' },
-  'gemini-cli': { id: 'gemini-cli', callsign: 'GAMMA', mode: 'communication' },
-};
-
 let abortRef = false;
 let currentStartTime = 0;
 
@@ -57,19 +49,34 @@ export async function detectAndTrackAgents(): Promise<void> {
     const available = registry.getAvailableAgents();
     const terminals: TerminalInfo[] = [];
 
-    const idToKey: Record<string, string> = {
-      opencode: 'opencode',
-      'claude-code': 'claude-code',
-      aider: 'aider',
-      goose: 'goose',
-      'gemini-cli': 'gemini-cli',
+    const knownCallsigns: Record<string, string> = {
+      'opencode': 'BETA',
+      'claude-code': 'ALPHA',
+      'aider': 'DELTA',
+      'goose': 'EPSILON',
+      'gemini-cli': 'GAMMA',
+      'codex-cli': 'ZETA',
+      'ollama': 'OMEGA',
+      'openai-api': 'THETA',
+      'anthropic-api': 'IOTA',
+    };
+
+    const defaultMode: Record<string, AgentOperationalMode> = {
+      'opencode': 'execution',
+      'claude-code': 'execution',
+      'aider': 'execution',
+      'goose': 'execution',
+      'gemini-cli': 'communication',
+      'codex-cli': 'execution',
+      'ollama': 'communication',
+      'openai-api': 'communication',
+      'anthropic-api': 'communication',
     };
 
     for (const agent of available) {
-      const key = idToKey[agent.id];
-      if (key && agentDefs[key]) {
-        const def = agentDefs[key];
-        terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+      const callsign = knownCallsigns[agent.id];
+      if (callsign) {
+        terminals.push({ callsign, agentId: agent.id, mode: defaultMode[agent.id] || 'execution' });
       }
     }
 
@@ -148,21 +155,30 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     });
 
     session.on('agent.fallback', (data) => {
+      state.setAgentStatus(data.from, { status: 'failed' });
+      state.setAgentStatus(data.to, { status: 'busy' });
       state.addMessage({ type: 'system', content: `Fallback: ${data.from} → ${data.to} (${data.reason})` });
+    });
+
+    session.on('agent.completed', (data) => {
+      state.setAgentStatus(data.agentId, { status: 'ready' });
+    });
+
+    session.on('agent.started', (data) => {
+      state.setAgentStatus(data.agentId, { status: 'busy' });
     });
 
     session.on('session.completed', (data) => {
       const duration = Date.now() - currentStartTime;
       state.updateGraphStats({ duration, nodes: 2, edges: 1 });
-      state.setAgentStatus('opencode', { status: 'ready' });
-      state.setAgentStatus('gemini', { status: 'ready' });
-      if (data.success) {
-        state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task completed in ' + formatDuration(duration), timestamp: Date.now() });
-      }
     });
 
     session.on('session.error', (data) => {
       state.addMessage({ type: 'error', content: 'Session error: ' + data.error });
+    });
+
+    session.on('changes.collected', (data) => {
+      state.updateGraphStats({ nodes: data.changes?.length || 2, edges: data.changes?.length || 1 });
     });
 
     const result = await session.run();
@@ -173,7 +189,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
       const msgId = state.addMessage({
         type: 'eamilos',
         content: formatDisplayContent(rawContent),
-        agent: 'EamilOS',
+        agent: result.agentUsed || 'EamilOS',
         isStreaming: false,
       });
 
@@ -191,9 +207,9 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
 
     state.updateGraphStats({
       duration,
-      nodes: 2,
-      edges: result.fileChanges?.length ?? 0,
-      toolsUsed: result.fileChanges?.length ?? 0,
+      nodes: result.fileChanges?.length || 2,
+      edges: result.fileChanges?.length || 0,
+      toolsUsed: result.fileChanges?.length || 0,
       validated: result.errors.length === 0,
     });
 
@@ -219,8 +235,6 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     const msg = execErr instanceof Error ? execErr.message : String(execErr);
     state.addMessage({ type: 'error', content: 'Execution failed: ' + msg });
   } finally {
-    state.setAgentStatus('opencode', { status: 'ready' });
-    state.setAgentStatus('gemini', { status: 'ready' });
     state.setRunning(false);
   }
 }
