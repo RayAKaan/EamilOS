@@ -296,6 +296,16 @@ export * from './features/index.js';
 export { Logger, initLogger, getLogger } from './logger.js';
 export { formatError as formatEamilOSError } from './error-handler.js';
 export * from './distributed/index.js';
+export { FeedbackLoop, type FeedbackLoopConfig, type LearningInsights, type LearningConfigState } from './learning/FeedbackLoop.js';
+export { AutoTuner, type AutoTunerConfig } from './learning/AutoTuner.js';
+export { ExecutionMemory } from './learning/ExecutionMemory.js';
+export { ModelPerformance } from './learning/ModelPerformance.js';
+export { SmartModelRouter, type RouterConfig } from './learning/SmartModelRouter.js';
+export { StrategyOptimizer, type StrategyConfig } from './learning/StrategyOptimizer.js';
+export { PromptOptimizer, type PromptOptimizerConfig } from './learning/PromptOptimizer.js';
+export { FailureAnalyzer, type FailureAnalyzerConfig } from './learning/FailureAnalyzer.js';
+export { EnrichmentLibrary } from './learning/EnrichmentLibrary.js';
+export * from './learning/statistics.js';
 export { CallsignRegistry } from './identity/CallsignRegistry.js';
 export { ConflictArbiter } from './comms/ConflictArbiter.js';
 export {
