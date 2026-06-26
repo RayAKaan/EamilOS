@@ -5,9 +5,11 @@ import type {
   Message,
   ToolCall,
   ExecutionStrategy,
+  AgentMode,
   AgentInfo,
   GraphStats,
   TerminalInfo,
+  PermissionRequest,
 } from '../types/ui.js';
 
 interface StoreActions {
@@ -18,7 +20,9 @@ interface StoreActions {
   updateToolInMessage: (messageId: string, toolId: string, updates: Partial<ToolCall>) => void;
   setRunning: (running: boolean) => void;
   setStrategy: (strategy: ExecutionStrategy) => void;
-  setAgentStatus: (agent: 'opencode' | 'gemini', info: Partial<AgentInfo>) => void;
+  setMode: (mode: AgentMode) => void;
+  setAgentFilter: (filter: 'auto' | 'local' | 'cloud' | 'cli') => void;
+  setAgentStatus: (agent: string, info: Partial<AgentInfo>) => void;
   updateGraphStats: (stats: Partial<GraphStats>) => void;
   setLastPrompt: (prompt: string) => void;
   toggleGraphPanel: () => void;
@@ -27,25 +31,25 @@ interface StoreActions {
   setTerminalSize: (width: number, height: number) => void;
   setActiveTerminals: (terminals: TerminalInfo[]) => void;
   addTerminal: (terminal: TerminalInfo) => void;
+  addPermissionRequest: (req: Omit<PermissionRequest, 'id' | 'timestamp'>) => string;
+  resolvePermissionRequest: (id: string, approved: boolean) => void;
 }
 
 const defaultGraphStats: GraphStats = {
   nodes: 0,
   edges: 0,
-  strategy: 'swarm',
+  strategy: 'fallback',
 };
-
-const defaultAgentInfo: AgentInfo = { status: 'offline', version: 'Kernel' };
 
 export const useStore = create<AppState & StoreActions>((set) => ({
   messages: [],
   isRunning: false,
-  currentStrategy: 'swarm' as ExecutionStrategy,
+  currentStrategy: 'fallback' as ExecutionStrategy,
+  currentMode: 'execution' as AgentMode,
+  currentAgentFilter: 'auto',
   graphStats: defaultGraphStats,
-  agentStatus: {
-    opencode: { ...defaultAgentInfo },
-    gemini: { ...defaultAgentInfo },
-  },
+  agentStatus: {},
+  pendingPermissions: [],
   lastPrompt: '',
   showGraphPanel: false,
   activeTerminals: [],
@@ -110,11 +114,15 @@ export const useStore = create<AppState & StoreActions>((set) => ({
       graphStats: { ...s.graphStats, strategy },
     })),
 
+  setMode: (mode) => set({ currentMode: mode }),
+
+  setAgentFilter: (filter) => set({ currentAgentFilter: filter }),
+
   setAgentStatus: (agent, info) =>
     set((s) => ({
       agentStatus: {
         ...s.agentStatus,
-        [agent]: { ...s.agentStatus[agent], ...info },
+        [agent]: { ...(s.agentStatus[agent] || { status: 'offline' }), ...info },
       },
     })),
 
@@ -133,4 +141,16 @@ export const useStore = create<AppState & StoreActions>((set) => ({
       if (exists) return s;
       return { activeTerminals: [...s.activeTerminals, terminal] };
     }),
+
+  addPermissionRequest: (req) => {
+    const id = nanoid();
+    const request: PermissionRequest = { id, timestamp: Date.now(), ...req };
+    set((s) => ({ pendingPermissions: [...s.pendingPermissions, request] }));
+    return id;
+  },
+
+  resolvePermissionRequest: (id, approved) =>
+    set((s) => ({
+      pendingPermissions: s.pendingPermissions.filter(p => p.id !== id),
+    })),
 }));

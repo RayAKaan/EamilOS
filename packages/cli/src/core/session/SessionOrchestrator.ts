@@ -8,6 +8,7 @@ import { takeWorkspaceSnapshot, diffWorkspace } from '../changes/ChangeCollector
 import { validateChanges } from '../validation/ChangeValidationPipeline.js';
 import { applyChanges } from '../changes/DiffApplier.js';
 import { parsePolicy } from '../policy/ExecutionPolicy.js';
+import { SessionStore, getSessionStore } from './SessionStore.js';
 import type { EamilOSAgent } from '../agents/EamilOSAgent.js';
 import type { AgentRequest, AgentResponse, ProposedFileChange } from '../agents/types.js';
 import type { ExecutionStrategy, AgentMode, SessionConfig } from '../agents/types.js';
@@ -62,6 +63,7 @@ export class SessionOrchestrator extends EventEmitter {
   private config: SessionConfig;
   private constraintEnforcer: ConstraintEnforcer;
   private stagingWorkspace: StagingWorkspace;
+  private sessionStore: SessionStore;
   private agents: Map<string, EamilOSAgent> = new Map();
   private startTime = 0;
   private fileChanges: ProposedFileChange[] = [];
@@ -77,6 +79,7 @@ export class SessionOrchestrator extends EventEmitter {
     this.registry = AgentRegistry.create();
     this.constraintEnforcer = getConstraintEnforcer();
     this.stagingWorkspace = getStagingWorkspace();
+    this.sessionStore = getSessionStore();
     this.policy = parsePolicy(config.policy);
   }
 
@@ -97,6 +100,8 @@ export class SessionOrchestrator extends EventEmitter {
       strategy: this.config.strategy,
       mode: this.config.mode,
     });
+
+    this.sessionStore.createSession(this.config.goal, this.config.mode, this.config.strategy);
 
     const terminalEnv = AdaptiveMultiplexer.detectEnvironment();
     const canMultiplex = AdaptiveMultiplexer.isMultiplexingSupported();
@@ -142,6 +147,13 @@ export class SessionOrchestrator extends EventEmitter {
         duration: Date.now() - this.startTime,
       };
     } finally {
+      this.sessionStore.recordResult(
+        !errors.length,
+        undefined,
+        Date.now() - this.startTime,
+        errors
+      );
+      await this.sessionStore.save();
       this.stagingWorkspace.cleanupAll();
     }
   }
@@ -202,6 +214,7 @@ export class SessionOrchestrator extends EventEmitter {
     }
 
     this.emit('agent.fallback', { from: primary.id, to: fallbackId, reason: firstResult.error || 'primary failed' });
+    this.sessionStore.recordFallback(primary.id, fallbackId);
 
     const fallback = AgentFactory.createAdapter(fallbackId, {
       workingDir: this.config.workingDir,
@@ -282,6 +295,7 @@ export class SessionOrchestrator extends EventEmitter {
     try {
       const response = await agent.run(request);
       this.emit('agent.completed', { agentId: agent.id, result: response });
+      this.sessionStore.recordTerminalOutput(agent.id, response.content);
 
       if (response.fileChanges.length > 0) {
         this.emit('validation.failed', { errors: ['File changes blocked in communication mode'] });
@@ -319,6 +333,7 @@ export class SessionOrchestrator extends EventEmitter {
   private async executeAgentSafely(agent: EamilOSAgent, prompt: string): Promise<AgentResponse> {
     this.emit('agent.started', { agentId: agent.id });
     this.emit('agent.output', { agentId: agent.id, content: `Starting ${agent.id}...` });
+    this.sessionStore.recordAgentSelected(agent.id);
 
     const request: AgentRequest = {
       id: `req_${Date.now()}`,

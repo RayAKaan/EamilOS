@@ -1,5 +1,6 @@
-export type AgentStatus    = 'ready' | 'busy' | 'offline';
+export type AgentStatus    = 'ready' | 'busy' | 'offline' | 'failed';
 export type ExecutionStrategy = 'single' | 'fallback' | 'swarm' | 'manual' | 'gemini-first' | 'opencode-first' | 'parallel';
+export type AgentMode = 'communication' | 'execution';
 
 // 'arbiter' is new in v2 — emitted when ConflictArbiter resolves a file conflict
 export type MessageType =
@@ -59,15 +60,29 @@ export interface AppState {
   messages:       Message[];
   isRunning:      boolean;
   currentStrategy:ExecutionStrategy;
+  currentMode:    AgentMode;
+  currentAgentFilter: 'auto' | 'local' | 'cloud' | 'cli';
   graphStats:     GraphStats;
-  agentStatus: {
-    opencode: AgentInfo;
-    gemini:   AgentInfo;
-  };
+  agentStatus: Record<string, AgentInfo>;
+  pendingPermissions: PermissionRequest[];
   activeTerminals: TerminalInfo[];
   lastPrompt:      string;
   showGraphPanel:  boolean;
   executionStart?: number;
   terminalWidth:   number;
   terminalHeight:  number;
+}
+
+export interface PermissionRequest {
+  id: string;
+  agentId: string;
+  action: string;
+  details: string;
+  timestamp: number;
+}
+
+export interface AgentInfo {
+  status:   AgentStatus;
+  version?: string;
+  error?:   string;
 }

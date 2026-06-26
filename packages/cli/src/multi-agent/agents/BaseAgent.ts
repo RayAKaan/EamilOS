@@ -70,11 +70,13 @@ export abstract class BaseAgent extends EventEmitter {
   }
 
   async checkInstalled(): Promise<HealthStatus> {
-    const { execSync } = await import('child_process');
+    const { execFileSync } = await import('child_process');
     try {
-      const result = execSync(`${this.command} --version 2>&1`, {
+      const [cmd, ...args] = this.installCheck;
+      const result = execFileSync(cmd, args, {
         timeout: 10000,
         encoding: 'utf-8',
+        windowsHide: true,
       });
       return {
         available: true,

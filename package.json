@@ -25,5 +25,8 @@
     "coordination"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
 }

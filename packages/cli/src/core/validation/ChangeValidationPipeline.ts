@@ -14,6 +14,71 @@ export interface ValidationResult {
   blocked: string[];
 }
 
+interface SyntaxError {
+  message: string;
+  line?: number;
+  column?: number;
+}
+
+function validateTypeScript(content: string): SyntaxError[] {
+  const errors: SyntaxError[] = [];
+  const lines = content.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+
+    const templateLitMatch = line.match(/`/g);
+    if (templateLitMatch && templateLitMatch.length % 2 !== 0) {
+      errors.push({ message: 'Unterminated template literal', line: lineNum });
+    }
+
+    const parenOpen = (line.match(/\(/g) || []).length;
+    const parenClose = (line.match(/\)/g) || []).length;
+    if (parenOpen !== parenClose) {
+      errors.push({ message: 'Mismatched parentheses', line: lineNum });
+    }
+
+    const braceOpen = (line.match(/\{/g) || []).length;
+    const braceClose = (line.match(/\}/g) || []).length;
+    if (braceOpen !== braceClose && !line.trim().startsWith('//')) {
+      errors.push({ message: 'Mismatched braces', line: lineNum });
+    }
+
+    const bracketOpen = (line.match(/\[/g) || []).length;
+    const bracketClose = (line.match(/\]/g) || []).length;
+    if (bracketOpen !== bracketClose && !line.trim().startsWith('//')) {
+      errors.push({ message: 'Mismatched brackets', line: lineNum });
+    }
+  }
+
+  return errors;
+}
+
+function validateContentSyntax(path: string, content: string): SyntaxError[] {
+  if (!content) return [];
+
+  const ext = path.toLowerCase().split('.').pop();
+
+  if (ext === 'ts' || ext === 'tsx') {
+    return validateTypeScript(content);
+  }
+
+  if (ext === 'js' || ext === 'jsx') {
+    return validateTypeScript(content);
+  }
+
+  if (ext === 'json') {
+    try {
+      JSON.parse(content);
+    } catch {
+      return [{ message: 'Invalid JSON syntax' }];
+    }
+  }
+
+  return [];
+}
+
 const BLOCKED_FILENAMES = [
   '.env',
   '.env.local',
@@ -91,6 +156,15 @@ export function validateFileChange(change: FileChange, policy: ExecutionPolicy):
         issues.push({ path: change.path, severity: 'warning', message: 'Contains placeholder/TODO markers' });
         break;
       }
+    }
+
+    const syntaxErrors = validateContentSyntax(change.path, change.content);
+    for (const se of syntaxErrors) {
+      issues.push({
+        path: change.path,
+        severity: 'warning',
+        message: se.line ? `Syntax: ${se.message} (line ${se.line})` : `Syntax: ${se.message}`,
+      });
     }
   }
 
