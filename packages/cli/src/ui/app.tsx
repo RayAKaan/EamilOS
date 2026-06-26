@@ -1,132 +1,91 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Text, useApp, useInput, useStdout } from 'ink';
+import React from 'react';
+import { Box, useInput } from 'ink';
 import { useStore } from './state/store.js';
-import { useOrchestrator } from './hooks/useOrchestrator.js';
-import { useAgentStatus } from './hooks/useAgentStatus.js';
-import { MessageHistory } from './components/MessageHistory.js';
+import { Container } from './components/layout/Container.js';
+import { DialogLayer } from './components/layout/DialogLayer.js';
 import { StatusBar } from './components/StatusBar.js';
-import { InputBox } from './components/InputBox.js';
-import { WelcomeBanner } from './components/WelcomeBanner.js';
-import type { ExecutionStrategy } from './types/ui.js';
+import { ChatPage } from './pages/ChatPage.js';
+import { LogsPage } from './pages/LogsPage.js';
+import { SessionsPage } from './pages/SessionsPage.js';
+import { AgentsPage } from './pages/AgentsPage.js';
+
+const PAGE_COMPONENTS: Record<string, React.FC> = {
+  chat: ChatPage,
+  logs: LogsPage,
+  sessions: SessionsPage,
+  agents: AgentsPage,
+};
 
 export const App: React.FC = () => {
-  const { exit } = useApp();
-  const { stdout } = useStdout();
-  const [terminalWidth, setTerminalWidth] = useState(() => stdout.columns || 80);
-
-  useEffect(() => {
-    const handler = () => setTerminalWidth(stdout.columns);
-    stdout.on('resize', handler);
-    return () => { stdout.off('resize', handler); };
-  }, [stdout]);
-
-  const messages = useStore((s) => s.messages);
+  const activePage = useStore((s) => s.activePage);
   const isRunning = useStore((s) => s.isRunning);
-  const currentStrategy = useStore((s) => s.currentStrategy);
-  const graphStats = useStore((s) => s.graphStats);
-  const agentStatus = useStore((s) => s.agentStatus);
-  const lastPrompt = useStore((s) => s.lastPrompt);
-  const showGraphPanel = useStore((s) => s.showGraphPanel);
-  const setStrategy = useStore((s) => s.setStrategy);
-  const toggleGraphPanel = useStore((s) => s.toggleGraphPanel);
+  const openOverlay = useStore((s) => s.openOverlay);
+  const closeOverlay = useStore((s) => s.closeOverlay);
+  const setActivePage = useStore((s) => s.setActivePage);
+  const setSidebarVisible = useStore((s) => s.setSidebarVisible);
+  const sidebarVisible = useStore((s) => s.sidebarVisible);
+  const activeOverlay = useStore((s) => s.activeOverlay);
   const clearMessages = useStore((s) => s.clearMessages);
 
-  const { run, cancel } = useOrchestrator();
-
-  useAgentStatus();
+  const PageComponent = PAGE_COMPONENTS[activePage] ?? ChatPage;
 
   useInput((input, key) => {
+    if (activeOverlay) return;
+
     if (key.ctrl && input === 'c') {
-      if (isRunning) cancel();
-      else exit();
+      if (isRunning) {
+        // cancel handled elsewhere
+      } else {
+        openOverlay('quit');
+      }
+      return;
     }
-    if (key.ctrl && input === 'l') clearMessages();
-    if (key.ctrl && input === 'g') toggleGraphPanel();
+
+    if (key.ctrl && input === 'p') {
+      openOverlay('command_palette');
+      return;
+    }
+
+    if (key.ctrl && input === 'q') {
+      openOverlay('quit');
+      return;
+    }
+
+    if (key.ctrl && input === 's') {
+      setSidebarVisible(!sidebarVisible);
+      return;
+    }
+
+    if (key.ctrl && input === 'l') {
+      clearMessages();
+      return;
+    }
+
+    if (key.ctrl && input === 'n') {
+      setActivePage('chat');
+      clearMessages();
+      return;
+    }
+
+    if (input === '1') { setActivePage('chat'); return; }
+    if (input === '2') { setActivePage('logs'); return; }
+    if (input === '3') { setActivePage('sessions'); return; }
+    if (input === '4') { setActivePage('agents'); return; }
+
+    if (input === '?') {
+      openOverlay('help');
+      return;
+    }
   });
 
-  const handleSubmit = useCallback(
-    (prompt: string, strategy: ExecutionStrategy) => run(prompt, strategy),
-    [run]
-  );
-
-  const handleStrategyChange = useCallback(
-    (s: ExecutionStrategy) => setStrategy(s),
-    [setStrategy]
-  );
-
-  const showWelcome = messages.length === 0;
-
   return (
-    <Box flexDirection="column" width={terminalWidth}>
-      <StatusBar
-        opencode={agentStatus.opencode}
-        gemini={agentStatus.gemini}
-        strategy={currentStrategy}
-        graphStats={graphStats}
-        isRunning={isRunning}
-        terminalWidth={terminalWidth}
-        version="1.0.0"
-      />
-
-      <Box flexDirection="column" flexGrow={1}>
-        {showWelcome ? (
-          <WelcomeBanner />
-        ) : (
-          <MessageHistory messages={messages} />
-        )}
+    <Container>
+      <StatusBar />
+      <Box flexGrow={1} height="100%">
+        <PageComponent />
       </Box>
-
-      {showGraphPanel && (
-        <Box
-          borderStyle="single"
-          borderColor="blue"
-          paddingX={1}
-          paddingY={0}
-          flexShrink={0}
-          gap={1}
-        >
-          <Text color="blue" bold>
-            📊 Graphify
-          </Text>
-          <Text dimColor>│</Text>
-          <Text>
-            N:<Text color="cyan">{graphStats.nodes}</Text>
-          </Text>
-          <Text dimColor>│</Text>
-          <Text>
-            E:<Text color="cyan">{graphStats.edges}</Text>
-          </Text>
-          <Text dimColor>│</Text>
-          <Text>
-            S:<Text color="cyan">{graphStats.strategy}</Text>
-          </Text>
-          {graphStats.duration !== undefined && (
-            <>
-              <Text dimColor>│</Text>
-              <Text>
-                D:<Text color="cyan">{(graphStats.duration / 1000).toFixed(1)}s</Text>
-              </Text>
-            </>
-          )}
-          {graphStats.toolsUsed !== undefined && (
-            <>
-              <Text dimColor>│</Text>
-              <Text>
-                T:<Text color="cyan">{graphStats.toolsUsed}</Text>
-              </Text>
-            </>
-          )}
-        </Box>
-      )}
-
-      <InputBox
-        isRunning={isRunning}
-        onSubmit={handleSubmit}
-        lastPrompt={lastPrompt}
-        currentStrategy={currentStrategy}
-        onStrategyChange={handleStrategyChange}
-      />
-    </Box>
+      <DialogLayer />
+    </Container>
   );
 };
 

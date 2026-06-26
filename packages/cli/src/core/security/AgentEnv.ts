@@ -22,6 +22,7 @@ const PROVIDER_ENV_BY_AGENT: Record<string, string[]> = {
   'ollama': ['OLLAMA_HOST'],
   'aider': ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY'],
   'goose': ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY'],
+  'eamilos': ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'OLLAMA_HOST'],
 };
 
 export function buildAgentEnv(agentId: string, extra?: Record<string, string>): Record<string, string> {

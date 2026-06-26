@@ -10,6 +10,9 @@ import type {
   GraphStats,
   TerminalInfo,
   PermissionRequest,
+  PageId,
+  OverlayId,
+  SessionSummary,
 } from '../types/ui.js';
 
 interface StoreActions {
@@ -33,6 +36,18 @@ interface StoreActions {
   addTerminal: (terminal: TerminalInfo) => void;
   addPermissionRequest: (req: Omit<PermissionRequest, 'id' | 'timestamp'>) => string;
   resolvePermissionRequest: (id: string, approved: boolean) => void;
+  setActivePage: (page: PageId) => void;
+  openOverlay: (overlay: OverlayId, params?: Record<string, unknown>) => void;
+  closeOverlay: () => void;
+  setSidebarVisible: (visible: boolean) => void;
+  setSidebarWidth: (width: number) => void;
+  setChatScrollY: (y: number) => void;
+  setChatInputValue: (value: string) => void;
+  addLog: (entry: string) => void;
+  clearLogs: () => void;
+  setSessions: (sessions: SessionSummary[]) => void;
+  addSession: (session: SessionSummary) => void;
+  updateSession: (id: string, updates: Partial<SessionSummary>) => void;
 }
 
 const defaultGraphStats: GraphStats = {
@@ -56,6 +71,15 @@ export const useStore = create<AppState & StoreActions>((set) => ({
   executionStart: undefined,
   terminalWidth: process.stdout.columns ?? 120,
   terminalHeight: process.stdout.rows ?? 30,
+  activePage: 'chat',
+  activeOverlay: null,
+  overlayParams: {},
+  sidebarVisible: true,
+  sidebarWidth: 28,
+  chatScrollY: 0,
+  chatInputValue: '',
+  logs: [],
+  sessions: [],
 
   addMessage: (msg) => {
     const id = nanoid();
@@ -152,5 +176,37 @@ export const useStore = create<AppState & StoreActions>((set) => ({
   resolvePermissionRequest: (id, approved) =>
     set((s) => ({
       pendingPermissions: s.pendingPermissions.filter(p => p.id !== id),
+    })),
+
+  setActivePage: (page) => set({ activePage: page }),
+
+  openOverlay: (overlay, params = {}) =>
+    set({ activeOverlay: overlay, overlayParams: params }),
+
+  closeOverlay: () => set({ activeOverlay: null, overlayParams: {} }),
+
+  setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
+
+  setSidebarWidth: (width) => set({ sidebarWidth: width }),
+
+  setChatScrollY: (y) => set({ chatScrollY: y }),
+
+  setChatInputValue: (value) => set({ chatInputValue: value }),
+
+  addLog: (entry) =>
+    set((s) => ({ logs: [...s.logs, entry] })),
+
+  clearLogs: () => set({ logs: [] }),
+
+  setSessions: (sessions) => set({ sessions }),
+
+  addSession: (session) =>
+    set((s) => ({ sessions: [...s.sessions, session] })),
+
+  updateSession: (id, updates) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === id ? { ...sess, ...updates } : sess
+      ),
     })),
 }));
