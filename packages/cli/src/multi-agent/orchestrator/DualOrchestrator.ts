@@ -15,7 +15,7 @@ export function isErrorResponse(content: string): boolean {
   const errorPatterns = [
     'authentication', 'auth method', 'api.key', 'not configured',
     'command not found', 'enoent', 'spawn', 'enode',
-    'not available', 'timeout', 'permission denied',
+    'not available', 'timeout', 'timed out', 'permission denied',
     'not installed', 'google_api_key', 'invalid',
     'fallback failed', 'fetch failed', 'error:',
   ];
@@ -584,7 +584,7 @@ Task: "${task}"`
     errors: string[];
   }> {
     const errors: string[] = [];
-    const finalOutput = result.files.length > 0 ? result.primary : (result.secondary || result.primary);
+    const finalOutput = result.files.length > 0 ? result.primary : (result.primary || result.secondary);
     const validatedFiles = [...result.files];
 
     const expectsCode = !taskType ||

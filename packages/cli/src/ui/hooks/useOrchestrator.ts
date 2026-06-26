@@ -76,7 +76,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     strategy: strat,
     workingDir: process.cwd(),
     maxRetries: 2,
-    timeoutMs: 60000,
+    timeoutMs: 120000,
     env: process.env as Record<string, string>,
   });
 

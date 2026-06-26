@@ -118,8 +118,9 @@ export class GeminiCliAgent extends BaseAgent {
       const timeout = setTimeout(async () => {
         timedOut = true;
         try { proc.kill(); } catch {}
-        resolve(this.createMessage(id, 'Agent timed out after 15s', stderr || 'timeout', [], { duration: Date.now() - startTime }));
-      }, 15000);
+        const timeoutSec = Math.round((this.config.timeoutMs ?? 15000) / 1000);
+        resolve(this.createMessage(id, `Agent timed out after ${timeoutSec}s`, stderr || 'timeout', [], { duration: Date.now() - startTime }));
+      }, this.config.timeoutMs ?? 15000);
 
       proc.on('close', async (code) => {
         if (timedOut) return;
