@@ -1,7 +1,7 @@
 import { execSync, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 
-export type AgentOperationalMode = 'communication_only' | 'unrestricted_execution';
+export type AgentOperationalMode = 'communication_only' | 'unrestricted_execution' | 'communication' | 'execution';
 
 export interface MultiplexedAgentTerminal {
   agentId: string;

@@ -295,6 +295,8 @@ export * from './cli/index.js';
 export * from './features/index.js';
 export { Logger, initLogger, getLogger } from './logger.js';
 export { formatError as formatEamilOSError } from './error-handler.js';
+export * from './agents/index.js';
+export * from './session/index.js';
 export * from './distributed/index.js';
 export { FeedbackLoop, type FeedbackLoopConfig, type LearningInsights, type LearningConfigState } from './learning/FeedbackLoop.js';
 export { AutoTuner, type AutoTunerConfig } from './learning/AutoTuner.js';

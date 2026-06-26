@@ -1,5 +1,5 @@
 export type AgentStatus    = 'ready' | 'busy' | 'offline';
-export type ExecutionStrategy = 'gemini-first' | 'opencode-first' | 'parallel' | 'swarm';
+export type ExecutionStrategy = 'single' | 'fallback' | 'swarm' | 'manual' | 'gemini-first' | 'opencode-first' | 'parallel';
 
 // 'arbiter' is new in v2 — emitted when ConflictArbiter resolves a file conflict
 export type MessageType =
@@ -52,7 +52,7 @@ export interface AgentInfo {
 export interface TerminalInfo {
   callsign: string;
   agentId: string;
-  mode: 'communication_only' | 'unrestricted_execution';
+  mode: 'communication_only' | 'unrestricted_execution' | 'communication' | 'execution';
 }
 
 export interface AppState {

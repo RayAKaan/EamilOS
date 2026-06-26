@@ -356,7 +356,7 @@ export interface CallsignMap { [callsign: string]: string }
 export interface TerminalPanelInfo {
   callsign: string;
   agentId: string;
-  mode: 'communication_only' | 'unrestricted_execution';
+  mode: 'communication_only' | 'unrestricted_execution' | 'communication' | 'execution';
 }
 
 export interface SidebarData {
@@ -411,9 +411,10 @@ export function renderSidebar(data: SidebarData, w: number): string[] {
   if (terms && terms.length > 0) {
     lines.push(...sec('terminals'));
     for (const t of terms.slice(0, 3)) {
-      const modeIcon = t.mode === 'unrestricted_execution' ? fg('green', '⚡') : fg('yellow', '◇');
-      const modeLabel = t.mode === 'unrestricted_execution' ? 'U' : 'C';
-      lines.push(modeIcon + ' ' + kv(t.callsign.padEnd(4), modeLabel, t.mode === 'unrestricted_execution' ? 'green' : 'yellow'));
+      const isExec = t.mode === 'execution' || t.mode === 'unrestricted_execution';
+      const modeIcon = isExec ? fg('green', '⚡') : fg('yellow', '◇');
+      const modeLabel = isExec ? 'U' : 'C';
+      lines.push(modeIcon + ' ' + kv(t.callsign.padEnd(4), modeLabel, isExec ? 'green' : 'yellow'));
     }
     lines.push(...sep());
   }

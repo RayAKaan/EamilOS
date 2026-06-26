@@ -80,11 +80,11 @@ export function createMultiAgentCommands(): Command {
 
         const agentDefs: AgentTerminalDef[] = [];
         const agentModeMap: Record<string, { id: string; callsign: string; mode: AgentOperationalMode; emoji: string }> = {
-          'opencode': { id: 'opencode', callsign: 'BETA', mode: 'unrestricted_execution', emoji: '🤖' },
-          'claude-code': { id: 'claude-code', callsign: 'ALPHA', mode: 'unrestricted_execution', emoji: '🧠' },
-          'aider': { id: 'aider', callsign: 'DELTA', mode: 'unrestricted_execution', emoji: '🔧' },
-          'goose': { id: 'goose', callsign: 'EPSILON', mode: 'unrestricted_execution', emoji: '🦆' },
-          'gemini-cli': { id: 'gemini-cli', callsign: 'GAMMA', mode: 'communication_only', emoji: '✨' },
+          'opencode': { id: 'opencode', callsign: 'BETA', mode: 'execution', emoji: '🤖' },
+          'claude-code': { id: 'claude-code', callsign: 'ALPHA', mode: 'execution', emoji: '🧠' },
+          'aider': { id: 'aider', callsign: 'DELTA', mode: 'execution', emoji: '🔧' },
+          'goose': { id: 'goose', callsign: 'EPSILON', mode: 'execution', emoji: '🦆' },
+          'gemini-cli': { id: 'gemini-cli', callsign: 'GAMMA', mode: 'communication', emoji: '✨' },
         };
         const agentCmdMap: Record<string, { command: string; args: string[] }> = {
           'opencode': { command: 'npx', args: ['opencode', 'run', task] },
@@ -124,9 +124,9 @@ export function createMultiAgentCommands(): Command {
           spinner.stop();
           console.log(chalk.cyan('\n  🖥️  Adaptive Terminal Multiplexing\n'));
           for (const ad of agentDefs) {
-            const modeLabel = ad.mode === 'unrestricted_execution'
-              ? chalk.green('UNRESTRICTED_EXECUTION')
-              : chalk.yellow('COMMUNICATION_ONLY');
+            const modeLabel = ad.mode === 'execution' || ad.mode === 'unrestricted_execution'
+              ? chalk.green('EXECUTION')
+              : chalk.yellow('COMMUNICATION');
             const emoji = agentModeMap[ad.id]?.emoji || '⚡';
             console.log(`  ${emoji} [${ad.callsign}] ${chalk.bold(ad.id)} → ${modeLabel}`);
           }

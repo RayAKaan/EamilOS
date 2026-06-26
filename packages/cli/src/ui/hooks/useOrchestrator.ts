@@ -1,11 +1,11 @@
 import { useStore } from '../state/store.js';
 import type { ExecutionStrategy, TerminalInfo } from '../types/ui.js';
-import { SwarmOrchestrator } from '../../multi-agent/orchestrator/SwarmOrchestrator.js';
+import { createSessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
+import { AgentRegistry } from '../../core/agents/AgentRegistry.js';
 import { initEamilOS } from '../../core/index.js';
 import {
   AdaptiveMultiplexer,
   getAdaptiveMultiplexer,
-  getConstraintEnforcer,
   type AgentOperationalMode,
   type AgentTerminalDef,
 } from '../../terminal/index.js';
@@ -39,45 +39,38 @@ function formatDisplayContent(raw: string): string {
 }
 
 const agentDefs: Record<string, { id: string; callsign: string; mode: AgentOperationalMode }> = {
-  'opencode': { id: 'opencode', callsign: 'BETA', mode: 'unrestricted_execution' },
-  'claude-code': { id: 'claude-code', callsign: 'ALPHA', mode: 'unrestricted_execution' },
-  'aider': { id: 'aider', callsign: 'DELTA', mode: 'unrestricted_execution' },
-  'goose': { id: 'goose', callsign: 'EPSILON', mode: 'unrestricted_execution' },
-  'gemini-cli': { id: 'gemini-cli', callsign: 'GAMMA', mode: 'communication_only' },
+  'opencode': { id: 'opencode', callsign: 'BETA', mode: 'execution' },
+  'claude-code': { id: 'claude-code', callsign: 'ALPHA', mode: 'execution' },
+  'aider': { id: 'aider', callsign: 'DELTA', mode: 'execution' },
+  'goose': { id: 'goose', callsign: 'EPSILON', mode: 'execution' },
+  'gemini-cli': { id: 'gemini-cli', callsign: 'GAMMA', mode: 'communication' },
 };
 
 let abortRef = false;
 let currentStartTime = 0;
 
 export async function detectAndTrackAgents(): Promise<void> {
-  const healthCheck = new SwarmOrchestrator({
-    strategy: 'parallel',
-    workingDir: process.cwd(),
-  });
+  const registry = AgentRegistry.create();
 
   try {
-    const health = await healthCheck.healthCheck();
+    await registry.detect();
+    const available = registry.getAvailableAgents();
     const terminals: TerminalInfo[] = [];
 
-    if (health.claudeCode.available) {
-      const def = agentDefs['claude-code'];
-      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
-    }
-    if (health.opencode.available) {
-      const def = agentDefs['opencode'];
-      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
-    }
-    if (health.gemini.available) {
-      const def = agentDefs['gemini-cli'];
-      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
-    }
-    if (health.aider.available) {
-      const def = agentDefs['aider'];
-      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
-    }
-    if (health.goose.available) {
-      const def = agentDefs['goose'];
-      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+    const idToKey: Record<string, string> = {
+      opencode: 'opencode',
+      'claude-code': 'claude-code',
+      aider: 'aider',
+      goose: 'goose',
+      'gemini-cli': 'gemini-cli',
+    };
+
+    for (const agent of available) {
+      const key = idToKey[agent.id];
+      if (key && agentDefs[key]) {
+        const def = agentDefs[key];
+        terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+      }
     }
 
     useStore.getState().setActiveTerminals(terminals);
@@ -94,8 +87,6 @@ export async function detectAndTrackAgents(): Promise<void> {
       await multiplexer.spawnAgentTerminals(terminalDefs);
     }
   } catch {
-  } finally {
-    await healthCheck.terminate();
   }
 }
 
@@ -132,65 +123,52 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
   const state = useStore.getState();
   const handlers: Array<[string, EventHandler]> = [];
 
-  const orchestrator = new SwarmOrchestrator({
-    strategy: strat,
+  const normalizeStrategy = (s: string): 'single' | 'fallback' | 'swarm' | 'manual' => {
+    if (s === 'swarm') return 'swarm';
+    if (s === 'single' || s === 'manual') return s;
+    return 'fallback';
+  };
+
+  const session = createSessionOrchestrator({
+    goal: prompt,
+    projectId: `tui_${Date.now()}`,
+    strategy: normalizeStrategy(strat),
+    mode: 'execution',
     workingDir: process.cwd(),
     maxRetries: 2,
     timeoutMs: 120000,
-    env: process.env as Record<string, string>,
-  });
-
-  const on = (event: string, handler: EventHandler) => {
-    orchestrator.on(event, handler);
-    handlers.push([event, handler]);
-  };
-
-  const off = (event: string, handler: EventHandler) => {
-    orchestrator.off(event, handler);
-  };
-
-  on(EVENTS.TASK_STARTED, (data: unknown) => {
-    if (abortRef) return;
-    const d = data as { task?: string; taskId?: string };
-    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task started: ' + (d.task ?? 'processing') });
-  });
-
-  on(EVENTS.TASK_COMPLETED, (data: unknown) => {
-    if (abortRef) return;
-    const d = data as { taskId?: string; attempts?: number; agent?: string };
-    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task completed (' + (d.attempts ?? 1) + ' attempt(s))', timestamp: Date.now() });
-    state.updateGraphStats({ nodes: 2, edges: 1 });
-    state.setAgentStatus('opencode', { status: 'ready' });
-    state.setAgentStatus('gemini', { status: 'ready' });
-  });
-
-  on(EVENTS.TASK_FAILED, (data: unknown) => {
-    const d = data as { taskId?: string; errors?: string[] };
-    state.addMessage({ type: 'error', content: 'Task failed: ' + ((d.errors ?? ['Unknown error']) as string[]).join(', ') });
-    state.setAgentStatus('opencode', { status: 'ready' });
-    state.setAgentStatus('gemini', { status: 'ready' });
-  });
-
-  on('arbiter', (data: unknown) => {
-    const d = data as { path?: string; method?: string; callsign?: string; reason?: string };
-    state.addMessage({
-      type: 'arbiter',
-      content: JSON.stringify({
-        path: d.path ?? '?',
-        method: d.method ?? 'sole',
-        callsign: d.callsign,
-        reason: d.reason,
-      }),
-    });
   });
 
   try {
-    state.setAgentStatus('opencode', { status: 'busy' });
-    state.setAgentStatus('gemini', { status: 'busy' });
-    const result = await orchestrator.execute(prompt, strat);
+    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Running...' });
+
+    session.on('agent.output', (data) => {
+      if (abortRef) return;
+      state.addMessage({ type: 'system', content: `[${data.agentId}] ${data.content.slice(0, 200)}` });
+    });
+
+    session.on('agent.fallback', (data) => {
+      state.addMessage({ type: 'system', content: `Fallback: ${data.from} → ${data.to} (${data.reason})` });
+    });
+
+    session.on('session.completed', (data) => {
+      const duration = Date.now() - currentStartTime;
+      state.updateGraphStats({ duration, nodes: 2, edges: 1 });
+      state.setAgentStatus('opencode', { status: 'ready' });
+      state.setAgentStatus('gemini', { status: 'ready' });
+      if (data.success) {
+        state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task completed in ' + formatDuration(duration), timestamp: Date.now() });
+      }
+    });
+
+    session.on('session.error', (data) => {
+      state.addMessage({ type: 'error', content: 'Session error: ' + data.error });
+    });
+
+    const result = await session.run();
     const duration = Date.now() - currentStartTime;
 
-    const rawContent = result.primaryResult ?? result.finalOutput ?? '';
+    const rawContent = result.primaryResult ?? '';
     if (rawContent) {
       const msgId = state.addMessage({
         type: 'eamilos',
@@ -199,13 +177,13 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
         isStreaming: false,
       });
 
-      if (result.files && result.files.length > 0) {
-        for (const file of result.files) {
+      if (result.fileChanges && result.fileChanges.length > 0) {
+        for (const file of result.fileChanges) {
           state.addToolToMessage(msgId, {
-            name: file.action,
+            name: file.action === 'delete' ? 'deleted' : file.action === 'modify' ? 'modified' : 'created',
             args: file.path,
             status: 'done',
-            result: file.content ? '(edited ' + file.content.length + ' chars)' : undefined,
+            result: file.content ? '(content ' + file.content.length + ' chars)' : undefined,
           });
         }
       }
@@ -213,10 +191,10 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
 
     state.updateGraphStats({
       duration,
-      nodes: result.graphNodes?.length ?? 2,
-      edges: result.files?.length ?? 0,
-      toolsUsed: result.files?.length ?? 0,
-      validated: result.validated ?? false,
+      nodes: 2,
+      edges: result.fileChanges?.length ?? 0,
+      toolsUsed: result.fileChanges?.length ?? 0,
+      validated: result.errors.length === 0,
     });
 
     state.addMessage({
@@ -224,10 +202,10 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
       content: JSON.stringify({
         strategy: strat,
         duration: formatDuration(duration),
-        toolsUsed: result.files?.length ?? 0,
-        nodes: result.graphNodes?.length ?? 2,
-        edges: result.files?.length ?? 0,
-        validated: result.validated ?? false,
+        toolsUsed: result.fileChanges?.length ?? 0,
+        nodes: 2,
+        edges: result.fileChanges?.length ?? 0,
+        validated: result.errors.length === 0,
         agentUsed: result.agentUsed,
       }),
     });
@@ -241,9 +219,6 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     const msg = execErr instanceof Error ? execErr.message : String(execErr);
     state.addMessage({ type: 'error', content: 'Execution failed: ' + msg });
   } finally {
-    for (const [event, handler] of handlers) {
-      off(event, handler);
-    }
     state.setAgentStatus('opencode', { status: 'ready' });
     state.setAgentStatus('gemini', { status: 'ready' });
     state.setRunning(false);

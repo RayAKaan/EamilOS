@@ -187,13 +187,21 @@ program
   .option('-b, --budget <budget>', 'Budget limit in USD', (val) => parseFloat(val))
   .option('--model <name>', 'Override model selection')
   .option('--provider <name>', 'Override provider')
+  .option('--agent <name>', 'Preferred agent (opencode, claude-code, gemini-cli, aider, goose)')
+  .option('--strategy <name>', 'Execution strategy (single, fallback, swarm, manual)', 'fallback')
+  .option('--mode <name>', 'Agent mode (communication, execution)', 'execution')
+  .option('--swarm', 'Shorthand for --strategy swarm', false)
   .option('--output <dir>', 'Output directory')
   .option('--debug', 'Show detailed output')
   .option('--ephemeral', 'Run without writing config to disk')
   .action(async (goal: string, options) => {
     try {
       const eamilos = await initEamilOS();
-      await run(eamilos, goal, options);
+      const runOptions = {
+        ...options,
+        strategy: options.swarm ? 'swarm' : options.strategy,
+      };
+      await run(eamilos, goal, runOptions);
     } catch (error) {
       handleFatalError(error, options.debug === true);
     }

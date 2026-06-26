@@ -1,5 +1,9 @@
 import { EventEmitter } from 'events';
-import type { AgentOperationalMode } from './AdaptiveMultiplexer.js';
+import { execSync } from 'child_process';
+import { mkdtempSync, writeFileSync, cpSync, rmSync, existsSync } from 'fs';
+import { join } from 'path';
+
+export type AgentOperationalMode = 'communication' | 'execution';
 
 export type RestrictedTool =
   | 'workspace_write'
@@ -7,7 +11,9 @@ export type RestrictedTool =
   | 'bash'
   | 'shell_exec'
   | 'file_write'
-  | 'fs_write';
+  | 'fs_write'
+  | 'git_commit'
+  | 'package_install';
 
 export interface ConstraintViolation {
   callsign: string;
@@ -25,10 +31,23 @@ const RESTRICTED_TOOLS: RestrictedTool[] = [
   'shell_exec',
   'file_write',
   'fs_write',
+  'git_commit',
+  'package_install',
+];
+
+const ALLOWED_COMMUNICATION_TOOLS: string[] = [
+  'read',
+  'search',
+  'grep',
+  'analyze',
+  'list',
+  'stat',
+  'view',
 ];
 
 export class ConstraintEnforcer extends EventEmitter {
   private violations: ConstraintViolation[] = [];
+  private isolatedDirs: Map<string, string> = new Map();
 
   checkToolAllowed(
     tool: string,
@@ -36,11 +55,14 @@ export class ConstraintEnforcer extends EventEmitter {
     callsign: string,
     agentId: string
   ): boolean {
-    if (mode === 'unrestricted_execution') return true;
+    if (mode === 'execution') return true;
 
-    if (mode === 'communication_only' && this.isRestricted(tool)) {
-      this.recordViolation({ callsign, agentId, tool, mode, timestamp: Date.now(), message: `Blocked ${tool} in COMMUNICATION_ONLY mode` });
-      return false;
+    if (mode === 'communication') {
+      if (ALLOWED_COMMUNICATION_TOOLS.includes(tool)) return true;
+      if (this.isRestricted(tool)) {
+        this.recordViolation({ callsign, agentId, tool, mode, timestamp: Date.now(), message: `Blocked ${tool} in COMMUNICATION mode` });
+        return false;
+      }
     }
 
     return true;
@@ -80,6 +102,32 @@ export class ConstraintEnforcer extends EventEmitter {
   ): Promise<T> {
     this.assertToolAllowed(tool, mode, callsign, agentId);
     return fn();
+  }
+
+  createIsolatedContext(agentId: string, originalDir: string): string {
+    const tmpDir = mkdtempSync('eamilos-comm-');
+    const isoDir = join(tmpDir, 'workspace');
+    this.isolatedDirs.set(agentId, isoDir);
+
+    if (existsSync(originalDir)) {
+      try {
+        cpSync(originalDir, isoDir, { recursive: true, force: true, filter: (src) => {
+          const basename = src.split(/[/\\]/).pop() || '';
+          return !basename.startsWith('.git') && !basename.startsWith('node_modules');
+        }});
+      } catch { }
+    }
+
+    this.emit('constraint:isolated', { agentId, originalDir, isolatedDir: isoDir });
+    return isoDir;
+  }
+
+  cleanupIsolatedContext(agentId: string): void {
+    const dir = this.isolatedDirs.get(agentId);
+    if (dir) {
+      try { rmSync(dir, { recursive: true, force: true }); } catch { }
+      this.isolatedDirs.delete(agentId);
+    }
   }
 
   getViolations(callsign?: string): ConstraintViolation[] {
