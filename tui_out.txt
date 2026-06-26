@@ -1,0 +1,13 @@
+
+Detected providers:
+
+✅ Claude CLI
+✅ OpenCode CLI
+✅ CodeX CLI
+❌ Ollama (not running)
+❌ OpenAI API (missing API key)
+❌ Anthropic API (missing API key)
+
+✔ Using OpenCode CLI
+Run: eamilos run "your task"
+

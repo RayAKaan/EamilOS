@@ -1,5 +1,6 @@
 import { spawn, SpawnOptions, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
+import { buildAgentEnv } from '../../core/security/AgentEnv.js';
 
 export function crossSpawn(cmd: string, args: string[], opts: SpawnOptions = {}) {
   if (process.platform === 'win32') {
@@ -87,13 +88,9 @@ export abstract class BaseAgent extends EventEmitter {
     }
   }
 
-  protected async spawnProcess(command: string, args: string[]): Promise<void> {
+  protected async spawnProcess(command: string, args: string[], agentId?: string): Promise<void> {
     return new Promise((resolve) => {
-      const fullEnv = {
-        ...process.env,
-        NO_COLOR: 'true',
-        ...this.config.env,
-      };
+      const fullEnv = buildAgentEnv(agentId || this.name, this.config.env);
 
       this.process = crossSpawn(command, args, {
         cwd: this.config.workingDir,

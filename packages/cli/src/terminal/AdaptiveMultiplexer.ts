@@ -21,6 +21,26 @@ export interface AgentTerminalDef {
   mode?: AgentOperationalMode;
 }
 
+function shellQuote(args: string[]): string {
+  return args.map(a => {
+    if (/^[a-zA-Z0-9_\/\.\-\:]+$/.test(a)) return a;
+    return `'${a.replace(/'/g, "'\\''")}'`;
+  }).join(' ');
+}
+
+function windowsQuote(args: string[]): string {
+  const parts = args.map(a => {
+    if (/^[a-zA-Z0-9_\/\.\-\:]+$/.test(a)) return a;
+    const escaped = a.replace(/"/g, '\\"');
+    return `"${escaped}"`;
+  });
+  return parts.join(' ');
+}
+
+function escapeForOsascript(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+
 export class AdaptiveMultiplexer extends EventEmitter {
   private activeTerminals: Map<string, MultiplexedAgentTerminal> = new Map();
   private defaultMode: AgentOperationalMode;
@@ -119,22 +139,21 @@ export class AdaptiveMultiplexer extends EventEmitter {
     env: TerminalEnvironment,
     workingDir?: string
   ): void {
-    const cmdStr = [command, ...args].join(' ');
     const cwd = workingDir || process.cwd();
 
     try {
       switch (env) {
         case 'windows-terminal':
-          this.spawnWindowsTerminal(term, cmdStr, cwd);
+          this.spawnWindowsTerminal(term, command, args, cwd);
           break;
         case 'tmux':
-          this.spawnTmux(term, cmdStr, cwd);
+          this.spawnTmux(term, command, args, cwd);
           break;
         case 'iterm2':
-          this.spawnIterm2(term, cmdStr, cwd);
+          this.spawnIterm2(term, command, args, cwd);
           break;
         case 'vscode':
-          this.spawnVSCode(term, cmdStr, cwd);
+          this.spawnVSCode(term, cwd);
           break;
       }
     } catch (err) {
@@ -145,24 +164,28 @@ export class AdaptiveMultiplexer extends EventEmitter {
     }
   }
 
-  private spawnWindowsTerminal(term: MultiplexedAgentTerminal, cmd: string, cwd: string): void {
+  private spawnWindowsTerminal(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
+    const quotedArgs = windowsQuote(args);
+    const safeTitle = term.title.replace(/"/g, '');
     const profile = term.mode === 'communication_only' ? '--profile "Command Prompt"' : '';
     execSync(
-      `wt -w 0 split-pane -V --title "${term.title}" ${profile} cmd.exe /c "cd /d ${cwd} && ${cmd}"`,
+      `wt -w 0 split-pane -V --title "${safeTitle}" ${profile} cmd.exe /c "cd /d ${cwd} && ${command} ${quotedArgs}"`,
       { stdio: 'ignore', timeout: 10000 }
     );
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'windows-terminal' });
   }
 
-  private spawnTmux(term: MultiplexedAgentTerminal, cmd: string, cwd: string): void {
+  private spawnTmux(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
     const existingCount = this.activeTerminals.size;
     const direction = existingCount % 2 === 0 ? '-h' : '-v';
+    const safeCwd = cwd.replace(/"/g, '\\"');
+    const quotedCmd = shellQuote([command, ...args]);
 
-    execSync(`tmux split-window ${direction} -c "${cwd}" "${cmd}"`, {
+    execSync(`tmux split-window ${direction} -c "${safeCwd}" "${quotedCmd}"`, {
       stdio: 'ignore',
       timeout: 10000,
     });
-    execSync(`tmux select-pane -T "${term.title}"`, { stdio: 'ignore', timeout: 2000 });
+    execSync(`tmux select-pane -T "${term.title.replace(/"/g, '')}"`, { stdio: 'ignore', timeout: 2000 });
 
     if (this.activeTerminals.size >= 3) {
       try {
@@ -173,26 +196,30 @@ export class AdaptiveMultiplexer extends EventEmitter {
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'tmux' });
   }
 
-  private spawnIterm2(term: MultiplexedAgentTerminal, cmd: string, _cwd: string): void {
+  private spawnIterm2(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
+    const safeTitle = escapeForOsascript(term.title);
+    const safeCmd = escapeForOsascript(`${command} ${shellQuote(args)}`);
+    const safeCwd = escapeForOsascript(cwd);
     const script = `
 tell application "iTerm"
   activate
   tell current window
     set newSession to (create tab with default profile)
     tell newSession
-      set name "${term.title}"
-      write text "${cmd.replace(/"/g, '\\"')}"
+      set name "${safeTitle}"
+      write text "cd ${safeCwd} && ${safeCmd}"
     end tell
   end tell
 end tell`;
-    execSync(`osascript -e '${script}'`, { stdio: 'ignore', timeout: 10000 });
+    execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { stdio: 'ignore', timeout: 10000 });
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'iterm2' });
   }
 
-  private spawnVSCode(term: MultiplexedAgentTerminal, cmd: string, cwd: string): void {
-    const title = term.title.replace(/["']/g, '');
+  private spawnVSCode(term: MultiplexedAgentTerminal, cwd: string): void {
+    const safeTitle = term.title.replace(/["']/g, '');
+    const safeCwd = cwd.replace(/"/g, '');
     execSync(
-      `code --terminal-split -c "${cwd}" --title "${title}"`,
+      `code --terminal-split -c "${safeCwd}" --title "${safeTitle}"`,
       { stdio: 'ignore', timeout: 10000 }
     );
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'vscode' });

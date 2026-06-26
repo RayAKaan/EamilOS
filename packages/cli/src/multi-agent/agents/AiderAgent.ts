@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
+import { buildAgentEnv } from '../../core/security/AgentEnv.js';
 
 export interface AiderResult {
   output: string;
@@ -88,7 +89,7 @@ export class AiderAgent extends BaseAgent {
       const proc = crossSpawn(this.command, args, {
         cwd: this.config.workingDir,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, NO_COLOR: 'true', ...this.config.env },
+        env: buildAgentEnv('aider', { NO_COLOR: 'true', ...this.config.env }),
       });
 
       proc.on('error', async () => {

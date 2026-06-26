@@ -3,9 +3,16 @@ import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { AgentFactory } from '../agents/AgentFactory.js';
 import { ConstraintEnforcer, getConstraintEnforcer } from '../../terminal/ConstraintEnforcer.js';
 import { AdaptiveMultiplexer, getAdaptiveMultiplexer } from '../../terminal/AdaptiveMultiplexer.js';
+import { StagingWorkspace, getStagingWorkspace } from '../workspace/StagingWorkspace.js';
+import { takeWorkspaceSnapshot, diffWorkspace } from '../changes/ChangeCollector.js';
+import { validateChanges } from '../validation/ChangeValidationPipeline.js';
+import { applyChanges } from '../changes/DiffApplier.js';
+import { parsePolicy } from '../policy/ExecutionPolicy.js';
 import type { EamilOSAgent } from '../agents/EamilOSAgent.js';
 import type { AgentRequest, AgentResponse, ProposedFileChange } from '../agents/types.js';
 import type { ExecutionStrategy, AgentMode, SessionConfig } from '../agents/types.js';
+import type { ExecutionPolicy } from '../policy/ExecutionPolicy.js';
+import type { FileChange } from '../changes/ChangeCollector.js';
 
 export interface SessionEventMap {
   'session.started': { goal: string; strategy: ExecutionStrategy; mode: AgentMode };
@@ -17,6 +24,9 @@ export interface SessionEventMap {
   'validation.started': {};
   'validation.passed': {};
   'validation.failed': { errors: string[] };
+  'changes.collected': { changes: FileChange[] };
+  'changes.applied': { applied: string[]; failed: { path: string; error: string }[] };
+  'staging.cleaned': { sessionId: string };
   'session.completed': { success: boolean; duration: number };
   'session.error': { error: string };
 }
@@ -29,6 +39,7 @@ export interface SessionResult {
   agentUsed?: string;
   primaryResult?: string;
   fileChanges: ProposedFileChange[];
+  appliedChanges: string[];
   errors: string[];
   duration: number;
 }
@@ -49,9 +60,11 @@ export class SessionOrchestrator extends EventEmitter {
   private registry: AgentRegistry;
   private config: SessionConfig;
   private constraintEnforcer: ConstraintEnforcer;
+  private stagingWorkspace: StagingWorkspace;
   private agents: Map<string, EamilOSAgent> = new Map();
   private startTime = 0;
   private fileChanges: ProposedFileChange[] = [];
+  private policy: ExecutionPolicy;
 
   constructor(config: SessionConfig) {
     super();
@@ -62,6 +75,8 @@ export class SessionOrchestrator extends EventEmitter {
     };
     this.registry = AgentRegistry.create();
     this.constraintEnforcer = getConstraintEnforcer();
+    this.stagingWorkspace = getStagingWorkspace();
+    this.policy = parsePolicy(config.policy);
   }
 
   on<K extends keyof SessionEventMap>(event: K, listener: (data: SessionEventMap[K]) => void): this {
@@ -121,9 +136,12 @@ export class SessionOrchestrator extends EventEmitter {
         strategy: this.config.strategy,
         mode: this.config.mode,
         fileChanges: this.fileChanges,
+        appliedChanges: [],
         errors,
         duration: Date.now() - this.startTime,
       };
+    } finally {
+      this.stagingWorkspace.cleanupAll();
     }
   }
 
@@ -139,7 +157,7 @@ export class SessionOrchestrator extends EventEmitter {
       return this.executeInCommunicationMode(agent);
     }
 
-    return this.executeAgentWithFallback(agent, this.config.goal);
+    return this.executeAgentWithChanges(agent, this.config.goal);
   }
 
   private async executeFallback(): Promise<SessionResult> {
@@ -160,6 +178,7 @@ export class SessionOrchestrator extends EventEmitter {
         agentUsed: primary.id,
         primaryResult: firstResult.content,
         fileChanges: this.fileChanges,
+        appliedChanges: [],
         errors: [],
         duration: Date.now() - this.startTime,
       };
@@ -175,6 +194,7 @@ export class SessionOrchestrator extends EventEmitter {
         agentUsed: primary.id,
         primaryResult: firstResult.content,
         fileChanges: this.fileChanges,
+        appliedChanges: [],
         errors: [firstResult.error || 'Primary agent failed, no fallback available'],
         duration: Date.now() - this.startTime,
       };
@@ -191,7 +211,7 @@ export class SessionOrchestrator extends EventEmitter {
     }
 
     this.agents.set(fallback.id, fallback);
-    return this.executeAgentWithFallback(fallback, this.config.goal);
+    return this.executeAgentWithChanges(fallback, this.config.goal);
   }
 
   private async executeSwarm(): Promise<SessionResult> {
@@ -224,6 +244,7 @@ export class SessionOrchestrator extends EventEmitter {
         strategy: 'swarm',
         mode: this.config.mode,
         fileChanges: this.fileChanges,
+        appliedChanges: [],
         errors: ['All swarm agents failed'],
         duration: Date.now() - this.startTime,
       };
@@ -238,23 +259,8 @@ export class SessionOrchestrator extends EventEmitter {
       agentUsed: best.agentId,
       primaryResult: best.content,
       fileChanges: this.fileChanges,
+      appliedChanges: [],
       errors: [],
-      duration: Date.now() - this.startTime,
-    };
-  }
-
-  private async executeAgentWithFallback(agent: EamilOSAgent, prompt: string): Promise<SessionResult> {
-    const result = await this.executeAgentSafely(agent, prompt);
-
-    return {
-      success: result.success,
-      goal: this.config.goal,
-      strategy: this.config.strategy,
-      mode: this.config.mode,
-      agentUsed: agent.id,
-      primaryResult: result.content,
-      fileChanges: this.fileChanges,
-      errors: result.error ? [result.error] : [],
       duration: Date.now() - this.startTime,
     };
   }
@@ -288,6 +294,7 @@ export class SessionOrchestrator extends EventEmitter {
         agentUsed: agent.id,
         primaryResult: response.content,
         fileChanges: [],
+        appliedChanges: [],
         errors: [],
         duration: Date.now() - this.startTime,
       };
@@ -301,6 +308,7 @@ export class SessionOrchestrator extends EventEmitter {
         mode: 'communication',
         agentUsed: agent.id,
         fileChanges: [],
+        appliedChanges: [],
         errors: [msg],
         duration: Date.now() - this.startTime,
       };
@@ -339,6 +347,103 @@ export class SessionOrchestrator extends EventEmitter {
     }
   }
 
+  private async executeAgentWithChanges(agent: EamilOSAgent, prompt: string): Promise<SessionResult> {
+    const session = this.stagingWorkspace.createSession(agent.id, this.config.workingDir);
+    const stagingDir = session.workspaceDir;
+
+    const beforeSnapshot = takeWorkspaceSnapshot(stagingDir);
+
+    const request: AgentRequest = {
+      id: `req_${Date.now()}`,
+      sessionId: `session_${Date.now()}`,
+      prompt,
+      systemPrompt: SYSTEM_PROMPT,
+      mode: 'execution',
+      workingDir: stagingDir,
+      timeoutMs: this.config.timeoutMs ?? 240000,
+    };
+
+    let response: AgentResponse;
+    try {
+      this.emit('agent.output', { agentId: agent.id, content: `Starting ${agent.id} in staging workspace...` });
+      response = await agent.run(request);
+      this.emit('agent.completed', { agentId: agent.id, result: response });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.emit('agent.error', { agentId: agent.id, error: msg });
+      return {
+        success: false,
+        goal: this.config.goal,
+        strategy: this.config.strategy,
+        mode: this.config.mode,
+        agentUsed: agent.id,
+        fileChanges: [],
+        appliedChanges: [],
+        errors: [msg],
+        duration: Date.now() - this.startTime,
+      };
+    }
+
+    const afterSnapshot = takeWorkspaceSnapshot(stagingDir);
+    const detectedChanges = diffWorkspace(beforeSnapshot, afterSnapshot, stagingDir, agent.id);
+
+    this.emit('changes.collected', { changes: detectedChanges });
+
+    if (detectedChanges.length === 0) {
+      return {
+        success: response.success,
+        goal: this.config.goal,
+        strategy: this.config.strategy,
+        mode: this.config.mode,
+        agentUsed: agent.id,
+        primaryResult: response.content,
+        fileChanges: response.fileChanges,
+        appliedChanges: [],
+        errors: response.error ? [response.error] : [],
+        duration: Date.now() - this.startTime,
+      };
+    }
+
+    const validationResult = validateChanges(detectedChanges, this.policy);
+    this.emit('validation.started', {});
+
+    if (!validationResult.valid) {
+      this.emit('validation.failed', { errors: validationResult.issues.filter(i => i.severity === 'error').map(i => i.message) });
+      return {
+        success: false,
+        goal: this.config.goal,
+        strategy: this.config.strategy,
+        mode: this.config.mode,
+        agentUsed: agent.id,
+        primaryResult: response.content,
+        fileChanges: response.fileChanges,
+        appliedChanges: [],
+        errors: validationResult.issues.filter(i => i.severity === 'error').map(i => `[${i.path}] ${i.message}`),
+        duration: Date.now() - this.startTime,
+      };
+    }
+
+    this.emit('validation.passed', {});
+
+    const applyResult = applyChanges(detectedChanges, this.config.workingDir);
+    this.emit('changes.applied', { applied: applyResult.applied, failed: applyResult.failed });
+
+    this.emit('staging.cleaned', { sessionId: session.id });
+
+    return {
+      success: applyResult.success,
+      goal: this.config.goal,
+      strategy: this.config.strategy,
+      mode: this.config.mode,
+      agentUsed: agent.id,
+      primaryResult: response.content,
+      fileChanges: response.fileChanges,
+      appliedChanges: applyResult.applied,
+      errors: applyResult.failed.map(f => `Failed to apply ${f.path}: ${f.error}`),
+      duration: Date.now() - this.startTime,
+    };
+  }
+
   private findFallbackAgent(currentId: string): string | null {
     const available = this.registry.getAvailableAgents(this.config.mode);
     const fallbacks = available.filter(a => a.id !== currentId).sort((a, b) => a.priority - b.priority);
@@ -352,6 +457,7 @@ export class SessionOrchestrator extends EventEmitter {
       strategy: this.config.strategy,
       mode: this.config.mode,
       fileChanges: [],
+      appliedChanges: [],
       errors: [error],
       duration: Date.now() - this.startTime,
     };

@@ -92,11 +92,14 @@ export interface EamilOSAgent {
 
 export type ExecutionStrategy = 'single' | 'fallback' | 'swarm' | 'manual';
 
+import type { ExecutionPolicy } from '../policy/ExecutionPolicy.js';
+
 export interface SessionConfig {
   goal: string;
   projectId: string;
   strategy: ExecutionStrategy;
   mode: AgentMode;
+  policy?: ExecutionPolicy;
   workingDir: string;
   outputDir?: string;
   preferredAgent?: string;

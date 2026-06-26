@@ -1,6 +1,7 @@
 import { spawn, execSync, ChildProcess } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
+import { buildAgentEnv } from '../../core/security/AgentEnv.js';
 
 export interface OpenCodeResult {
   output: string;
@@ -78,11 +79,7 @@ export class OpenCodeAgent extends BaseAgent {
     OpenCodeAgent.serverUrl = `http://127.0.0.1:${port}`;
 
     return new Promise((resolve, reject) => {
-      const env = {
-        ...process.env,
-        NO_COLOR: 'true',
-        ...this.config.env,
-      };
+      const env = buildAgentEnv('opencode', { NO_COLOR: 'true', ...this.config.env });
 
       this.serverProcess = crossSpawn(this.command, [
         'opencode-ai', 'serve',
@@ -212,11 +209,7 @@ export class OpenCodeAgent extends BaseAgent {
       const proc = crossSpawn(this.command, ['--yes', 'opencode-ai', ...args], {
         cwd: this.config.workingDir,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          NO_COLOR: 'true',
-          ...this.config.env,
-        },
+        env: buildAgentEnv('opencode', { NO_COLOR: 'true', ...this.config.env }),
       });
 
       proc.on('error', async (err) => {

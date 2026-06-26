@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
+import { buildAgentEnv } from '../../core/security/AgentEnv.js';
 
 export interface GooseResult {
   output: string;
@@ -89,7 +90,7 @@ export class GooseAgent extends BaseAgent {
       const proc = crossSpawn(finalCmd, args, {
         cwd: this.config.workingDir,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, NO_COLOR: 'true', ...this.config.env },
+        env: buildAgentEnv('goose', { NO_COLOR: 'true', ...this.config.env }),
       });
 
       proc.on('error', async () => {

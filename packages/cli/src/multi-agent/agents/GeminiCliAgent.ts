@@ -1,7 +1,7 @@
 import { execSync, ChildProcess } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
-
+import { buildAgentEnv } from '../../core/security/AgentEnv.js';
 
 export interface GeminiResult {
   response: string;
@@ -105,7 +105,7 @@ export class GeminiCliAgent extends BaseAgent {
       const proc = crossSpawn(this.command, ['--yes', '@google/gemini-cli', ...args], {
         cwd: this.config.workingDir,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, NO_COLOR: 'true', ...this.config.env },
+        env: buildAgentEnv('gemini-cli', { NO_COLOR: 'true', ...this.config.env }),
       });
 
       proc.on('error', async () => {

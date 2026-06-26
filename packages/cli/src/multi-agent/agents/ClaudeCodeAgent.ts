@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
+import { buildAgentEnv } from '../../core/security/AgentEnv.js';
 
 export interface ClaudeCodeResult {
   output: string;
@@ -75,7 +76,7 @@ export class ClaudeCodeAgent extends BaseAgent {
       const proc = crossSpawn(this.command, ['--yes', '@anthropic-ai/claude-code', ...args], {
         cwd: this.config.workingDir,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, NO_COLOR: 'true', ...this.config.env },
+        env: buildAgentEnv('claude-code', { NO_COLOR: 'true', ...this.config.env }),
       });
 
       proc.on('error', async () => {
