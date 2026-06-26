@@ -153,7 +153,7 @@ export function renderAgent(msg: Message, w: number, frame: number): string[] {
 
 // ─── Arbiter message — conflict resolution event ───────────────────────────
 //
-// Emitted by DualOrchestrator when ConflictArbiter resolves a file conflict.
+// Emitted by SwarmOrchestrator when ConflictArbiter resolves a file conflict.
 // msg.content is JSON: { path, method, callsign, reason }
 
 export interface ArbiterPayload {
@@ -353,15 +353,22 @@ export function renderStatusBar(
 
 export interface CallsignMap { [callsign: string]: string }
 
+export interface TerminalPanelInfo {
+  callsign: string;
+  agentId: string;
+  mode: 'communication_only' | 'unrestricted_execution';
+}
+
 export interface SidebarData {
-  oc:           AgentInfo;
-  gem:          AgentInfo;
-  callsigns:    CallsignMap;
-  graphStats:   GraphStats;
-  messageCount: number;
-  toolCount:    number;
-  conflictCount:number;
-  strategy:     ExecutionStrategy;
+  oc:              AgentInfo;
+  gem:             AgentInfo;
+  callsigns:       CallsignMap;
+  graphStats:      GraphStats;
+  messageCount:    number;
+  toolCount:       number;
+  conflictCount:   number;
+  strategy:        ExecutionStrategy;
+  activeTerminals?: TerminalPanelInfo[];
 }
 
 export function renderSidebar(data: SidebarData, w: number): string[] {
@@ -398,6 +405,18 @@ export function renderSidebar(data: SidebarData, w: number): string[] {
   lines.push(kv('nodes',    String(data.graphStats.nodes),   'white'));
   lines.push(kv('edges',    String(data.graphStats.edges),   'white'));
   lines.push(...sep());
+
+  // terminals
+  const terms = data.activeTerminals;
+  if (terms && terms.length > 0) {
+    lines.push(...sec('terminals'));
+    for (const t of terms.slice(0, 3)) {
+      const modeIcon = t.mode === 'unrestricted_execution' ? fg('green', '⚡') : fg('yellow', '◇');
+      const modeLabel = t.mode === 'unrestricted_execution' ? 'U' : 'C';
+      lines.push(modeIcon + ' ' + kv(t.callsign.padEnd(4), modeLabel, t.mode === 'unrestricted_execution' ? 'green' : 'yellow'));
+    }
+    lines.push(...sep());
+  }
 
   // session
   lines.push(...sec('session'));
@@ -443,7 +462,7 @@ export function renderHintBar(): string {
   return ' ' + [
     pair('↑',      'recall'),
     pair('tab',    'strategy'),
-    pair('ctrl+g', 'sidebar'),
+    pair('ctrl+alt+g', 'sidebar'),
     pair('ctrl+l', 'clear'),
     pair('ctrl+c', 'exit'),
     pair('pg↑↓',  'scroll'),

@@ -110,7 +110,7 @@ export const InputBox: React.FC<InputBoxProps> = ({
 
       <Box paddingX={1}>
         <Text dimColor wrap="truncate">
-          ↑repeat │ 1-4strategy │ Ctrl+Ggraph │ Ctrl+Lclear │ Ctrl+Ccancel
+          ↑repeat │ 1-4strategy │ Ctrl+Alt+Ggraph │ Ctrl+Lclear │ Ctrl+Ccancel
         </Text>
       </Box>
     </Box>

@@ -5,65 +5,44 @@ import { initWorkspace, Workspace } from './workspace.js';
 import { initTaskManager, TaskManager } from './task-manager.js';
 import { initEventBus, EventBus } from './event-bus.js';
 import { initLogger, Logger } from './logger.js';
-import { initProviderManager } from './provider-manager.js';
-import { initAgentRegistry } from './agent-registry.js';
-import { initModelRouter } from './model-router.js';
-import { initContextBuilder } from './context-builder.js';
-import { initAgentRunner } from './agent-runner.js';
 import type { AgentExecutionResult } from './agent-runner.js';
-import { initOrchestrator, getOrchestrator } from './orchestrator/StrictOrchestrator.js';
-import { loadConfig as loadConfigFromFile, getConfig } from './config.js';
-import { CallsignRegistry } from './identity/CallsignRegistry.js';
-import { initDistributedCommsGround } from './comms/DistributedCommsGround.js';
-import { initDistributedCommunicator } from './comms/DistributedAgentCommunicator.js';
+import { getOrchestrator } from './orchestrator/StrictOrchestrator.js';
+import { loadConfig as loadConfigFromFile } from './config.js';
 
 export class EamilOS {
-  private db: DatabaseManager;
-  private workspace: Workspace;
-  private taskManager: TaskManager;
-  private eventBus: EventBus;
+  private _db: DatabaseManager | null = null;
+  private _workspace: Workspace | null = null;
+  private _taskManager: TaskManager | null = null;
+  private _eventBus: EventBus | null = null;
   private logger: Logger;
-  private instanceId: string;
-  private initialized: boolean = false;
+  readonly instanceId: string;
 
   constructor() {
     this.instanceId = nanoid(8);
-    this.db = initDatabase();
-    this.workspace = initWorkspace();
-    this.taskManager = initTaskManager(this.db);
-    this.eventBus = initEventBus(this.db);
     this.logger = initLogger();
+    this.logger.info(`EamilOS ${this.instanceId} ready (lazy init)`);
   }
 
-  async initialize(): Promise<void> {
-    if (this.initialized) return;
-
-    this.logger.info(`Initializing EamilOS (instance: ${this.instanceId})`);
-    initProviderManager();
-    initAgentRegistry();
-    initModelRouter();
-    initContextBuilder();
-    initAgentRunner();
-    initOrchestrator({ maxRetries: 3 });
-
-    // Config-gated subsystem wiring
-    const config = getConfig();
-    if (config.features.distributed_comms) {
-      this.logger.info('Initializing distributed comms ground');
-      initDistributedCommsGround('eamilos-main', this.eventBus as any);
-      initDistributedCommunicator('eamilos-main');
+  private ensureDb(): DatabaseManager {
+    if (!this._db) {
+      this._db = initDatabase();
+      this._taskManager = initTaskManager(this._db);
+      this._eventBus = initEventBus(this._db);
     }
-    if (config.features.callsign_registry) {
-      this.logger.info('Initializing callsign registry');
-      // Singleton pattern — instantiated once, holds session file path
-      new CallsignRegistry('./.eamilos/callsigns.json');
-    }
-
-    await this.recoverCrashedProjects();
-
-    this.initialized = true;
-    this.logger.success('EamilOS initialized');
+    return this._db;
   }
+
+  private ensureWorkspace(): Workspace {
+    if (!this._workspace) {
+      this._workspace = initWorkspace();
+    }
+    return this._workspace;
+  }
+
+  private get db(): DatabaseManager { return this.ensureDb(); }
+  private get workspace(): Workspace { return this.ensureWorkspace(); }
+  private get taskManager(): TaskManager { this.ensureDb(); return this._taskManager!; }
+  private get eventBus(): EventBus { this.ensureDb(); return this._eventBus!; }
 
   async executeTask(taskId: string): Promise<AgentExecutionResult> {
     const task = this.getTask(taskId);
@@ -268,19 +247,16 @@ export class EamilOS {
 
   shutdown(): void {
     this.logger.info('Shutting down EamilOS');
-    this.db.close();
+    if (this._db) this._db.close();
   }
 }
 
 let globalInstance: EamilOS | null = null;
 
 export async function initEamilOS(): Promise<EamilOS> {
-  if (globalInstance) {
-    return globalInstance;
-  }
+  if (globalInstance) return globalInstance;
   await loadConfigFromFile();
   globalInstance = new EamilOS();
-  await globalInstance.initialize();
   return globalInstance;
 }
 
@@ -296,10 +272,6 @@ export * from './validation/index.js';
 export * from './utils/index.js';
 export * from './errors.js';
 export * from './error-handler.js';
-export * as DEL from './del/index.js';
-export { DELExecutor, createDELExecutor, executeDEL } from './del/executor.js';
-export type { ExecutionContext, ExecutionResult } from './del/executor.js';
-export type { ExecutionCallbacks, Session, FileResult, WALEntry } from './del/stateful-types.js';
 export { initAgentRegistry, getAgentRegistry } from './agent-registry.js';
 export * from './models/ModelDiscovery.js';
 export * from './models/SmartModelSelector.js';
@@ -323,16 +295,16 @@ export * from './cli/index.js';
 export * from './features/index.js';
 export { Logger, initLogger, getLogger } from './logger.js';
 export { formatError as formatEamilOSError } from './error-handler.js';
-export * from './distributed/index.js';
-export { FeedbackLoop, type FeedbackLoopConfig, type LearningInsights, type LearningConfigState } from './learning/FeedbackLoop.js';
-export { AutoTuner, type AutoTunerConfig } from './learning/AutoTuner.js';
-export { ExecutionMemory } from './learning/ExecutionMemory.js';
-export { ModelPerformance } from './learning/ModelPerformance.js';
-export { SmartModelRouter, type RouterConfig } from './learning/SmartModelRouter.js';
-export { StrategyOptimizer, type StrategyConfig } from './learning/StrategyOptimizer.js';
-export { PromptOptimizer, type PromptOptimizerConfig } from './learning/PromptOptimizer.js';
-export { FailureAnalyzer, type FailureAnalyzerConfig } from './learning/FailureAnalyzer.js';
-export { EnrichmentLibrary } from './learning/EnrichmentLibrary.js';
-export * from './learning/statistics.js';
 export { CallsignRegistry } from './identity/CallsignRegistry.js';
 export { ConflictArbiter } from './comms/ConflictArbiter.js';
+export {
+  AdaptiveMultiplexer,
+  getAdaptiveMultiplexer,
+  ConstraintEnforcer,
+  getConstraintEnforcer,
+  ConstraintError,
+  type AgentOperationalMode,
+  type MultiplexedAgentTerminal,
+  type TerminalEnvironment,
+  type AgentTerminalDef,
+} from '../terminal/index.js';

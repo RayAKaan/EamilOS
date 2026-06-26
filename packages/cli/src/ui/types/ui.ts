@@ -49,6 +49,12 @@ export interface AgentInfo {
   version?: string;
 }
 
+export interface TerminalInfo {
+  callsign: string;
+  agentId: string;
+  mode: 'communication_only' | 'unrestricted_execution';
+}
+
 export interface AppState {
   messages:       Message[];
   isRunning:      boolean;
@@ -58,6 +64,7 @@ export interface AppState {
     opencode: AgentInfo;
     gemini:   AgentInfo;
   };
+  activeTerminals: TerminalInfo[];
   lastPrompt:      string;
   showGraphPanel:  boolean;
   executionStart?: number;

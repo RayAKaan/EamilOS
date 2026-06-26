@@ -7,6 +7,7 @@ import type {
   ExecutionStrategy,
   AgentInfo,
   GraphStats,
+  TerminalInfo,
 } from '../types/ui.js';
 
 interface StoreActions {
@@ -24,6 +25,8 @@ interface StoreActions {
   clearMessages: () => void;
   setExecutionStart: () => void;
   setTerminalSize: (width: number, height: number) => void;
+  setActiveTerminals: (terminals: TerminalInfo[]) => void;
+  addTerminal: (terminal: TerminalInfo) => void;
 }
 
 const defaultGraphStats: GraphStats = {
@@ -45,6 +48,7 @@ export const useStore = create<AppState & StoreActions>((set) => ({
   },
   lastPrompt: '',
   showGraphPanel: false,
+  activeTerminals: [],
   executionStart: undefined,
   terminalWidth: process.stdout.columns ?? 120,
   terminalHeight: process.stdout.rows ?? 30,
@@ -122,4 +126,11 @@ export const useStore = create<AppState & StoreActions>((set) => ({
   clearMessages: () => set({ messages: [] }),
   setExecutionStart: () => set({ executionStart: Date.now() }),
   setTerminalSize: (width, height) => set({ terminalWidth: width, terminalHeight: height }),
+  setActiveTerminals: (terminals) => set({ activeTerminals: terminals }),
+  addTerminal: (terminal) =>
+    set((s) => {
+      const exists = s.activeTerminals.find(t => t.callsign === terminal.callsign);
+      if (exists) return s;
+      return { activeTerminals: [...s.activeTerminals, terminal] };
+    }),
 }));

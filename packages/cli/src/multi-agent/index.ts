@@ -8,3 +8,14 @@ export { Graphify } from './graph/Graphify.js';
 export { SwarmOrchestrator, ExecutionStrategy, ExecutionResult, TaskAnalysis, OrchestratorConfig } from './orchestrator/SwarmOrchestrator.js';
 export { createMultiAgentCommands } from './commands/index.js';
 export { detectEnvironment, canMultiplex, spawnSplitTerminals } from './multiplexer.js';
+export {
+  AdaptiveMultiplexer,
+  getAdaptiveMultiplexer,
+  ConstraintEnforcer,
+  getConstraintEnforcer,
+  ConstraintError,
+  type AgentOperationalMode,
+  type MultiplexedAgentTerminal,
+  type TerminalEnvironment,
+  type AgentTerminalDef,
+} from '../terminal/index.js';

@@ -1,11 +1,14 @@
-/**
- * useOrchestrator — Run the DualOrchestrator and stream events to the UI
- * Uses plain functions (not hooks) for imperative store access.
- */
 import { useStore } from '../state/store.js';
-import type { ExecutionStrategy } from '../types/ui.js';
-import { DualOrchestrator } from '../../multi-agent/orchestrator/DualOrchestrator.js';
+import type { ExecutionStrategy, TerminalInfo } from '../types/ui.js';
+import { SwarmOrchestrator } from '../../multi-agent/orchestrator/SwarmOrchestrator.js';
 import { initEamilOS } from '../../core/index.js';
+import {
+  AdaptiveMultiplexer,
+  getAdaptiveMultiplexer,
+  getConstraintEnforcer,
+  type AgentOperationalMode,
+  type AgentTerminalDef,
+} from '../../terminal/index.js';
 
 type EventHandler = (...args: unknown[]) => void;
 
@@ -35,8 +38,66 @@ function formatDisplayContent(raw: string): string {
   return raw;
 }
 
+const agentDefs: Record<string, { id: string; callsign: string; mode: AgentOperationalMode }> = {
+  'opencode': { id: 'opencode', callsign: 'BETA', mode: 'unrestricted_execution' },
+  'claude-code': { id: 'claude-code', callsign: 'ALPHA', mode: 'unrestricted_execution' },
+  'aider': { id: 'aider', callsign: 'DELTA', mode: 'unrestricted_execution' },
+  'goose': { id: 'goose', callsign: 'EPSILON', mode: 'unrestricted_execution' },
+  'gemini-cli': { id: 'gemini-cli', callsign: 'GAMMA', mode: 'communication_only' },
+};
+
 let abortRef = false;
 let currentStartTime = 0;
+
+export async function detectAndTrackAgents(): Promise<void> {
+  const healthCheck = new SwarmOrchestrator({
+    strategy: 'parallel',
+    workingDir: process.cwd(),
+  });
+
+  try {
+    const health = await healthCheck.healthCheck();
+    const terminals: TerminalInfo[] = [];
+
+    if (health.claudeCode.available) {
+      const def = agentDefs['claude-code'];
+      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+    }
+    if (health.opencode.available) {
+      const def = agentDefs['opencode'];
+      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+    }
+    if (health.gemini.available) {
+      const def = agentDefs['gemini-cli'];
+      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+    }
+    if (health.aider.available) {
+      const def = agentDefs['aider'];
+      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+    }
+    if (health.goose.available) {
+      const def = agentDefs['goose'];
+      terminals.push({ callsign: def.callsign, agentId: def.id, mode: def.mode });
+    }
+
+    useStore.getState().setActiveTerminals(terminals);
+
+    if (terminals.length > 0) {
+      const multiplexer = getAdaptiveMultiplexer();
+      const terminalDefs: AgentTerminalDef[] = terminals.map(t => ({
+        id: t.agentId,
+        callsign: t.callsign,
+        command: '',
+        args: [],
+        mode: t.mode,
+      }));
+      await multiplexer.spawnAgentTerminals(terminalDefs);
+    }
+  } catch {
+  } finally {
+    await healthCheck.terminate();
+  }
+}
 
 export async function run(prompt: string, strategy?: ExecutionStrategy): Promise<void> {
   const state = useStore.getState();
@@ -62,7 +123,6 @@ export async function run(prompt: string, strategy?: ExecutionStrategy): Promise
   try {
     await initEamilOS();
   } catch {
-    // Continue even if config file init had warnings
   }
 
   await runOrchestrator(prompt, strat, sysId);
@@ -72,7 +132,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
   const state = useStore.getState();
   const handlers: Array<[string, EventHandler]> = [];
 
-  const orchestrator = new DualOrchestrator({
+  const orchestrator = new SwarmOrchestrator({
     strategy: strat,
     workingDir: process.cwd(),
     maxRetries: 2,
@@ -98,7 +158,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
   on(EVENTS.TASK_COMPLETED, (data: unknown) => {
     if (abortRef) return;
     const d = data as { taskId?: string; attempts?: number; agent?: string };
-    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task completed (' + (d.attempts ?? 1) + ' attempt(s))' });
+    state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Task completed (' + (d.attempts ?? 1) + ' attempt(s))', timestamp: Date.now() });
     state.updateGraphStats({ nodes: 2, edges: 1 });
     state.setAgentStatus('opencode', { status: 'ready' });
     state.setAgentStatus('gemini', { status: 'ready' });
@@ -109,6 +169,19 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     state.addMessage({ type: 'error', content: 'Task failed: ' + ((d.errors ?? ['Unknown error']) as string[]).join(', ') });
     state.setAgentStatus('opencode', { status: 'ready' });
     state.setAgentStatus('gemini', { status: 'ready' });
+  });
+
+  on('arbiter', (data: unknown) => {
+    const d = data as { path?: string; method?: string; callsign?: string; reason?: string };
+    state.addMessage({
+      type: 'arbiter',
+      content: JSON.stringify({
+        path: d.path ?? '?',
+        method: d.method ?? 'sole',
+        callsign: d.callsign,
+        reason: d.reason,
+      }),
+    });
   });
 
   try {

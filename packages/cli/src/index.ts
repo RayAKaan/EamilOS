@@ -13,10 +13,8 @@ import { validateCommand } from './commands/validate.js';
 import { welcomeCommand, markFirstRunComplete } from './commands/welcome.js';
 import { setupCommand } from './commands/setup.js';
 import { pluginsCommand } from './commands/plugins.js';
-import { insightsCommand } from './commands/insights.js';
-import { explainRoutingCommand } from './commands/explain-routing.js';
-import { learningConfigCommand } from './commands/learning-config.js';
 import { helloCommand } from './commands/hello.js';
+import { hiCommand } from './commands/hi.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAndAutoInstall, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -382,50 +380,6 @@ program
   });
 
 program
-  .command('insights')
-  .description('View learning system insights')
-  .option('--model <name>', 'Show insights for specific model')
-  .option('--failures', 'Show failure patterns')
-  .option('--tuning', 'Show auto-tuning state')
-  .option('--prompts', 'Show prompt evolution')
-  .option('--export <path>', 'Export insights to JSON file')
-  .option('--json', 'Output as JSON')
-  .action(async (options) => {
-    try {
-      await insightsCommand({
-        model: options.model,
-        failures: options.failures,
-        tuning: options.tuning,
-        prompts: options.prompts,
-        export: options.export,
-        json: options.json,
-      });
-    } catch (error) {
-      handleFatalError(error);
-    }
-  });
-
-program
-  .command('explain-routing')
-  .description('Explain why a model/strategy was chosen')
-  .option('--role <role>', 'Agent role')
-  .option('--task-type <type>', 'Task type')
-  .option('--complexity <level>', 'Task complexity')
-  .option('--model <name>', 'Specific model to explain')
-  .action(async (options) => {
-    try {
-      await explainRoutingCommand({
-        role: options.role,
-        taskType: options.taskType,
-        complexity: options.complexity,
-        model: options.model,
-      });
-    } catch (error) {
-      handleFatalError(error);
-    }
-  });
-
-program
   .command('hello [name]')
   .description('Display a greeting with system info')
   .action(async (name?: string) => {
@@ -436,71 +390,12 @@ program
     }
   });
 
-const learningCmd = program
-  .command('learning-config')
-  .description('Configure learning system parameters');
-
-learningCmd
-  .command('list')
-  .description('List current settings')
-  .action(async () => {
+program
+  .command('hi [name]')
+  .description('Display a greeting with system info')
+  .action(async (name?: string) => {
     try {
-      await learningConfigCommand({ list: true });
-    } catch (error) {
-      handleFatalError(error);
-    }
-  });
-
-learningCmd
-  .command('get <key>')
-  .description('Get specific setting')
-  .action(async (key: string) => {
-    try {
-      await learningConfigCommand({ get: key });
-    } catch (error) {
-      handleFatalError(error);
-    }
-  });
-
-learningCmd
-  .command('set <key>=<value>')
-  .description('Set a setting')
-  .action(async (keyValue: string) => {
-    try {
-      await learningConfigCommand({ set: keyValue });
-    } catch (error) {
-      handleFatalError(error);
-    }
-  });
-
-learningCmd
-  .command('reset')
-  .description('Reset to defaults')
-  .action(async () => {
-    try {
-      await learningConfigCommand({ reset: true });
-    } catch (error) {
-      handleFatalError(error);
-    }
-  });
-
-learningCmd
-  .command('export <path>')
-  .description('Export configuration')
-  .action(async (path: string) => {
-    try {
-      await learningConfigCommand({ export: path });
-    } catch (error) {
-      handleFatalError(error);
-    }
-  });
-
-learningCmd
-  .command('import <path>')
-  .description('Import configuration')
-  .action(async (path: string) => {
-    try {
-      await learningConfigCommand({ import: path });
+      await hiCommand(name);
     } catch (error) {
       handleFatalError(error);
     }

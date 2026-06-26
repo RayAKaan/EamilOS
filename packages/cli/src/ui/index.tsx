@@ -17,7 +17,7 @@
  * Key OpenCode lessons applied:
  *   - Sidebar for context-panel info (they use file tree; we use agent state)
  *   - Tab to cycle strategy (they use Tab to cycle agent; same slot)
- *   - ctrl+g toggles the sidebar (they use sidebar_toggle keybind)
+ *   - ctrl+alt+g toggles the sidebar (they use sidebar_toggle keybind)
  *   - Section headers have timestamp flush-right (they show timestamps below msgs)
  *   - Running state disables input and shows a spinner bar (same pattern)
  *   - Delayed second render for dimension accuracy on startup
@@ -26,7 +26,8 @@
 
 import blessed from 'blessed';
 import { useStore }          from './state/store.js';
-import { run, cancel }       from './hooks/useOrchestrator.js';
+import { AdaptiveMultiplexer } from '../multi-agent/index.js';
+import { run, cancel, detectAndTrackAgents } from './hooks/useOrchestrator.js';
 import { checkAgentStatus }  from './hooks/useAgentStatus.js';
 import {
   messageToLines,
@@ -178,6 +179,63 @@ const enterHint = blessed.text({
   align:   'right',
 });
 
+// ─── Slash-command popup menu ──────────────────────────────────────────────
+
+const COMMANDS = [
+  { cmd: '/strategy', desc: 'Set strategy' },
+  { cmd: '/s',        desc: 'Shorthand for /strategy' },
+  { cmd: '/multiplex', desc: 'Show terminal panes' },
+  { cmd: '/mx',       desc: 'Shorthand for /multiplex' },
+  { cmd: '/agents',   desc: 'Show detected agents' },
+  { cmd: '/clear',    desc: 'Clear messages' },
+  { cmd: '/help',     desc: 'Show this help' },
+];
+
+const MAX_VISIBLE = 4;
+
+const cmdPopup = blessed.list({
+  parent:          screen,
+  top:             1,
+  left:            0,
+  width:           '100%',
+  height:          Math.min(COMMANDS.length, MAX_VISIBLE) + 2,
+  hidden:          true,
+  keys:            true,
+  vi:              true,
+  mouse:           true,
+  scrollbar:       { ch: '▐', track: { bg: '#333' }, style: { bg: '#569cd6' } },
+  scrollable:      true,
+  border:          { type: 'line', fg: '#569cd6' },
+  style:           {
+    selected: { bg: '#264f78', fg: 'white' },
+    item:     { fg: '#d4d4d4' },
+    header:   { fg: '#569cd6' },
+  },
+  items:           COMMANDS.map(c => `  {bold}${c.cmd}{/bold}`),
+});
+
+let cmdPopupItems: typeof COMMANDS = [];
+
+function showCommandMenu(filter: string): void {
+  const lower = filter.toLowerCase();
+  cmdPopupItems = COMMANDS.filter(c => c.cmd.toLowerCase().startsWith(lower));
+  if (cmdPopupItems.length === 0 || lower === '') {
+    cmdPopup.hide();
+    screen.render();
+    return;
+  }
+  cmdPopup.setItems(cmdPopupItems.map(c => `  {bold}${c.cmd}{/bold}`));
+  cmdPopup.height = Math.min(cmdPopupItems.length, MAX_VISIBLE) + 2;
+  cmdPopup.select(0);
+  cmdPopup.show();
+  screen.render();
+}
+
+function hideCommandMenu(): void {
+  cmdPopup.hide();
+  screen.render();
+}
+
 // ─── Spinner ───────────────────────────────────────────────────────────────
 
 let spinFrame = 0;
@@ -230,14 +288,15 @@ function buildSidebar(sideW: number): string {
   }
 
   const data: SidebarData = {
-    oc:            state.agentStatus.opencode,
-    gem:           state.agentStatus.gemini,
-    callsigns:     _callsigns,
-    graphStats:    state.graphStats,
-    messageCount:  msgs.length,
+    oc:              state.agentStatus.opencode,
+    gem:             state.agentStatus.gemini,
+    callsigns:       _callsigns,
+    graphStats:      state.graphStats,
+    messageCount:    msgs.length,
     toolCount,
     conflictCount,
-    strategy:      state.currentStrategy,
+    strategy:        state.currentStrategy,
+    activeTerminals: state.activeTerminals.length > 0 ? state.activeTerminals : undefined,
   };
 
   return renderSidebar(data, Math.max(sideW - 2, 8)).join('\n');
@@ -388,6 +447,36 @@ function handleCommand(input: string): void {
       render();
       break;
     }
+    case 'multiplex':
+    case 'mx':
+    case 'terminals': {
+      const state = useStore.getState();
+      const terms = state.activeTerminals;
+      if (!terms || terms.length === 0) {
+        useStore.getState().addMessage({ type: 'system', content: 'No active terminals. Run a task to spawn agent terminals.' });
+        return;
+      }
+      const lines = terms.map(t =>
+        `  ${t.callsign.padEnd(8)} ${t.agentId.padEnd(14)} mode: ${t.mode === 'unrestricted_execution' ? '⚡ UNRESTRICTED' : '◇ COMMUNICATION_ONLY'}`
+      );
+      useStore.getState().addMessage({ type: 'system', content: 'Active Terminals:\n' + lines.join('\n') });
+      break;
+    }
+    case 'agents':
+    case 'agent': {
+      const state = useStore.getState();
+      const terms = state.activeTerminals;
+      if (!terms || terms.length === 0) {
+        useStore.getState().addMessage({ type: 'system', content: 'No agents detected. Run "eamilos multi doctor" from CLI to check.' });
+        return;
+      }
+      const lines = terms.map(t =>
+        `  ${t.agentId.padEnd(14)} ${t.callsign.padEnd(8)} mode: ${t.mode === 'unrestricted_execution' ? '⚡ U' : '◇ C'}`
+      );
+      const env = AdaptiveMultiplexer.detectEnvironment();
+      useStore.getState().addMessage({ type: 'system', content: `Detected Agents (env: ${env}):\n` + lines.join('\n') });
+      break;
+    }
     case 'clear':
       useStore.getState().clearMessages();
       render();
@@ -401,12 +490,14 @@ function handleCommand(input: string): void {
           'Commands:',
           '  /strategy <name>   Set strategy (opencode-first, gemini-first, parallel, swarm)',
           '  /s <name>          Shorthand for /strategy',
+          '  /multiplex         Show active terminal panes and their modes',
+          '  /agents            Show detected CLI agents with callsigns',
           '  /clear             Clear messages',
           '  /help              Show this help',
           '',
           'Keys:',
           '  Tab / Shift+Tab    Cycle strategy forward / backward',
-          '  Ctrl+G             Toggle sidebar',
+          '  Ctrl+Alt+G         Toggle sidebar',
           '  Ctrl+L             Clear messages',
           '  Ctrl+C             Cancel / exit',
           '  ↑ / ↓              Recall / clear prompt',
@@ -433,14 +524,15 @@ function bindKeys(): void {
     render();
   });
 
-  // Toggle sidebar (ctrl+g — same slot as OpenCode's sidebar_toggle)
-  screen.key('C-g', () => {
+  // Toggle sidebar (ctrl+alt+g — avoids VS Code ctrl+g conflict)
+  screen.key('C-M-g', () => {
     useStore.getState().toggleGraphPanel();
     render();
   });
 
-  // Tab to cycle strategy (OpenCode: agent_cycle maps to Tab)
+  // Tab to cycle strategy (OpenCode: agent_cycle maps to Tab) — hide popup if open
   textbox.key('tab', () => {
+    hideCommandMenu();
     if (textbox.getValue().length > 0) return;
     const cur  = useStore.getState().currentStrategy;
     const idx  = STRATS.indexOf(cur);
@@ -458,16 +550,58 @@ function bindKeys(): void {
     render();
   });
 
-  // History (OpenCode: history_previous / history_next)
+  // ─── Command popup keys ──────────────────────────────────────────────────
+  // Detect `/` typing to show/hide popup
+  textbox.on('keypress', () => {
+    const val = textbox.getValue();
+    if (val.startsWith('/')) {
+      showCommandMenu(val);
+    } else {
+      hideCommandMenu();
+    }
+  });
+
+  // Popup navigation via textbox keys
   textbox.key('up', () => {
+    if (!cmdPopup.hidden) {
+      cmdPopup.up(1);
+      screen.render();
+      return;
+    }
     const last = useStore.getState().lastPrompt;
     if (last) { textbox.setValue(last); screen.render(); }
   });
-  textbox.key('down', () => { textbox.clearValue(); screen.render(); });
+  textbox.key('down', () => {
+    if (!cmdPopup.hidden) {
+      cmdPopup.down(1);
+      screen.render();
+      return;
+    }
+    textbox.clearValue(); screen.render();
+  });
 
-  // Slash commands
+  // Escape hides popup
+  screen.key('escape', () => {
+    if (!cmdPopup.hidden) hideCommandMenu();
+  });
+
+  // Slash commands + popup select
   textbox.key('enter', () => {
     const val = textbox.getValue().trim();
+
+    // Popup selection
+    if (!cmdPopup.hidden && cmdPopupItems.length > 0) {
+      const sel = cmdPopup.selected;
+      const item = cmdPopupItems[sel];
+      if (item) {
+        textbox.clearValue();
+        screen.render();
+        handleCommand(item.cmd);
+      }
+      hideCommandMenu();
+      return;
+    }
+
     if (!val) return;
     textbox.clearValue();
     screen.render();
@@ -522,6 +656,7 @@ function main(): void {
 
   // Async agent detection — doesn't block first paint
   Promise.resolve().then(() => checkAgentStatus());
+  Promise.resolve().then(() => detectAndTrackAgents());
 
   process.stdin.resume();
   process.on('SIGTERM', shutdown);

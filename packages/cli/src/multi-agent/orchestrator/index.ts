@@ -1,7 +1,7 @@
 export {
-  DualOrchestrator,
+  SwarmOrchestrator,
   ExecutionStrategy,
   ExecutionResult,
   TaskAnalysis,
   OrchestratorConfig
-} from './DualOrchestrator.js';
+} from './SwarmOrchestrator.js';

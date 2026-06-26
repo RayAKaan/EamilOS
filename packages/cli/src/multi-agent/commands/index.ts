@@ -1,6 +1,13 @@
 import { Command } from 'commander';
 import { SwarmOrchestrator, ExecutionStrategy } from '../orchestrator/SwarmOrchestrator.js';
 import { detectEnvironment, canMultiplex, spawnSplitTerminals } from '../multiplexer.js';
+import {
+  AdaptiveMultiplexer,
+  getAdaptiveMultiplexer,
+  getConstraintEnforcer,
+  type AgentOperationalMode,
+  type AgentTerminalDef,
+} from '../../terminal/index.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { execSync } from 'child_process';
@@ -71,31 +78,60 @@ export function createMultiAgentCommands(): Command {
       if (useSplit && canMultiplex()) {
         spinner.info('Spawning split terminal panes...');
 
-        const agentCommands: { name: string; command: string; args: string[] }[] = [];
+        const agentDefs: AgentTerminalDef[] = [];
+        const agentModeMap: Record<string, { id: string; callsign: string; mode: AgentOperationalMode; emoji: string }> = {
+          'opencode': { id: 'opencode', callsign: 'BETA', mode: 'unrestricted_execution', emoji: '🤖' },
+          'claude-code': { id: 'claude-code', callsign: 'ALPHA', mode: 'unrestricted_execution', emoji: '🧠' },
+          'aider': { id: 'aider', callsign: 'DELTA', mode: 'unrestricted_execution', emoji: '🔧' },
+          'goose': { id: 'goose', callsign: 'EPSILON', mode: 'unrestricted_execution', emoji: '🦆' },
+          'gemini-cli': { id: 'gemini-cli', callsign: 'GAMMA', mode: 'communication_only', emoji: '✨' },
+        };
+        const agentCmdMap: Record<string, { command: string; args: string[] }> = {
+          'opencode': { command: 'npx', args: ['opencode', 'run', task] },
+          'claude-code': { command: 'npx', args: ['--yes', '@anthropic-ai/claude-code', '--print', task] },
+          'aider': { command: 'aider', args: ['--message', task, '--yes'] },
+          'goose': { command: 'npx', args: ['--yes', '@block/goose', 'run', task] },
+          'gemini-cli': { command: 'npx', args: ['--yes', '@google/gemini-cli', 'run', task] },
+        };
 
         if (health.claudeCode.available) {
-          agentCommands.push({ name: 'Claude Code', command: 'npx', args: ['--yes', '@anthropic-ai/claude-code', '--print', task] });
+          const def = agentModeMap['claude-code'];
+          const cmd = agentCmdMap['claude-code'];
+          agentDefs.push({ ...def, ...cmd });
         }
         if (health.opencode.available) {
-          agentCommands.push({ name: 'OpenCode', command: 'npx', args: ['--yes', 'opencode-ai', 'run', task] });
+          const def = agentModeMap['opencode'];
+          const cmd = agentCmdMap['opencode'];
+          agentDefs.push({ ...def, ...cmd });
         }
         if (health.gemini.available) {
-          agentCommands.push({ name: 'Gemini', command: 'npx', args: ['--yes', '@google/gemini-cli', 'run', task] });
+          const def = agentModeMap['gemini-cli'];
+          const cmd = agentCmdMap['gemini-cli'];
+          agentDefs.push({ ...def, ...cmd });
         }
         if (health.aider.available) {
-          agentCommands.push({ name: 'Aider', command: 'aider', args: ['--message', task, '--yes'] });
+          const def = agentModeMap['aider'];
+          const cmd = agentCmdMap['aider'];
+          agentDefs.push({ ...def, ...cmd });
         }
         if (health.goose.available) {
-          agentCommands.push({ name: 'Goose', command: 'npx', args: ['--yes', '@block/goose', 'run', task] });
+          const def = agentModeMap['goose'];
+          const cmd = agentCmdMap['goose'];
+          agentDefs.push({ ...def, ...cmd });
         }
 
-        if (agentCommands.length > 0) {
+        if (agentDefs.length > 0) {
           spinner.stop();
-          await spawnSplitTerminals({
-            agents: agentCommands,
-            task,
-            workingDir: options.workingDir,
-          });
+          console.log(chalk.cyan('\n  🖥️  Adaptive Terminal Multiplexing\n'));
+          for (const ad of agentDefs) {
+            const modeLabel = ad.mode === 'unrestricted_execution'
+              ? chalk.green('UNRESTRICTED_EXECUTION')
+              : chalk.yellow('COMMUNICATION_ONLY');
+            const emoji = agentModeMap[ad.id]?.emoji || '⚡';
+            console.log(`  ${emoji} [${ad.callsign}] ${chalk.bold(ad.id)} → ${modeLabel}`);
+          }
+          const multiplexer = getAdaptiveMultiplexer();
+          await multiplexer.spawnAgentTerminals(agentDefs, options.workingDir);
           console.log(chalk.green('\n  ✅ Split terminal agents launched.\n'));
         }
       }
