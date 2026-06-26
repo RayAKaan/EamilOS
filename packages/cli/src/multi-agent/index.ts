@@ -1,6 +1,10 @@
 export { OpenCodeAgent } from './agents/OpenCodeAgent.js';
 export { GeminiCliAgent } from './agents/GeminiCliAgent.js';
+export { ClaudeCodeAgent } from './agents/ClaudeCodeAgent.js';
+export { AiderAgent } from './agents/AiderAgent.js';
+export { GooseAgent } from './agents/GooseAgent.js';
 export { BaseAgent } from './agents/BaseAgent.js';
 export { Graphify } from './graph/Graphify.js';
-export { DualOrchestrator, ExecutionStrategy, ExecutionResult, TaskAnalysis, OrchestratorConfig } from './orchestrator/DualOrchestrator.js';
+export { SwarmOrchestrator, ExecutionStrategy, ExecutionResult, TaskAnalysis, OrchestratorConfig } from './orchestrator/SwarmOrchestrator.js';
 export { createMultiAgentCommands } from './commands/index.js';
+export { detectEnvironment, canMultiplex, spawnSplitTerminals } from './multiplexer.js';

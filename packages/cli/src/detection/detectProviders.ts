@@ -45,12 +45,18 @@ export async function installProvider(providerId: string): Promise<{ success: bo
   const installCommands: Record<string, string> = {
     'claude-cli': 'npm install -g @anthropic-ai/claude-code',
     'opencode-cli': 'npm install -g opencode-ai',
+    'gemini-cli': 'npm install -g @google/gemini-cli',
+    'aider-cli': 'pip install aider-chat',
+    'goose-cli': 'npm install -g @block/goose',
     'codex-cli': 'npm install -g @openai/codex',
   };
   
   const installCmds: Record<string, string> = {
     'claude-cli': 'claude',
     'opencode-cli': 'opencode',
+    'gemini-cli': 'gemini',
+    'aider-cli': 'aider',
+    'goose-cli': 'goose',
     'codex-cli': 'codex',
   };
   

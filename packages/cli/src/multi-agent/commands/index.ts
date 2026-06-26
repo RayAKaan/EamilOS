@@ -1,5 +1,6 @@
 import { Command } from 'commander';
-import { DualOrchestrator, ExecutionStrategy } from '../orchestrator/DualOrchestrator.js';
+import { SwarmOrchestrator, ExecutionStrategy } from '../orchestrator/SwarmOrchestrator.js';
+import { detectEnvironment, canMultiplex, spawnSplitTerminals } from '../multiplexer.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { execSync } from 'child_process';
@@ -17,7 +18,21 @@ export function createMultiAgentCommands(): Command {
     .option('--max-retries <n>', 'Maximum retry attempts', '3')
     .option('--timeout <ms>', 'Timeout per agent in milliseconds', '180000')
     .option('--env <key=value>', 'Environment variables (repeatable)', collectEnvs, [])
+    .option('--split', 'Spawn physical OS terminal split panes (desktop only)')
+    .option('--multiplex', 'Alias for --split')
     .action(async (task, options) => {
+      const useSplit = options.split || options.multiplex;
+
+      if (useSplit) {
+        const terminalEnv = detectEnvironment();
+        if (canMultiplex()) {
+          console.log(chalk.cyan(`\n  🖥️  Split Terminal Mode Detected: ${terminalEnv}\n`));
+        } else {
+          console.log(chalk.yellow('\n  ⚠️  --split flag ignored: Terminal does not support multiplexing.\n'));
+          console.log(chalk.gray('  Supported: Windows Terminal, Tmux, iTerm2, VS Code\n'));
+        }
+      }
+
       const spinner = ora('Initializing agents...').start();
 
       const env: Record<string, string> = {};
@@ -26,7 +41,7 @@ export function createMultiAgentCommands(): Command {
         env[key] = value;
       }
 
-      const orchestrator = new DualOrchestrator({
+      const orchestrator = new SwarmOrchestrator({
         strategy: options.strategy as ExecutionStrategy,
         workingDir: options.workingDir,
         maxRetries: parseInt(options.maxRetries),
@@ -37,17 +52,53 @@ export function createMultiAgentCommands(): Command {
       spinner.text = 'Checking agent availability...';
       const health = await orchestrator.healthCheck();
 
-      if (!health.opencode.available) {
-        spinner.fail(`OpenCode not found: ${health.opencode.error}`);
+      if (!health.opencode.available && !health.claudeCode.available && !health.aider.available && !health.gemini.available) {
+        spinner.fail('No coding agents found. Install one: npm install -g opencode-ai');
         console.log(chalk.gray('Run: eamilos multi install'));
         process.exit(1);
       }
-      if (!health.gemini.available) {
-        spinner.warn('Gemini CLI not found — will use OpenCode only');
-        console.log(chalk.gray('Run: eamilos multi install to install Gemini CLI'));
-      }
 
-      spinner.succeed(`Agents ready: OpenCode ${health.opencode.version || 'ok'}${health.gemini.available ? `, Gemini CLI ${health.gemini.version || 'ok'}` : ' (Gemini unavailable)'}`);
+      const available: string[] = [];
+      if (health.opencode.available) available.push('OpenCode');
+      if (health.claudeCode.available) available.push('Claude Code');
+      if (health.aider.available) available.push('Aider');
+      if (health.goose.available) available.push('Goose');
+      if (health.gemini.available) available.push('Gemini');
+
+      spinner.succeed(`Agents ready: ${available.join(', ') || 'none'}`);
+
+      // If --split mode is active and terminal supports it, spawn physical split panes
+      if (useSplit && canMultiplex()) {
+        spinner.info('Spawning split terminal panes...');
+
+        const agentCommands: { name: string; command: string; args: string[] }[] = [];
+
+        if (health.claudeCode.available) {
+          agentCommands.push({ name: 'Claude Code', command: 'npx', args: ['--yes', '@anthropic-ai/claude-code', '--print', task] });
+        }
+        if (health.opencode.available) {
+          agentCommands.push({ name: 'OpenCode', command: 'npx', args: ['--yes', 'opencode-ai', 'run', task] });
+        }
+        if (health.gemini.available) {
+          agentCommands.push({ name: 'Gemini', command: 'npx', args: ['--yes', '@google/gemini-cli', 'run', task] });
+        }
+        if (health.aider.available) {
+          agentCommands.push({ name: 'Aider', command: 'aider', args: ['--message', task, '--yes'] });
+        }
+        if (health.goose.available) {
+          agentCommands.push({ name: 'Goose', command: 'npx', args: ['--yes', '@block/goose', 'run', task] });
+        }
+
+        if (agentCommands.length > 0) {
+          spinner.stop();
+          await spawnSplitTerminals({
+            agents: agentCommands,
+            task,
+            workingDir: options.workingDir,
+          });
+          console.log(chalk.green('\n  ✅ Split terminal agents launched.\n'));
+        }
+      }
 
       spinner.start(`Executing task (strategy: ${options.strategy})...`);
 
@@ -108,7 +159,7 @@ export function createMultiAgentCommands(): Command {
     .command('doctor')
     .description('Check agent availability and system health')
     .action(async () => {
-      const orchestrator = new DualOrchestrator({
+      const orchestrator = new SwarmOrchestrator({
         strategy: 'gemini-first',
         workingDir: process.cwd(),
       });
@@ -119,34 +170,39 @@ export function createMultiAgentCommands(): Command {
 
       console.log(chalk.bold('\n━━━ Multi-Agent System Health ━━━\n'));
 
-      if (health.opencode.available) {
-        console.log(chalk.green('  ✅ OpenCode CLI'));
-        console.log(`     Version: ${health.opencode.version || 'ok'}`);
-      } else {
-        console.log(chalk.red('  ❌ OpenCode CLI not found'));
-        console.log(chalk.gray(`     ${health.opencode.error || 'Run: npm install -g opencode-ai'}`));
-      }
+      const agentEntries: { name: string; key: keyof typeof health; emoji: string; install: string }[] = [
+        { name: 'OpenCode CLI', key: 'opencode' as any, emoji: '🤖', install: 'npm install -g opencode-ai' },
+        { name: 'Claude Code', key: 'claudeCode' as any, emoji: '🧠', install: 'npm install -g @anthropic-ai/claude-code' },
+        { name: 'Aider', key: 'aider' as any, emoji: '🔧', install: 'pip install aider-chat' },
+        { name: 'Goose', key: 'goose' as any, emoji: '🦆', install: 'npm install -g @block/goose' },
+        { name: 'Gemini CLI', key: 'gemini' as any, emoji: '✨', install: 'npm install -g @google/gemini-cli' },
+      ];
 
-      if (health.gemini.available) {
-        console.log(chalk.green('  ✅ Gemini CLI'));
-        console.log(`     Version: ${health.gemini.version || 'ok'}`);
-      } else {
-        console.log(chalk.yellow('  ⚠️ Gemini CLI not found'));
-        console.log(chalk.gray(`     ${health.gemini.error || 'Run: npm install -g @google/gemini-cli'}`));
+      for (const entry of agentEntries) {
+        const status = (health as any)[entry.key];
+        if (status?.available) {
+          console.log(chalk.green(`  ✅ ${entry.emoji} ${entry.name}`));
+          console.log(`     Version: ${status.version || 'ok'}`);
+        } else {
+          console.log(chalk.red(`  ❌ ${entry.emoji} ${entry.name} not found`));
+          console.log(chalk.gray(`     ${status?.error || `Run: ${entry.install}`}`));
+        }
       }
 
       console.log(chalk.green('  ✅ Knowledge Graph (Graphify)'));
       console.log(`     Nodes: ${health.graph.nodes}, Edges: ${health.graph.edges}`);
 
       console.log(chalk.bold('\n━━━ Installation Commands ━━━\n'));
-      console.log('  OpenCode:  npm install -g opencode-ai');
-      console.log('  Gemini:    npm install -g @google/gemini-cli');
+      for (const entry of agentEntries) {
+        console.log(`  ${entry.emoji} ${entry.name}:  ${entry.install}`);
+      }
       console.log('  Or run:    eamilos multi install\n');
 
       console.log(chalk.bold('━━━ Authentication ━━━\n'));
-      console.log('  OpenAI (for OpenCode):  export OPENAI_API_KEY=sk-...');
-      console.log('  Google (for Gemini):    export GOOGLE_API_KEY=...');
-      console.log(chalk.gray('  (Or configure via opencode auth login / gemini login)\n'));
+      console.log('  OpenAI (for OpenCode):    export OPENAI_API_KEY=sk-...');
+      console.log('  Claude (for Claude Code): export ANTHROPIC_API_KEY=sk-ant-...');
+      console.log('  Google (for Gemini):      export GOOGLE_API_KEY=...');
+      console.log(chalk.gray('  (Or configure via respective CLI auth login commands)\n'));
 
       await orchestrator.terminate();
     });
@@ -159,8 +215,21 @@ export function createMultiAgentCommands(): Command {
     .action(async (packages, options) => {
       const toInstall = packages.length > 0 ? packages : ['opencode', 'gemini'];
 
+      const installMap: Record<string, { cmd: string; display: string }> = {
+        'opencode': { cmd: 'npm install -g opencode-ai', display: 'OpenCode CLI' },
+        'opencode-ai': { cmd: 'npm install -g opencode-ai', display: 'OpenCode CLI' },
+        'claude': { cmd: 'npm install -g @anthropic-ai/claude-code', display: 'Claude Code' },
+        'claude-code': { cmd: 'npm install -g @anthropic-ai/claude-code', display: 'Claude Code' },
+        'aider': { cmd: 'pip install aider-chat', display: 'Aider' },
+        'aider-chat': { cmd: 'pip install aider-chat', display: 'Aider' },
+        'goose': { cmd: 'npm install -g @block/goose', display: 'Goose' },
+        'gemini': { cmd: 'npm install -g @google/gemini-cli', display: 'Gemini CLI' },
+        'gemini-cli': { cmd: 'npm install -g @google/gemini-cli', display: 'Gemini CLI' },
+        'all': { cmd: 'npm install -g opencode-ai @anthropic-ai/claude-code @block/goose @google/gemini-cli && pip install aider-chat', display: 'All agents' },
+      };
+
       if (options.checkOnly) {
-        const orchestrator = new DualOrchestrator({
+        const orchestrator = new SwarmOrchestrator({
           strategy: 'gemini-first',
           workingDir: process.cwd(),
         });
@@ -168,13 +237,22 @@ export function createMultiAgentCommands(): Command {
 
         console.log(chalk.bold('\n━━━ Installation Status ━━━\n'));
 
-        const opencodeStatus = health.opencode.available ? '✅ installed' : '❌ not found';
-        const geminiStatus = health.gemini.available ? '✅ installed' : '⚠️ not found';
+        const statusEntries: { name: string; key: keyof typeof health; emoji: string }[] = [
+          { name: 'OpenCode CLI', key: 'opencode' as any, emoji: '🤖' },
+          { name: 'Claude Code', key: 'claudeCode' as any, emoji: '🧠' },
+          { name: 'Aider', key: 'aider' as any, emoji: '🔧' },
+          { name: 'Goose', key: 'goose' as any, emoji: '🦆' },
+          { name: 'Gemini CLI', key: 'gemini' as any, emoji: '✨' },
+        ];
 
-        console.log(`  OpenCode CLI: ${chalk.green(opencodeStatus)}`);
-        console.log(`  Gemini CLI:   ${health.gemini.available ? chalk.green(geminiStatus) : chalk.yellow(geminiStatus)}`);
+        for (const entry of statusEntries) {
+          const status = (health as any)[entry.key];
+          const icon = status?.available ? chalk.green('✅ installed') : chalk.red('❌ not found');
+          console.log(`  ${entry.emoji} ${entry.name}: ${icon}`);
+        }
 
-        if (!health.opencode.available || !health.gemini.available) {
+        const allInstalled = statusEntries.every(e => (health as any)[e.key]?.available);
+        if (!allInstalled) {
           console.log(chalk.gray('\n  Run "eamilos multi install" to install missing packages\n'));
         }
 
@@ -186,33 +264,27 @@ export function createMultiAgentCommands(): Command {
 
       for (const pkg of toInstall) {
         const pkgName = pkg.toLowerCase();
+        const pkgInfo = installMap[pkgName];
 
-        let installCmd = '';
-        if (pkgName === 'opencode' || pkgName === 'opencode-ai') {
-          installCmd = 'npm install -g opencode-ai';
-        } else if (pkgName === 'gemini' || pkgName === 'gemini-cli') {
-          installCmd = 'npm install -g @google/gemini-cli';
-        } else if (pkgName === 'all') {
-          installCmd = 'npm install -g opencode-ai @google/gemini-cli';
-        } else {
-          console.log(chalk.yellow(`Unknown package: ${pkg}`));
+        if (!pkgInfo) {
+          console.log(chalk.yellow(`Unknown package: ${pkg}. Try: opencode, claude, aider, goose, gemini, or all`));
           continue;
         }
 
-        spinner.text = `Installing ${pkgName}...`;
+        spinner.text = `Installing ${pkgInfo.display}...`;
 
         try {
-          console.log(chalk.gray(`\n  Running: ${installCmd}`));
-          execSync(installCmd, { stdio: 'inherit', timeout: 120000 });
-          console.log(chalk.green(`  ✅ ${pkgName} installed\n`));
+          console.log(chalk.gray(`\n  Running: ${pkgInfo.cmd}`));
+          execSync(pkgInfo.cmd, { stdio: 'inherit', timeout: 120000 });
+          console.log(chalk.green(`  ✅ ${pkgInfo.display} installed\n`));
         } catch (err) {
-          console.log(chalk.red(`  ❌ Failed to install ${pkgName}: ${(err as Error).message}`));
+          console.log(chalk.red(`  ❌ Failed to install ${pkgInfo.display}: ${(err as Error).message}`));
         }
       }
 
       spinner.succeed('Installation complete');
 
-      const orchestrator = new DualOrchestrator({
+      const orchestrator = new SwarmOrchestrator({
         strategy: 'gemini-first',
         workingDir: process.cwd(),
       });
@@ -220,12 +292,18 @@ export function createMultiAgentCommands(): Command {
       const health = await orchestrator.healthCheck();
 
       console.log(chalk.bold('\n━━━ Verification ━━━\n'));
-      console.log(`  OpenCode: ${health.opencode.available ? chalk.green('✅') : chalk.red('❌')}`);
-      console.log(`  Gemini:   ${health.gemini.available ? chalk.green('✅') : chalk.yellow('⚠️')}`);
 
-      if (!health.gemini.available) {
-        console.log(chalk.gray('\n  Note: Gemini CLI may require additional authentication.'));
-        console.log(chalk.gray('  Run: gemini --prompt "test" to complete setup\n'));
+      const entries: { name: string; key: keyof typeof health; emoji: string }[] = [
+        { name: 'OpenCode CLI', key: 'opencode' as any, emoji: '🤖' },
+        { name: 'Claude Code', key: 'claudeCode' as any, emoji: '🧠' },
+        { name: 'Aider', key: 'aider' as any, emoji: '🔧' },
+        { name: 'Goose', key: 'goose' as any, emoji: '🦆' },
+        { name: 'Gemini CLI', key: 'gemini' as any, emoji: '✨' },
+      ];
+
+      for (const entry of entries) {
+        const status = (health as any)[entry.key];
+        console.log(`  ${entry.emoji} ${entry.name}: ${status?.available ? chalk.green('✅') : chalk.red('❌')}`);
       }
 
       await orchestrator.terminate();
@@ -237,7 +315,7 @@ export function createMultiAgentCommands(): Command {
     .option('--reset', 'Reset all statistics', false)
     .action(async (options) => {
       if (options.reset) {
-        const orchestrator = new DualOrchestrator({
+        const orchestrator = new SwarmOrchestrator({
           strategy: 'gemini-first',
           workingDir: process.cwd(),
         });
@@ -248,7 +326,7 @@ export function createMultiAgentCommands(): Command {
         return;
       }
 
-      const orchestrator = new DualOrchestrator({
+      const orchestrator = new SwarmOrchestrator({
         strategy: 'gemini-first',
         workingDir: process.cwd(),
       });
@@ -261,6 +339,9 @@ export function createMultiAgentCommands(): Command {
 
       console.log('  System Status:');
       console.log(`    OpenCode CLI: ${health.opencode.available ? chalk.green('✓') : chalk.red('✗')}`);
+      console.log(`    Claude Code:  ${health.claudeCode.available ? chalk.green('✓') : chalk.red('✗')}`);
+      console.log(`    Aider:        ${health.aider.available ? chalk.green('✓') : chalk.red('✗')}`);
+      console.log(`    Goose:        ${health.goose.available ? chalk.green('✓') : chalk.red('✗')}`);
       console.log(`    Gemini CLI:   ${health.gemini.available ? chalk.green('✓') : chalk.red('✗')}`);
 
       console.log(chalk.bold('\n  Knowledge Graph:'));
@@ -310,7 +391,7 @@ export function createMultiAgentCommands(): Command {
     .option('--nodes <type>', 'Filter nodes by type (task|agent|file|concept|error)')
     .option('--recent <n>', 'Show N recent nodes', '10')
     .action(async (query, options) => {
-      const orchestrator = new DualOrchestrator({
+      const orchestrator = new SwarmOrchestrator({
         strategy: 'gemini-first',
         workingDir: process.cwd(),
       });
@@ -427,7 +508,7 @@ export function createMultiAgentCommands(): Command {
     .description('Analyze a task and show the planned strategy')
     .option('--working-dir <path>', 'Working directory', process.cwd())
     .action(async (task, options) => {
-      const orchestrator = new DualOrchestrator({
+      const orchestrator = new SwarmOrchestrator({
         strategy: 'gemini-first',
         workingDir: options.workingDir,
       });
