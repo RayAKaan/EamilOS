@@ -295,6 +295,7 @@ export * from './cli/index.js';
 export * from './features/index.js';
 export { Logger, initLogger, getLogger } from './logger.js';
 export { formatError as formatEamilOSError } from './error-handler.js';
+export * from './distributed/index.js';
 export { CallsignRegistry } from './identity/CallsignRegistry.js';
 export { ConflictArbiter } from './comms/ConflictArbiter.js';
 export {
