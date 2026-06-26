@@ -79,6 +79,18 @@ export class AgentRegistry {
     return available[0] ?? null;
   }
 
+  getAgentInfoMap(): Record<string, { status: string; version?: string; error?: string }> {
+    const map: Record<string, { status: string; version?: string; error?: string }> = {};
+    for (const [id, agent] of this.agents) {
+      map[id] = {
+        status: agent.status === 'available' ? 'ready' : 'offline',
+        version: agent.version,
+        error: agent.error,
+      };
+    }
+    return map;
+  }
+
   suggestStrategy(goal: string): ExecutionStrategy {
     const lower = goal.toLowerCase();
     const isSimple = lower.length < 100;

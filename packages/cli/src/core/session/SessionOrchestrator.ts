@@ -12,6 +12,7 @@ import { parsePolicy } from '../policy/ExecutionPolicy.js';
 import { SessionStore, getSessionStore } from './SessionStore.js';
 import { planTask, suggestExecutionStrategy } from '../planning/TaskPlanner.js';
 import { routeTask } from '../routing/AgentRouter.js';
+import { getPermissionService } from '../permissions.js';
 import type { EamilOSAgent } from '../agents/EamilOSAgent.js';
 import type { AgentRequest, AgentResponse, ProposedFileChange, ExecutionStrategy, AgentMode, SessionConfig } from '../agents/types.js';
 import type { ExecutionPolicy } from '../policy/ExecutionPolicy.js';
@@ -53,6 +54,7 @@ export class SessionOrchestrator extends EventEmitter {
   private startTime = 0;
   private fileChanges: ProposedFileChange[] = [];
   private policy: ExecutionPolicy;
+  private permissionService: ReturnType<typeof getPermissionService>;
 
   constructor(config: SessionConfig) {
     super();
@@ -66,6 +68,14 @@ export class SessionOrchestrator extends EventEmitter {
     this.stagingWorkspace = getStagingWorkspace();
     this.sessionStore = getSessionStore();
     this.policy = parsePolicy(config.policy);
+    this.permissionService = getPermissionService();
+    this.permissionService.on('permission:requested', (request) => {
+      this.emit('permission.requested', {
+        agentId: request.agentId,
+        action: request.action,
+        details: request.reason,
+      });
+    });
   }
 
   on<K extends keyof SessionEventMap>(event: K, listener: (data: SessionEventMap[K]) => void): this {
@@ -469,6 +479,34 @@ export class SessionOrchestrator extends EventEmitter {
     }
 
     this.emit('validation.passed', {});
+
+    for (const change of detectedChanges) {
+      const permCheck = this.permissionService.checkFileWrite(
+        this.config.projectId,
+        agent.id,
+        change.path,
+        'file:write'
+      );
+      if (!permCheck.allowed && permCheck.requireApproval) {
+        this.emit('permission.requested', {
+          agentId: agent.id,
+          action: 'write',
+          details: `Write to ${change.path}`,
+        });
+        return {
+          success: false,
+          goal: this.config.goal,
+          strategy: this.config.strategy,
+          mode: this.config.mode,
+          agentUsed: agent.id,
+          primaryResult: response.content,
+          fileChanges: response.fileChanges,
+          appliedChanges: [],
+          errors: [`Permission denied: write to ${change.path}`],
+          duration: Date.now() - this.startTime,
+        };
+      }
+    }
 
     const applyResult = applyChanges(detectedChanges, this.config.workingDir);
     this.emit('changes.applied', { applied: applyResult.applied, failed: applyResult.failed });

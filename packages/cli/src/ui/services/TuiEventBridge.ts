@@ -74,8 +74,14 @@ export function createSessionEventBridge(orchestrator: SessionOrchestrator): () 
     }
   });
 
+  const permissionRequested = orchestrator.on('permission.requested', ({ agentId, action, details }) => {
+    const store = useStore.getState();
+    store.addPermissionRequest({ agentId, action, details });
+    store.addLog(`PERMISSION: ${agentId} requested ${action} — ${details}`);
+  });
+
   unsubs.push(sessionStarted, agentOutput, agentCompleted, agentError);
-  unsubs.push(sessionCompleted, sessionError, validationFailed, changesApplied);
+  unsubs.push(sessionCompleted, sessionError, validationFailed, changesApplied, permissionRequested);
 
   return () => { unsubs.forEach((fn) => fn()); };
 }

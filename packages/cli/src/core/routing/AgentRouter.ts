@@ -7,8 +7,21 @@ export interface Assignment {
   role: string;
 }
 
+export type FallbackReason =
+  | 'timeout'
+  | 'quota'
+  | 'rate-limit'
+  | 'auth-failed'
+  | 'token-limit'
+  | 'context-overflow'
+  | 'invalid-output'
+  | 'validation-failed'
+  | 'agent-crashed'
+  | 'provider-unavailable'
+  | 'user-requested';
+
 export interface RoutingDecision {
-  strategy: 'single' | 'fallback' | 'swarm' | 'manual';
+  strategy: 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
   selectedAgents: string[];
   fallbackChain: string[];
   assignments: Assignment[];
@@ -136,11 +149,14 @@ export function routeTask(input: RouterInput): RoutingDecision {
     }
   }
 
-  const resolvedStrategy: RoutingDecision['strategy'] = strategy === 'swarm' && plan.subtasks.filter(s => s.canRunInParallel).length >= 2
-    ? 'swarm'
-    : strategy === 'single' || plan.subtasks.length <= 1
-      ? 'single'
-      : 'fallback';
+  const resolvedStrategy: RoutingDecision['strategy'] =
+    strategy === 'swarm'
+      ? 'swarm'
+      : strategy === 'single-fallback' || strategy === 'fallback'
+        ? strategy
+        : strategy === 'single' || plan.subtasks.length <= 1
+          ? 'single'
+          : 'single-fallback';
 
   return {
     strategy: resolvedStrategy,
