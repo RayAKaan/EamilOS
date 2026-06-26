@@ -11,6 +11,4 @@ export {
   ConstraintEnforcer,
   getConstraintEnforcer,
   ConstraintError,
-  type ConstraintViolation,
-  type RestrictedTool,
 } from './ConstraintEnforcer.js';

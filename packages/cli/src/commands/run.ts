@@ -123,6 +123,5 @@ export async function run(
   } finally {
     await session.stop();
     eamilos.shutdown();
-    process.exit(0);
   }
 }

@@ -5,7 +5,7 @@ export { AiderAgent } from './agents/AiderAgent.js';
 export { GooseAgent } from './agents/GooseAgent.js';
 export { BaseAgent } from './agents/BaseAgent.js';
 export { Graphify } from './graph/Graphify.js';
-export { SwarmOrchestrator, ExecutionStrategy, ExecutionResult, TaskAnalysis, OrchestratorConfig } from './orchestrator/SwarmOrchestrator.js';
+export { SwarmOrchestrator, type ExecutionStrategy, type ExecutionResult, type OrchestratorConfig } from './orchestrator/SwarmOrchestrator.js';
 export { createMultiAgentCommands } from './commands/index.js';
 export { detectEnvironment, canMultiplex, spawnSplitTerminals } from './multiplexer.js';
 export {

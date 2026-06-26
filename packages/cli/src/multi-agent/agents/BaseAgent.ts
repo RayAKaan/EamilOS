@@ -1,6 +1,12 @@
 import { spawn, SpawnOptions, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { buildAgentEnv } from '../../core/security/AgentEnv.js';
+import { buildAgentEnv, buildSafeEnv } from '../../core/security/AgentEnv.js';
+import { getStagingWorkspace } from '../../core/workspace/StagingWorkspace.js';
+import { classifyAgentError } from '../../core/agents/AgentErrorClassifier.js';
+import { takeWorkspaceSnapshot, diffWorkspace } from '../../core/changes/ChangeCollector.js';
+import type { AgentMode } from '../../core/agents/types.js';
+import type { AgentErrorType } from '../../core/agents/types.js';
+import type { FileChange } from '../../core/changes/ChangeCollector.js';
 
 export function crossSpawn(cmd: string, args: string[], opts: SpawnOptions = {}) {
   if (process.platform === 'win32') {
@@ -22,6 +28,8 @@ export interface AgentConfig {
   env?: Record<string, string>;
   timeoutMs?: number;
   model?: string;
+  mode?: AgentMode;
+  stagingEnabled?: boolean;
 }
 
 export interface TerminalMessage {
@@ -53,6 +61,8 @@ export abstract class BaseAgent extends EventEmitter {
   protected pendingMessages = new Map<string, (msg: TerminalMessage) => void>();
   protected startTime = 0;
   protected messageCount = 0;
+  protected mode: AgentMode = 'execution';
+  protected detectedChanges: FileChange[] = [];
 
   abstract readonly name: string;
   abstract readonly command: string;
@@ -64,8 +74,11 @@ export abstract class BaseAgent extends EventEmitter {
     this.config = {
       timeoutMs: 60000,
       workingDir: process.cwd(),
+      mode: 'execution',
+      stagingEnabled: false,
       ...config,
     };
+    this.mode = this.config.mode ?? 'execution';
     this.sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
@@ -147,6 +160,37 @@ export abstract class BaseAgent extends EventEmitter {
     };
   }
 
+  setMode(mode: AgentMode): void {
+    this.mode = mode;
+    this.config.mode = mode;
+  }
+
+  getMode(): AgentMode {
+    return this.mode;
+  }
+
+  buildSafeEnv(): Record<string, string> {
+    return buildSafeEnv(this.config.env);
+  }
+
+  protected getStagingDir(): string | undefined {
+    if (!this.config.stagingEnabled) return undefined;
+    const ws = getStagingWorkspace();
+    const session = ws.createSession(this.name, this.config.workingDir ?? process.cwd());
+    return session.workspaceDir;
+  }
+
+  protected detectChanges(beforeDir: string, afterDir: string): FileChange[] {
+    const before = takeWorkspaceSnapshot(beforeDir);
+    const after = takeWorkspaceSnapshot(afterDir);
+    this.detectedChanges = diffWorkspace(before, after, afterDir, this.name);
+    return this.detectedChanges;
+  }
+
+  protected classifyError(stderr: string, stdout?: string): AgentErrorType {
+    return classifyAgentError(stderr, stdout);
+  }
+
   async terminate(): Promise<void> {
     if (this.process) {
       this.process.stdin?.write('\x03');
@@ -161,6 +205,7 @@ export abstract class BaseAgent extends EventEmitter {
     return {
       id: this.sessionId,
       name: this.name,
+      mode: this.mode,
       uptime: this.startTime ? Date.now() - this.startTime : 0,
       messageCount: this.messageCount,
     };

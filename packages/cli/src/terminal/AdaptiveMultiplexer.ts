@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 
 export type AgentOperationalMode = 'communication_only' | 'unrestricted_execution' | 'communication' | 'execution';
@@ -21,28 +21,13 @@ export interface AgentTerminalDef {
   mode?: AgentOperationalMode;
 }
 
-function shellQuote(args: string[]): string {
-  return args.map(a => {
-    if (/^[a-zA-Z0-9_\/\.\-\:]+$/.test(a)) return a;
-    return `'${a.replace(/'/g, "'\\''")}'`;
-  }).join(' ');
-}
-
-function windowsQuote(args: string[]): string {
-  const parts = args.map(a => {
-    if (/^[a-zA-Z0-9_\/\.\-\:]+$/.test(a)) return a;
-    const escaped = a.replace(/"/g, '\\"');
-    return `"${escaped}"`;
-  });
-  return parts.join(' ');
-}
-
 function escapeForOsascript(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
 export class AdaptiveMultiplexer extends EventEmitter {
   private activeTerminals: Map<string, MultiplexedAgentTerminal> = new Map();
+  private processes: Map<string, ChildProcess> = new Map();
   private defaultMode: AgentOperationalMode;
 
   constructor(defaultMode: AgentOperationalMode = 'communication_only') {
@@ -103,9 +88,8 @@ export class AdaptiveMultiplexer extends EventEmitter {
       this.emit('multiplexer:mode-switched', { callsign, mode: newMode });
 
       if (process.env.TMUX) {
-        try {
-          execSync(`tmux select-pane -t "${term.callsign}"`, { stdio: 'ignore' });
-        } catch {}
+        const pane = spawn('tmux', ['select-pane', '-t', term.callsign], { stdio: 'ignore' });
+        pane.unref();
       }
     }
   }
@@ -123,11 +107,10 @@ export class AdaptiveMultiplexer extends EventEmitter {
   }
 
   terminateAll(): void {
-    if (process.env.TMUX) {
-      try {
-        execSync('tmux select-layout even-horizontal', { stdio: 'ignore' });
-      } catch {}
+    for (const [, proc] of this.processes) {
+      proc.kill();
     }
+    this.processes.clear();
     this.activeTerminals.clear();
     this.emit('multiplexer:terminals-closed');
   }
@@ -147,7 +130,7 @@ export class AdaptiveMultiplexer extends EventEmitter {
           this.spawnWindowsTerminal(term, command, args, cwd);
           break;
         case 'tmux':
-          this.spawnTmux(term, command, args, cwd);
+          this.spawnTmux(term, cwd);
           break;
         case 'iterm2':
           this.spawnIterm2(term, command, args, cwd);
@@ -165,40 +148,42 @@ export class AdaptiveMultiplexer extends EventEmitter {
   }
 
   private spawnWindowsTerminal(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
-    const quotedArgs = windowsQuote(args);
     const safeTitle = term.title.replace(/"/g, '');
-    const profile = term.mode === 'communication_only' ? '--profile "Command Prompt"' : '';
-    execSync(
-      `wt -w 0 split-pane -V --title "${safeTitle}" ${profile} cmd.exe /c "cd /d ${cwd} && ${command} ${quotedArgs}"`,
-      { stdio: 'ignore', timeout: 10000 }
-    );
+    const profileArgs = term.mode === 'communication_only' ? ['--profile', 'Command Prompt'] : [];
+    const proc = spawn('wt', [
+      '-w', '0', 'split-pane', '-V',
+      '--title', safeTitle,
+      ...profileArgs,
+      'cmd.exe', '/c',
+      command,
+      ...args,
+    ], {
+      cwd,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    this.processes.set(term.callsign, proc);
+    proc.on('exit', () => this.processes.delete(term.callsign));
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'windows-terminal' });
   }
 
-  private spawnTmux(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
-    const existingCount = this.activeTerminals.size;
-    const direction = existingCount % 2 === 0 ? '-h' : '-v';
-    const safeCwd = cwd.replace(/"/g, '\\"');
-    const quotedCmd = shellQuote([command, ...args]);
-
-    execSync(`tmux split-window ${direction} -c "${safeCwd}" "${quotedCmd}"`, {
+  private spawnTmux(term: MultiplexedAgentTerminal, cwd: string): void {
+    const proc = spawn('tmux', ['split-window', '-c', cwd], {
       stdio: 'ignore',
-      timeout: 10000,
+      windowsHide: true,
     });
-    execSync(`tmux select-pane -T "${term.title.replace(/"/g, '')}"`, { stdio: 'ignore', timeout: 2000 });
-
-    if (this.activeTerminals.size >= 3) {
-      try {
-        execSync('tmux select-layout tiled', { stdio: 'ignore', timeout: 2000 });
-      } catch {}
-    }
-
+    this.processes.set(term.callsign, proc);
+    proc.on('exit', () => {
+      this.processes.delete(term.callsign);
+      const titleProc = spawn('tmux', ['select-pane', '-T', term.title], { stdio: 'ignore' });
+      titleProc.unref();
+    });
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'tmux' });
   }
 
   private spawnIterm2(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
     const safeTitle = escapeForOsascript(term.title);
-    const safeCmd = escapeForOsascript(`${command} ${shellQuote(args)}`);
+    const safeCmd = escapeForOsascript(`${command} ${args.join(' ')}`);
     const safeCwd = escapeForOsascript(cwd);
     const script = `
 tell application "iTerm"
@@ -211,17 +196,26 @@ tell application "iTerm"
     end tell
   end tell
 end tell`;
-    execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { stdio: 'ignore', timeout: 10000 });
+    const proc = spawn('osascript', ['-e', script], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    this.processes.set(term.callsign, proc);
+    proc.on('exit', () => this.processes.delete(term.callsign));
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'iterm2' });
   }
 
   private spawnVSCode(term: MultiplexedAgentTerminal, cwd: string): void {
-    const safeTitle = term.title.replace(/["']/g, '');
-    const safeCwd = cwd.replace(/"/g, '');
-    execSync(
-      `code --terminal-split -c "${safeCwd}" --title "${safeTitle}"`,
-      { stdio: 'ignore', timeout: 10000 }
-    );
+    const proc = spawn('code', [
+      '--terminal-split',
+      '-c', cwd,
+      '--title', term.title,
+    ], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    this.processes.set(term.callsign, proc);
+    proc.on('exit', () => this.processes.delete(term.callsign));
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'vscode' });
   }
 }

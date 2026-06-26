@@ -1,52 +1,12 @@
 import { EventEmitter } from 'events';
-import { execSync } from 'child_process';
-import { mkdtempSync, writeFileSync, cpSync, rmSync, existsSync } from 'fs';
+import { spawn } from 'child_process';
+import { mkdtempSync, readdirSync, cpSync, rmSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import type { AgentMode } from '../core/agents/types.js';
 
 export type AgentOperationalMode = 'communication' | 'execution';
 
-export type RestrictedTool =
-  | 'workspace_write'
-  | 'edit_file'
-  | 'bash'
-  | 'shell_exec'
-  | 'file_write'
-  | 'fs_write'
-  | 'git_commit'
-  | 'package_install';
-
-export interface ConstraintViolation {
-  callsign: string;
-  agentId: string;
-  tool: string;
-  mode: AgentOperationalMode;
-  timestamp: number;
-  message: string;
-}
-
-const RESTRICTED_TOOLS: RestrictedTool[] = [
-  'workspace_write',
-  'edit_file',
-  'bash',
-  'shell_exec',
-  'file_write',
-  'fs_write',
-  'git_commit',
-  'package_install',
-];
-
-const ALLOWED_COMMUNICATION_TOOLS: string[] = [
-  'read',
-  'search',
-  'grep',
-  'analyze',
-  'list',
-  'stat',
-  'view',
-];
-
 export class ConstraintEnforcer extends EventEmitter {
-  private violations: ConstraintViolation[] = [];
   private isolatedDirs: Map<string, string> = new Map();
 
   checkToolAllowed(
@@ -56,16 +16,7 @@ export class ConstraintEnforcer extends EventEmitter {
     agentId: string
   ): boolean {
     if (mode === 'execution') return true;
-
-    if (mode === 'communication') {
-      if (ALLOWED_COMMUNICATION_TOOLS.includes(tool)) return true;
-      if (this.isRestricted(tool)) {
-        this.recordViolation({ callsign, agentId, tool, mode, timestamp: Date.now(), message: `Blocked ${tool} in COMMUNICATION mode` });
-        return false;
-      }
-    }
-
-    return true;
+    return false;
   }
 
   assertToolAllowed(
@@ -111,10 +62,15 @@ export class ConstraintEnforcer extends EventEmitter {
 
     if (existsSync(originalDir)) {
       try {
-        cpSync(originalDir, isoDir, { recursive: true, force: true, filter: (src) => {
-          const basename = src.split(/[/\\]/).pop() || '';
-          return !basename.startsWith('.git') && !basename.startsWith('node_modules');
-        }});
+        const entries = readdirSync(originalDir);
+        for (const entry of entries) {
+          if (entry === '.git' || entry === 'node_modules') continue;
+          const src = join(originalDir, entry);
+          const dst = join(isoDir, entry);
+          try {
+            cpSync(src, dst, { recursive: true, force: true });
+          } catch { }
+        }
       } catch { }
     }
 
@@ -128,35 +84,6 @@ export class ConstraintEnforcer extends EventEmitter {
       try { rmSync(dir, { recursive: true, force: true }); } catch { }
       this.isolatedDirs.delete(agentId);
     }
-  }
-
-  getViolations(callsign?: string): ConstraintViolation[] {
-    if (callsign) {
-      return this.violations.filter(v => v.callsign === callsign);
-    }
-    return [...this.violations];
-  }
-
-  getViolationCount(): number {
-    return this.violations.length;
-  }
-
-  clearViolations(): void {
-    this.violations = [];
-  }
-
-  private isRestricted(tool: string): boolean {
-    return RESTRICTED_TOOLS.includes(tool as RestrictedTool);
-  }
-
-  private recordViolation(violation: ConstraintViolation): void {
-    this.violations.push(violation);
-    this.emit('constraint:violation', violation);
-    this.emit('constraint:blocked', {
-      callsign: violation.callsign,
-      tool: violation.tool,
-      message: violation.message,
-    });
   }
 }
 

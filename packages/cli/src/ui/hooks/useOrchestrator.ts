@@ -2,21 +2,11 @@ import { useStore } from '../state/store.js';
 import type { ExecutionStrategy, TerminalInfo } from '../types/ui.js';
 import { createSessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
 import { AgentRegistry } from '../../core/agents/AgentRegistry.js';
+import { CLI_AGENT_DEFINITIONS } from '../../core/agents/definitions.js';
 import { initEamilOS } from '../../core/index.js';
-import {
-  AdaptiveMultiplexer,
-  getAdaptiveMultiplexer,
-  type AgentOperationalMode,
-  type AgentTerminalDef,
-} from '../../terminal/index.js';
+import type { AgentMode } from '../../core/agents/types.js';
 
 type EventHandler = (...args: unknown[]) => void;
-
-const EVENTS = {
-  TASK_STARTED: 'task:started',
-  TASK_COMPLETED: 'task:completed',
-  TASK_FAILED: 'task:failed',
-} as const;
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return ms + 'ms';
@@ -49,52 +39,25 @@ export async function detectAndTrackAgents(): Promise<void> {
     const available = registry.getAvailableAgents();
     const terminals: TerminalInfo[] = [];
 
-    const knownCallsigns: Record<string, string> = {
-      'opencode': 'BETA',
-      'claude-code': 'ALPHA',
-      'aider': 'DELTA',
-      'goose': 'EPSILON',
-      'gemini-cli': 'GAMMA',
-      'codex-cli': 'ZETA',
-      'ollama': 'OMEGA',
-      'openai-api': 'THETA',
-      'anthropic-api': 'IOTA',
-    };
-
-    const defaultMode: Record<string, AgentOperationalMode> = {
-      'opencode': 'execution',
-      'claude-code': 'execution',
-      'aider': 'execution',
-      'goose': 'execution',
-      'gemini-cli': 'communication',
-      'codex-cli': 'execution',
-      'ollama': 'communication',
-      'openai-api': 'communication',
-      'anthropic-api': 'communication',
-    };
-
     for (const agent of available) {
-      const callsign = knownCallsigns[agent.id];
-      if (callsign) {
-        terminals.push({ callsign, agentId: agent.id, mode: defaultMode[agent.id] || 'execution' });
+      const def = CLI_AGENT_DEFINITIONS.find(d => d.id === agent.id);
+      if (def) {
+        terminals.push({
+          callsign: agent.id.toUpperCase().slice(0, 4),
+          agentId: agent.id,
+          mode: getDefaultMode(agent.id),
+        });
       }
     }
 
     useStore.getState().setActiveTerminals(terminals);
-
-    if (terminals.length > 0) {
-      const multiplexer = getAdaptiveMultiplexer();
-      const terminalDefs: AgentTerminalDef[] = terminals.map(t => ({
-        id: t.agentId,
-        callsign: t.callsign,
-        command: '',
-        args: [],
-        mode: t.mode,
-      }));
-      await multiplexer.spawnAgentTerminals(terminalDefs);
-    }
   } catch {
   }
+}
+
+function getDefaultMode(agentId: string): AgentMode {
+  const executionAgents = ['opencode', 'claude-code', 'aider', 'goose', 'codex-cli'];
+  return executionAgents.includes(agentId) ? 'execution' : 'communication';
 }
 
 export async function run(prompt: string, strategy?: ExecutionStrategy): Promise<void> {

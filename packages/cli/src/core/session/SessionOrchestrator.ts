@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { AgentFactory } from '../agents/AgentFactory.js';
+import { classifyAgentError, isFallbackTrigger } from '../agents/AgentErrorClassifier.js';
 import { ConstraintEnforcer, getConstraintEnforcer } from '../../terminal/ConstraintEnforcer.js';
 import { AdaptiveMultiplexer, getAdaptiveMultiplexer } from '../../terminal/AdaptiveMultiplexer.js';
 import { StagingWorkspace, getStagingWorkspace } from '../workspace/StagingWorkspace.js';
@@ -9,29 +10,13 @@ import { validateChanges } from '../validation/ChangeValidationPipeline.js';
 import { applyChanges } from '../changes/DiffApplier.js';
 import { parsePolicy } from '../policy/ExecutionPolicy.js';
 import { SessionStore, getSessionStore } from './SessionStore.js';
+import { planTask, suggestExecutionStrategy } from '../planning/TaskPlanner.js';
+import { routeTask } from '../routing/AgentRouter.js';
 import type { EamilOSAgent } from '../agents/EamilOSAgent.js';
-import type { AgentRequest, AgentResponse, ProposedFileChange } from '../agents/types.js';
-import type { ExecutionStrategy, AgentMode, SessionConfig } from '../agents/types.js';
+import type { AgentRequest, AgentResponse, ProposedFileChange, ExecutionStrategy, AgentMode, SessionConfig } from '../agents/types.js';
 import type { ExecutionPolicy } from '../policy/ExecutionPolicy.js';
 import type { FileChange } from '../changes/ChangeCollector.js';
-
-export interface SessionEventMap {
-  'session.started': { goal: string; strategy: ExecutionStrategy; mode: AgentMode };
-  'agent.started': { agentId: string };
-  'agent.output': { agentId: string; content: string };
-  'agent.fallback': { from: string; to: string; reason: string };
-  'agent.completed': { agentId: string; result: AgentResponse };
-  'agent.error': { agentId: string; error: string; errorType?: string };
-  'file.proposed': { file: ProposedFileChange };
-  'validation.started': {};
-  'validation.passed': {};
-  'validation.failed': { errors: string[] };
-  'changes.collected': { changes: FileChange[] };
-  'changes.applied': { applied: string[]; failed: { path: string; error: string }[] };
-  'staging.cleaned': { sessionId: string };
-  'session.completed': { success: boolean; duration: number };
-  'session.error': { error: string };
-}
+import type { SessionEventMap } from './events.js';
 
 export interface SessionResult {
   success: boolean;
@@ -109,24 +94,38 @@ export class SessionOrchestrator extends EventEmitter {
     try {
       await this.registry.detect();
 
-      const strategy = this.config.strategy;
+      // Plan: decompose goal into subtasks
+      const available = this.registry.getAvailableAgents(this.config.mode);
+      const plan = planTask(this.config.goal, available.length > 0 ? available : undefined);
+
+      // Determine effective strategy
+      const effectiveStrategy: ExecutionStrategy =
+        this.config.strategy === 'swarm' ? 'swarm' :
+        suggestExecutionStrategy(plan, available.length);
+
+      // Route: pick best agent and fallback chain
+      const routing = routeTask({
+        plan,
+        availableAgents: available,
+        mode: this.config.mode,
+        strategy: effectiveStrategy,
+        preferredAgent: this.config.preferredAgent,
+      });
+
       let result: SessionResult;
 
-      switch (strategy) {
+      switch (effectiveStrategy) {
         case 'single':
-          result = await this.executeSingle();
+          result = await this.executeSingle(routing);
           break;
         case 'fallback':
-          result = await this.executeFallback();
+          result = await this.executeFallback(routing);
           break;
         case 'swarm':
-          result = await this.executeSwarm();
-          break;
-        case 'manual':
-          result = await this.executeSingle();
+          result = await this.executeSwarm(routing);
           break;
         default:
-          result = await this.executeFallback();
+          result = await this.executeSingle(routing);
       }
 
       result.duration = Date.now() - this.startTime;
@@ -158,8 +157,12 @@ export class SessionOrchestrator extends EventEmitter {
     }
   }
 
-  private async executeSingle(): Promise<SessionResult> {
-    const agent = await AgentFactory.createBestAdapter(this.registry, this.config.mode, this.config.preferredAgent);
+  private async executeSingle(routing: import('../routing/AgentRouter.js').RoutingDecision): Promise<SessionResult> {
+    const agentId = routing.selectedAgents[0] || this.config.preferredAgent;
+    const agent = agentId
+      ? AgentFactory.createAdapter(agentId, { workingDir: this.config.workingDir, timeoutMs: this.config.timeoutMs })
+      : await AgentFactory.createBestAdapter(this.registry, this.config.mode);
+
     if (!agent) {
       return this.noAgentResult('No available agent found');
     }
@@ -173,8 +176,13 @@ export class SessionOrchestrator extends EventEmitter {
     return this.executeAgentWithChanges(agent, this.config.goal);
   }
 
-  private async executeFallback(): Promise<SessionResult> {
-    const primary = await AgentFactory.createBestAdapter(this.registry, this.config.mode, this.config.preferredAgent);
+  private async executeFallback(routing: import('../routing/AgentRouter.js').RoutingDecision): Promise<SessionResult> {
+    const fallbackChain = routing.fallbackChain.length > 0 ? routing.fallbackChain : undefined;
+    const primaryId = routing.selectedAgents[0] || this.config.preferredAgent;
+    const primary = primaryId
+      ? AgentFactory.createAdapter(primaryId, { workingDir: this.config.workingDir, timeoutMs: this.config.timeoutMs })
+      : await AgentFactory.createBestAdapter(this.registry, this.config.mode);
+
     if (!primary) {
       return this.noAgentResult('No available agent found');
     }
@@ -197,7 +205,23 @@ export class SessionOrchestrator extends EventEmitter {
       };
     }
 
-    const fallbackId = this.findFallbackAgent(primary.id);
+    const errorType = classifyAgentError(firstResult.error || '', '');
+    if (!isFallbackTrigger(errorType)) {
+      return {
+        success: false,
+        goal: this.config.goal,
+        strategy: 'fallback',
+        mode: this.config.mode,
+        agentUsed: primary.id,
+        primaryResult: firstResult.content,
+        fileChanges: this.fileChanges,
+        appliedChanges: [],
+        errors: [firstResult.error || 'Primary agent failed, not fallback-eligible'],
+        duration: Date.now() - this.startTime,
+      };
+    }
+
+    const fallbackId = (fallbackChain && fallbackChain.length > 0) ? fallbackChain[0] : this.findFallbackAgent(primary.id);
     if (!fallbackId) {
       return {
         success: false,
@@ -228,15 +252,17 @@ export class SessionOrchestrator extends EventEmitter {
     return this.executeAgentWithChanges(fallback, this.config.goal);
   }
 
-  private async executeSwarm(): Promise<SessionResult> {
-    const available = this.registry.getAvailableAgents(this.config.mode);
-    if (available.length === 0) {
+  private async executeSwarm(routing: import('../routing/AgentRouter.js').RoutingDecision): Promise<SessionResult> {
+    const agentIds = routing.selectedAgents.length > 0
+      ? routing.selectedAgents
+      : this.registry.getAvailableAgents(this.config.mode).slice(0, 3).map(a => a.id);
+
+    if (agentIds.length === 0) {
       return this.noAgentResult('No available agents for swarm');
     }
 
-    const topAgents = available.slice(0, 3);
-    const promises = topAgents.map(async (a) => {
-      const adapter = AgentFactory.createAdapter(a.id, {
+    const promises = agentIds.map(async (id) => {
+      const adapter = AgentFactory.createAdapter(id, {
         workingDir: this.config.workingDir,
         timeoutMs: this.config.timeoutMs,
       });
