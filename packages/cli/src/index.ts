@@ -16,7 +16,7 @@ import { pluginsCommand } from './commands/plugins.js';
 import { helloCommand } from './commands/hello.js';
 import { hiCommand } from './commands/hi.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
-import { detectAndAutoInstall, selectBestProvider } from './detection/detectProviders.js';
+import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -32,7 +32,7 @@ async function detectAndShowProviders(): Promise<void> {
   const { default: chalk } = await import('chalk');
   
   try {
-    const providers = await detectAndAutoInstall();
+    const providers = await detectAllProviders();
     const best = selectBestProvider(providers);
     
     // Show detection results
@@ -188,8 +188,8 @@ program
   .option('--model <name>', 'Override model selection')
   .option('--provider <name>', 'Override provider')
   .option('--agent <name>', 'Preferred agent (opencode, claude-code, gemini-cli, aider, goose)')
-  .option('--strategy <name>', 'Execution strategy (single, fallback, swarm, manual)', 'fallback')
-  .option('--mode <name>', 'Agent mode (communication, execution)', 'execution')
+  .option('--strategy <name>', 'Execution strategy (single, single-fallback, fallback, swarm, manual)', 'single-fallback')
+  .option('--mode <name>', 'Agent mode (communication, execution)', 'communication')
   .option('--swarm', 'Shorthand for --strategy swarm', false)
   .option('--output <dir>', 'Output directory')
   .option('--debug', 'Show detailed output')
@@ -199,7 +199,7 @@ program
       const eamilos = await initEamilOS();
       const runOptions = {
         ...options,
-        strategy: options.swarm ? 'swarm' : options.strategy,
+        strategy: options.swarm ? 'swarm' : options.strategy || 'single-fallback',
       };
       await run(eamilos, goal, runOptions);
     } catch (error) {

@@ -93,17 +93,18 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
   const state = useStore.getState();
   const handlers: Array<[string, EventHandler]> = [];
 
-  const normalizeStrategy = (s: string): 'single' | 'fallback' | 'swarm' | 'manual' => {
+  const normalizeStrategy = (s: string): 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual' => {
     if (s === 'swarm') return 'swarm';
+    if (s === 'single-fallback') return 'single-fallback';
     if (s === 'single' || s === 'manual') return s;
-    return 'fallback';
+    return 'single-fallback';
   };
 
   const session = createSessionOrchestrator({
     goal: prompt,
     projectId: `tui_${Date.now()}`,
     strategy: normalizeStrategy(strat),
-    mode: 'execution',
+    mode: state.currentMode,
     workingDir: process.cwd(),
     maxRetries: 2,
     timeoutMs: 120000,

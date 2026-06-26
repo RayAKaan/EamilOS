@@ -43,7 +43,7 @@ Guaranteed Execution Protocols:
 }
 `.trim();
 
-export type ExecutionStrategy = 'gemini-first' | 'opencode-first' | 'parallel' | 'swarm';
+export type ExecutionStrategy = 'single' | 'single-fallback' | 'fallback' | 'gemini-first' | 'opencode-first' | 'parallel' | 'swarm' | 'manual';
 export type TaskType = 'code' | 'research' | 'analyze' | 'refactor' | 'debug' | 'general';
 
 export interface OrchestratorConfig {

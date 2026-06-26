@@ -53,14 +53,14 @@ interface StoreActions {
 const defaultGraphStats: GraphStats = {
   nodes: 0,
   edges: 0,
-  strategy: 'fallback',
+  strategy: 'single-fallback',
 };
 
 export const useStore = create<AppState & StoreActions>((set) => ({
   messages: [],
   isRunning: false,
-  currentStrategy: 'fallback' as ExecutionStrategy,
-  currentMode: 'execution' as AgentMode,
+  currentStrategy: 'single-fallback' as ExecutionStrategy,
+  currentMode: 'communication' as AgentMode,
   currentAgentFilter: 'auto',
   graphStats: defaultGraphStats,
   agentStatus: {},

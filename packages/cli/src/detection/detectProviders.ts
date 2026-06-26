@@ -168,25 +168,6 @@ export async function detectAllProviders(): Promise<ProviderStatus[]> {
 
 export async function detectAndAutoInstall(): Promise<ProviderStatus[]> {
   const providers = await detectAllProviders();
-  const missing = providers.filter(p => !p.available && p.installCommand);
-  
-  for (const provider of missing) {
-    if (provider.installCommand) {
-      const result = await installProvider(provider.id);
-      if (result.success) {
-        provider.available = true;
-        provider.reason = undefined;
-        if (result.alreadyWorking) {
-          console.log(`✅ ${provider.name} is already available!`);
-        } else {
-          console.log(`✅ ${provider.name} installed successfully!`);
-        }
-      } else {
-        console.log(`❌ Failed to install ${provider.name}`);
-      }
-    }
-  }
-  
   return providers;
 }
 

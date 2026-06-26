@@ -164,9 +164,6 @@ export function suggestExecutionStrategy(plan: TaskPlan, availableCount: number)
   if (availableCount <= 1) return 'single';
   if (plan.subtasks.length <= 1) return 'single';
 
-  const parallelCount = plan.subtasks.filter(s => s.canRunInParallel).length;
-  if (parallelCount >= 2 && availableCount >= 2) return 'swarm';
-
-  if (plan.subtasks.length >= 3) return 'fallback';
+  if (plan.subtasks.length >= 2) return 'single-fallback';
   return 'single';
 }

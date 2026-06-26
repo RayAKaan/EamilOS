@@ -90,7 +90,7 @@ export interface EamilOSAgent {
   stop?(): Promise<void>;
 }
 
-export type ExecutionStrategy = 'single' | 'fallback' | 'swarm' | 'manual';
+export type ExecutionStrategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
 
 import type { ExecutionPolicy } from '../policy/ExecutionPolicy.js';
 

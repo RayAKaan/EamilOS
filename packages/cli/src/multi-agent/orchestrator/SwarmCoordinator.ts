@@ -9,7 +9,7 @@ import type { AgentMode, AgentErrorType } from '../../core/agents/types.js';
 export interface SwarmCoordinatorConfig {
   goal: string;
   projectId: string;
-  strategy: 'single' | 'fallback' | 'swarm' | 'manual';
+  strategy: 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
   mode: AgentMode;
   workingDir: string;
   maxRetries?: number;

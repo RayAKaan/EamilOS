@@ -3,7 +3,7 @@ import { SwarmCoordinator } from './SwarmCoordinator.js';
 import { TaskPlanner, type TaskPlan } from './TaskPlanner.js';
 import type { AgentMode } from '../../core/agents/types.js';
 
-export type ExecutionStrategy = 'single' | 'fallback' | 'swarm' | 'manual';
+export type ExecutionStrategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
 
 export interface OrchestratorConfig {
   goal: string;

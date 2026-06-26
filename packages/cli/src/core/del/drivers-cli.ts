@@ -7,6 +7,7 @@ import {
   ProviderHealth,
   ProviderType,
 } from './provider-types.js';
+import { buildAgentEnv } from '../security/AgentEnv.js';
 
 export interface CLIProviderConfig {
   command: string;
@@ -112,7 +113,7 @@ export class CLIProviderDriver extends BaseProviderDriver {
     return new Promise((resolve, reject) => {
       const child = spawn(this.cliConfig.command, args, {
         cwd: this.cliConfig.workingDirectory || process.cwd(),
-        env: { ...process.env, ...this.cliConfig.env },
+        env: buildAgentEnv(this.id, this.cliConfig.env),
         shell: false,
       });
 
@@ -145,7 +146,7 @@ export class CLIProviderDriver extends BaseProviderDriver {
     return new Promise((resolve, reject) => {
       const child = spawn(this.cliConfig.command, args, {
         cwd: this.cliConfig.workingDirectory || process.cwd(),
-        env: { ...process.env, ...this.cliConfig.env },
+        env: buildAgentEnv(this.id, this.cliConfig.env),
         shell: false,
       });
 

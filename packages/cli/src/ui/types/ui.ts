@@ -1,5 +1,5 @@
 export type AgentStatus = 'ready' | 'busy' | 'offline' | 'failed';
-export type ExecutionStrategy = 'single' | 'fallback' | 'swarm' | 'manual' | 'gemini-first' | 'opencode-first' | 'parallel';
+export type ExecutionStrategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual' | 'gemini-first' | 'opencode-first' | 'parallel';
 export type AgentMode = 'communication' | 'execution';
 
 export type MessageType =

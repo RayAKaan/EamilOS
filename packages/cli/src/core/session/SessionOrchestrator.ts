@@ -98,9 +98,10 @@ export class SessionOrchestrator extends EventEmitter {
       const available = this.registry.getAvailableAgents(this.config.mode);
       const plan = planTask(this.config.goal, available.length > 0 ? available : undefined);
 
-      // Determine effective strategy
+       // Determine effective strategy
       const effectiveStrategy: ExecutionStrategy =
         this.config.strategy === 'swarm' ? 'swarm' :
+        this.config.strategy === 'single-fallback' ? 'single-fallback' :
         suggestExecutionStrategy(plan, available.length);
 
       // Route: pick best agent and fallback chain
@@ -118,6 +119,7 @@ export class SessionOrchestrator extends EventEmitter {
         case 'single':
           result = await this.executeSingle(routing);
           break;
+        case 'single-fallback':
         case 'fallback':
           result = await this.executeFallback(routing);
           break;
