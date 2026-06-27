@@ -1,7 +1,7 @@
 {
   "name": "eamilos",
-  "version": "1.6.5",
-  "description": "EamilOS v1.6.5 — Include README.md in npm package",
+  "version": "1.7.0",
+  "description": "EamilOS v1.7.0 — Full-screen TUI replaces Ink/React renderer",
   "type": "module",
   "private": true,
   "workspaces": [

@@ -6,14 +6,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..');
 
 await esbuild.build({
-  entryPoints: [join(root, 'src', 'ui', 'index.tsx')],
+  entryPoints: [join(root, 'src', 'ui-v2', 'index.ts')],
   bundle: true,
   platform: 'node',
   target: 'node20',
   format: 'esm',
   outfile: join(root, 'dist', 'eamilos-ui.js'),
   external: [
-    'blessed',
     'fs', 'fs/promises', 'path', 'os', 'child_process', 'stream',
     'stream/promises', 'util', 'events', 'crypto', 'http', 'https',
     'net', 'tls', 'url', 'querystring', 'readline', 'tty', 'assert',
@@ -21,9 +20,8 @@ await esbuild.build({
     'cluster', 'dns', 'dgram', 'zlib', 'string_decoder', 'timers',
     'timers/promises', 'constants', 'punycode', 'perf_hooks',
     'pty.js', 'term.js',
-    'zustand', 'nanoid', 'react', 'react-dom', 'execa',
-    'acorn', 'better-sqlite3', 'chalk', 'commander', 'ink',
-    'ink-text-input', 'ora', 'simple-git', 'yaml', 'zod',
+    'acorn', 'better-sqlite3', 'chalk', 'commander', 'execa',
+    'nanoid', 'ora', 'simple-git', 'yaml', 'zod',
   ],
   define: {
     'process.env.NODE_ENV': '"production"',

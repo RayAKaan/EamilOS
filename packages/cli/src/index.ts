@@ -71,9 +71,6 @@ async function launchUI(args: string[]) {
   const path = await import('path');
   const { fileURLToPath } = await import('url');
   
-  // Run provider detection before launching UI
-  await detectAndShowProviders();
-  
   const __filename = fileURLToPath(import.meta.url);
   const cliUiPath = path.resolve(path.dirname(__filename), 'eamilos-ui.js');
   const rootDir = process.cwd();
@@ -147,14 +144,9 @@ program
 
 program
   .command('ui')
-  .description('Launch interactive TUI (or --cli for text mode)')
-  .option('--cli', 'Use text CLI instead of rich TUI', false)
-  .action(async (options) => {
+  .description('Launch interactive TUI')
+  .action(async () => {
     try {
-      if (options.cli) {
-        console.log('Use "eamilos run <goal>" for CLI mode');
-        return;
-      }
       const { spawn } = await import('child_process');
       const path = await import('path');
       const { fileURLToPath } = await import('url');

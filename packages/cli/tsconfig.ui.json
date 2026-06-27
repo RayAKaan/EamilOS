@@ -3,7 +3,6 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "jsx": "react-jsx",
     "noEmit": true,
     "strict": true,
     "esModuleInterop": true,
@@ -15,19 +14,6 @@
     "noUnusedParameters": false
   },
   "include": [
-    "src/ui/types/ui.ts",
-    "src/ui/state/store.ts",
-    "src/ui/index.tsx",
-    "src/ui/app.tsx",
-    "src/ui/components/layout/*.tsx",
-    "src/ui/components/StatusBar.tsx",
-    "src/ui/components/chat/*.tsx",
-    "src/ui/components/sidebar/*.tsx",
-    "src/ui/components/terminal/*.tsx",
-    "src/ui/components/dialogs/*.tsx",
-    "src/ui/pages/*.tsx",
-    "src/ui/services/*.ts",
-    "src/ui/hooks/useOrchestrator.ts",
-    "src/ui/hooks/useAgentStatus.ts"
+    "src/ui-v2/**/*.ts"
   ]
 }
