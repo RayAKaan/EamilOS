@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.6.3",
-  "description": "EamilOS v1.6.3 — Fix TUI false-success on failed CLI agents and continue fallback chain",
+  "version": "1.6.4",
+  "description": "EamilOS v1.6.4 — Updated README for npm publishing",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {
