@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.6.4",
-  "description": "EamilOS v1.6.4 — Updated README for npm publishing",
+  "version": "1.6.5",
+  "description": "EamilOS v1.6.5 — Include README.md in npm package",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {
