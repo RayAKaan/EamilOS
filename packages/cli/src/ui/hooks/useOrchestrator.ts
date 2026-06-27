@@ -124,6 +124,9 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
   const state = useStore.getState();
   const handlers: Array<[string, EventHandler]> = [];
 
+  const uiSessionId = `session_${currentStartTime}`;
+  let uiSessionStatus: 'completed' | 'failed' = 'failed';
+
   const normalizeStrategy = (s: string): 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual' => {
     if (s === 'swarm') return 'swarm';
     if (s === 'single-fallback') return 'single-fallback';
@@ -177,6 +180,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     });
 
     const result = await session.run();
+    uiSessionStatus = result.errors.length === 0 ? 'completed' : 'failed';
     const duration = Date.now() - currentStartTime;
 
     const rawContent = result.primaryResult ?? '';
@@ -227,10 +231,20 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
       }
     }
   } catch (execErr) {
+    uiSessionStatus = 'failed';
     const msg = execErr instanceof Error ? execErr.message : String(execErr);
     state.addMessage({ type: 'error', content: 'Execution failed: ' + msg });
   } finally {
-    state.setRunning(false);
+    const latest = useStore.getState();
+    latest.addSession({
+      id: uiSessionId,
+      goal: prompt,
+      strategy: strat,
+      startedAt: currentStartTime,
+      messageCount: latest.messages.length,
+      status: uiSessionStatus,
+    });
+    latest.setRunning(false);
   }
 }
 
