@@ -12,11 +12,11 @@ interface InputBoxProps {
 }
 
 const STRATEGIES: ExecutionStrategy[] = [
+  'single',
   'single-fallback',
-  'opencode-first',
-  'gemini-first',
-  'parallel',
+  'fallback',
   'swarm',
+  'manual',
 ];
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -111,7 +111,7 @@ export const InputBox: React.FC<InputBoxProps> = ({
 
       <Box paddingX={1}>
         <Text dimColor wrap="truncate">
-          ↑repeat │ 1-5strategy │ Ctrl+Alt+Ggraph │ Ctrl+Lclear │ Ctrl+Ccancel
+          ↑repeat │ 1-5 strategy │ Ctrl+L clear │ Ctrl+C cancel
         </Text>
       </Box>
     </Box>

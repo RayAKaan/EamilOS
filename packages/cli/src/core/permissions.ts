@@ -28,10 +28,27 @@ export class PermissionService extends EventEmitter {
   private defaultPolicy: PermissionDecision;
   private sessionPermissions: Map<string, Set<string>> = new Map();
   private pendingRequests: Map<string, PermissionRequest> = new Map();
+  private pendingResolvers: Map<string, (decision: PermissionDecision) => void> = new Map();
 
   constructor(defaultPolicy: PermissionDecision = 'deny') {
     super();
     this.defaultPolicy = defaultPolicy;
+  }
+
+  async requestApproval(request: PermissionRequest): Promise<PermissionDecision> {
+    this.pendingRequests.set(request.id, request);
+    this.emit('permission:requested', request);
+
+    return new Promise<PermissionDecision>((resolve) => {
+      this.pendingResolvers.set(request.id, resolve);
+    });
+  }
+
+  waitForDecision(request: PermissionRequest): Promise<PermissionDecision> {
+    this.pendingResolvers.set(request.id, undefined!);
+    return new Promise<PermissionDecision>((resolve) => {
+      this.pendingResolvers.set(request.id, resolve);
+    });
   }
 
   checkFileWrite(sessionId: string, agentId: string, path: string, toolName: string): PermissionCheckResult {
@@ -64,6 +81,12 @@ export class PermissionService extends EventEmitter {
       const perms = this.sessionPermissions.get(request.sessionId) ?? new Set();
       perms.add(key);
       this.sessionPermissions.set(request.sessionId, perms);
+    }
+
+    const resolver = this.pendingResolvers.get(requestId);
+    if (resolver) {
+      resolver(decision);
+      this.pendingResolvers.delete(requestId);
     }
 
     this.emit('permission:resolved', { requestId, decision, request });

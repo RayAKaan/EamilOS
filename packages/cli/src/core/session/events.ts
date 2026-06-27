@@ -41,6 +41,6 @@ export interface SessionEventMap {
   'staging.cleaned': { sessionId: string };
   'session.completed': { success: boolean; duration: number };
   'session.error': { error: string };
-  'permission.requested': { agentId: string; action: string; details: string };
+  'permission.requested': { agentId: string; action: string; details: string; requestId?: string };
   'budget.updated': { tokensUsed: number; cost: number };
 }

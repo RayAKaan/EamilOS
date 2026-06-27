@@ -31,6 +31,12 @@ function formatDisplayContent(raw: string): string {
 let abortRef = false;
 let currentStartTime = 0;
 
+export function normalizeStrategyForSession(s: string): 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual' {
+  const valid = ['single', 'single-fallback', 'fallback', 'swarm', 'manual'] as const;
+  if ((valid as readonly string[]).includes(s)) return s as 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
+  return 'single-fallback';
+}
+
 export async function detectAndTrackAgents(): Promise<void> {
   const registry = AgentRegistry.create();
   const state = useStore.getState();
@@ -127,17 +133,10 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
   const uiSessionId = `session_${currentStartTime}`;
   let uiSessionStatus: 'completed' | 'failed' = 'failed';
 
-  const normalizeStrategy = (s: string): 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual' => {
-    if (s === 'swarm') return 'swarm';
-    if (s === 'single-fallback') return 'single-fallback';
-    if (s === 'single' || s === 'manual') return s;
-    return 'single-fallback';
-  };
-
   const session = createSessionOrchestrator({
     goal: prompt,
     projectId: `tui_${Date.now()}`,
-    strategy: normalizeStrategy(strat),
+    strategy: normalizeStrategyForSession(strat),
     mode: state.currentMode,
     workingDir: process.cwd(),
     maxRetries: 2,
@@ -177,6 +176,24 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
 
     session.on('changes.collected', (data) => {
       state.updateGraphStats({ nodes: data.changes?.length || 2, edges: data.changes?.length || 1 });
+    });
+
+    session.on('permission.requested', (data) => {
+      const id = state.addPermissionRequest({
+        agentId: data.agentId,
+        action: data.action,
+        details: data.details,
+      });
+
+      state.openOverlay('permission', {
+        request: {
+          id: (data as any).requestId ?? id,
+          agentId: data.agentId,
+          action: data.action,
+          details: data.details,
+          requestId: (data as any).requestId,
+        },
+      });
     });
 
     const result = await session.run();

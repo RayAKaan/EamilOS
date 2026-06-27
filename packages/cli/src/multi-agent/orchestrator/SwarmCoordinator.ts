@@ -63,12 +63,20 @@ export class SwarmCoordinator extends EventEmitter {
         case 'single':
           result = await this.executeSingle();
           break;
+
+        case 'single-fallback':
         case 'fallback':
           result = await this.executeFallback();
           break;
+
         case 'swarm':
           result = await this.executeSwarm();
           break;
+
+        case 'manual':
+          result = this.noAgentResult('Manual strategy is not implemented yet');
+          break;
+
         default:
           result = await this.executeFallback();
       }

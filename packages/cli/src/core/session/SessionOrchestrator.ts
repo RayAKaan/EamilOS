@@ -3,6 +3,7 @@ import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { AgentFactory } from '../agents/AgentFactory.js';
 import { classifyAgentError, isFallbackTrigger } from '../agents/AgentErrorClassifier.js';
 import { ConstraintEnforcer, getConstraintEnforcer } from '../../terminal/ConstraintEnforcer.js';
+import { ConflictArbiter } from '../comms/ConflictArbiter.js';
 import { AdaptiveMultiplexer, getAdaptiveMultiplexer } from '../../terminal/AdaptiveMultiplexer.js';
 import { StagingWorkspace, getStagingWorkspace } from '../workspace/StagingWorkspace.js';
 import { takeWorkspaceSnapshot, diffWorkspace } from '../changes/ChangeCollector.js';
@@ -74,6 +75,7 @@ export class SessionOrchestrator extends EventEmitter {
         agentId: request.agentId,
         action: request.action,
         details: request.reason,
+        requestId: request.id,
       });
     });
   }
@@ -303,6 +305,9 @@ export class SessionOrchestrator extends EventEmitter {
     }
 
     const best = successes.reduce((a, b) => (a.content.length > b.content.length ? a : b));
+    const resolvedChanges = await this.resolveSwarmFileChanges(successes);
+    this.fileChanges = resolvedChanges;
+
     return {
       success: true,
       goal: this.config.goal,
@@ -310,11 +315,68 @@ export class SessionOrchestrator extends EventEmitter {
       mode: this.config.mode,
       agentUsed: best.agentId,
       primaryResult: best.content,
-      fileChanges: this.fileChanges,
+      fileChanges: resolvedChanges,
       appliedChanges: [],
       errors: [],
       duration: Date.now() - this.startTime,
     };
+  }
+
+  private async resolveSwarmFileChanges(successes: AgentResponse[]): Promise<ProposedFileChange[]> {
+    const byPath = new Map<string, ProposedFileChange[]>();
+
+    for (const response of successes) {
+      for (const change of response.fileChanges ?? []) {
+        const existing = byPath.get(change.path) ?? [];
+        existing.push(change);
+        byPath.set(change.path, existing);
+      }
+    }
+
+    const arbiter = new ConflictArbiter();
+    const resolved: ProposedFileChange[] = [];
+
+    for (const [path, changes] of byPath) {
+      if (changes.length === 1) {
+        resolved.push(changes[0]!);
+        continue;
+      }
+
+      const contentCandidates = changes.filter((c) => c.content !== undefined);
+
+      if (contentCandidates.length === 0) {
+        resolved.push(changes[0]!);
+        continue;
+      }
+
+      const candidates = contentCandidates.map((change) => ({
+        callsign: change.sourceAgentId,
+        path,
+        content: change.content ?? '',
+        hash: ConflictArbiter.computeHash(
+          change.sourceAgentId,
+          path,
+          change.content ?? ''
+        ),
+      }));
+
+      const resolution = await arbiter.arbitrate(candidates);
+      const winner = contentCandidates.find(
+        (change) =>
+          change.sourceAgentId === resolution.winner.callsign &&
+          change.path === resolution.winner.path &&
+          (change.content ?? '') === resolution.winner.content
+      );
+
+      resolved.push(winner ?? contentCandidates[0]!);
+
+      this.emit('agent.output', {
+        agentId: 'arbiter',
+        content: `Resolved conflict for ${path}: ${resolution.winner.callsign} (${resolution.method})`,
+      });
+    }
+
+    return resolved;
   }
 
   private async executeInCommunicationMode(agent: EamilOSAgent): Promise<SessionResult> {
@@ -488,23 +550,46 @@ export class SessionOrchestrator extends EventEmitter {
         'file:write'
       );
       if (!permCheck.allowed && permCheck.requireApproval) {
+        const request = permCheck.request;
+
+        if (!request) {
+          return {
+            success: false,
+            goal: this.config.goal,
+            strategy: this.config.strategy,
+            mode: this.config.mode,
+            agentUsed: agent.id,
+            primaryResult: response.content,
+            fileChanges: response.fileChanges,
+            appliedChanges: [],
+            errors: [`Permission denied: write to ${change.path}`],
+            duration: Date.now() - this.startTime,
+          };
+        }
+
         this.emit('permission.requested', {
           agentId: agent.id,
           action: 'write',
           details: `Write to ${change.path}`,
+          requestId: request.id,
         });
-        return {
-          success: false,
-          goal: this.config.goal,
-          strategy: this.config.strategy,
-          mode: this.config.mode,
-          agentUsed: agent.id,
-          primaryResult: response.content,
-          fileChanges: response.fileChanges,
-          appliedChanges: [],
-          errors: [`Permission denied: write to ${change.path}`],
-          duration: Date.now() - this.startTime,
-        };
+
+        const decision = await this.permissionService.waitForDecision(request);
+
+        if (decision !== 'allow-once' && decision !== 'allow-session') {
+          return {
+            success: false,
+            goal: this.config.goal,
+            strategy: this.config.strategy,
+            mode: this.config.mode,
+            agentUsed: agent.id,
+            primaryResult: response.content,
+            fileChanges: response.fileChanges,
+            appliedChanges: [],
+            errors: [`Permission denied: write to ${change.path}`],
+            duration: Date.now() - this.startTime,
+          };
+        }
       }
     }
 
