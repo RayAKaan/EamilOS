@@ -416,6 +416,19 @@ function validateParsedObject(obj: unknown): { valid: boolean; files: ParsedFile
   return { valid: true, files: validFiles };
 }
 
+import type { ProposedFileChange } from '../agents/types.js';
+
+export function extractFileChanges(content: string, sourceAgentId: string = ''): ProposedFileChange[] {
+  const parsed = parseResponse(content);
+  if (!parsed.success || !parsed.files.length) return [];
+  return parsed.files.map(f => ({
+    path: f.path,
+    action: 'create' as const,
+    content: f.content,
+    sourceAgentId,
+  }));
+}
+
 export function parseResponse(raw: string): ParseResult {
   const cleaned = preprocess(raw);
   

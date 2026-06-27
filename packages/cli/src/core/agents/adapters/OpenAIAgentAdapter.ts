@@ -1,3 +1,4 @@
+import { extractFileChanges } from '../../parsers/ResponseParser.js';
 import { EamilOSAgent, AgentRequest, AgentResponse, AgentKind, AgentCapabilities, RegisteredAgent } from '../EamilOSAgent.js';
 
 export class OpenAIAgentAdapter implements EamilOSAgent {
@@ -84,11 +85,12 @@ export class OpenAIAgentAdapter implements EamilOSAgent {
       const data = await response.json() as any;
       const content = data.choices?.[0]?.message?.content || '';
 
+      const fileChanges = extractFileChanges(content, this.id);
       return {
         agentId: this.id,
         success: true,
         content,
-        fileChanges: [],
+        fileChanges,
         tokensUsed: data.usage?.total_tokens,
         costUsd: data.usage?.total_tokens ? (data.usage.total_tokens / 1000000) * 10 : undefined,
         durationMs: Date.now() - start,

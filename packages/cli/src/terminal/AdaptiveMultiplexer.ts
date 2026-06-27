@@ -11,9 +11,10 @@ export interface MultiplexedAgentTerminal {
   title: string;
   mode: AgentOperationalMode;
   terminalPid?: number;
+  paneId?: string;
 }
 
-export type TerminalEnvironment = 'single' | 'windows-terminal' | 'tmux' | 'iterm2' | 'vscode';
+export type TerminalEnvironment = 'single' | 'windows-terminal' | 'tmux' | 'iterm2';
 
 export interface AgentTerminalDef {
   id: string;
@@ -143,7 +144,7 @@ export class AdaptiveMultiplexer extends EventEmitter {
       this.processes.delete(callsign);
     }
 
-    const paneId = (this.activeTerminals.get(callsign) as any)?.paneId;
+    const paneId = this.activeTerminals.get(callsign)?.paneId;
     if (paneId && AdaptiveMultiplexer.detectEnvironment() === 'tmux') {
       const kill = spawn('tmux', ['kill-pane', '-t', paneId], { stdio: 'ignore' });
       kill.unref();
@@ -191,9 +192,6 @@ export class AdaptiveMultiplexer extends EventEmitter {
           break;
         case 'iterm2':
           this.spawnIterm2(term, command, args, cwd);
-          break;
-        case 'vscode':
-          this.spawnVSCode(term, cwd);
           break;
       }
     } catch (err) {
@@ -251,22 +249,18 @@ export class AdaptiveMultiplexer extends EventEmitter {
       }
     );
 
-    let paneId = '';
-
     proc.stdout?.on('data', (data: Buffer) => {
-      paneId += data.toString();
-    });
-
-    proc.on('exit', () => {
-      const pane = paneId.trim();
-      if (pane) {
-        const titleProc = spawn('tmux', ['select-pane', '-t', pane, '-T', term.title], {
+      const paneId = data.toString().trim();
+      if (paneId && !term.paneId) {
+        term.paneId = paneId;
+        const titleProc = spawn('tmux', ['select-pane', '-t', paneId, '-T', term.title], {
           stdio: 'ignore',
         });
         titleProc.unref();
-        (term as any).paneId = pane;
       }
+    });
 
+    proc.on('exit', () => {
       this.processes.delete(term.callsign);
     });
 
@@ -307,19 +301,6 @@ end tell`;
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'iterm2' });
   }
 
-  private spawnVSCode(term: MultiplexedAgentTerminal, cwd: string): void {
-    const proc = spawn('code', [
-      '--terminal-split',
-      '-c', cwd,
-      '--title', term.title,
-    ], {
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    this.processes.set(term.callsign, proc);
-    proc.on('exit', () => this.processes.delete(term.callsign));
-    this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'vscode' });
-  }
 }
 
 let globalMultiplexer: AdaptiveMultiplexer | null = null;

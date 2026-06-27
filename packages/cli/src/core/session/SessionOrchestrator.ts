@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import { mkdirSync, writeFileSync, appendFileSync } from 'fs';
+import { resolve } from 'path';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { AgentFactory } from '../agents/AgentFactory.js';
 import { classifyAgentError, isFallbackTrigger } from '../agents/AgentErrorClassifier.js';
@@ -56,6 +58,7 @@ export class SessionOrchestrator extends EventEmitter {
   private fileChanges: ProposedFileChange[] = [];
   private policy: ExecutionPolicy;
   private permissionService: ReturnType<typeof getPermissionService>;
+  private agentLogFiles: Map<string, string> = new Map();
 
   constructor(config: SessionConfig) {
     super();
@@ -275,6 +278,15 @@ export class SessionOrchestrator extends EventEmitter {
       return this.noAgentResult('No available agents for swarm');
     }
 
+    for (let i = 0; i < agentIds.length; i++) {
+      this.prepareAgentLogFile(agentIds[i], this.callsignForIndex(i));
+    }
+
+    const outputHandler = (data: { agentId: string; content: string }) => {
+      this.appendAgentLog(data.agentId, data.content + '\n');
+    };
+    this.on('agent.output', outputHandler);
+
     await this.startSwarmTerminals(agentIds);
 
     const promises = agentIds.map(async (id) => {
@@ -289,6 +301,8 @@ export class SessionOrchestrator extends EventEmitter {
     });
 
     const results = await Promise.allSettled(promises);
+
+    this.off('agent.output', outputHandler);
     const successes = results.filter(
       (r): r is PromiseFulfilledResult<AgentResponse> => r.status === 'fulfilled' && r.value !== null && r.value.success
     ).map(r => r.value);
@@ -345,15 +359,13 @@ export class SessionOrchestrator extends EventEmitter {
         agentId,
         this.config.workingDir
       );
+      const logPath = this.prepareAgentLogFile(agentId, callsign);
 
       return {
         id: agentId,
         callsign,
-        command: 'sh',
-        args: [
-          '-lc',
-          `echo "[${callsign}] ${agentId} terminal ready"; echo "workspace: ${isolatedDir}"; exec sh`,
-        ],
+        command: 'tail',
+        args: ['-f', logPath],
         cwd: isolatedDir,
         mode: this.config.mode,
       };
@@ -367,6 +379,23 @@ export class SessionOrchestrator extends EventEmitter {
         content: `Terminal pane spawned for ${term.callsign} (${term.mode}).`,
       });
     }
+  }
+
+  private prepareAgentLogFile(agentId: string, callsign: string): string {
+    const logDir = resolve(process.cwd(), '.eamilos', 'agent-logs', callsign);
+    mkdirSync(logDir, { recursive: true });
+    const logPath = resolve(logDir, 'output.log');
+    writeFileSync(logPath, `[${new Date().toISOString()}] [${callsign}] ${agentId} ready\n`);
+    this.agentLogFiles.set(agentId, logPath);
+    return logPath;
+  }
+
+  private appendAgentLog(agentId: string, content: string): void {
+    const logPath = this.agentLogFiles.get(agentId);
+    if (!logPath) return;
+    try {
+      appendFileSync(logPath, content);
+    } catch { /* ignore */ }
   }
 
   private callsignForIndex(index: number): string {
@@ -712,6 +741,7 @@ export class SessionOrchestrator extends EventEmitter {
         await agent.stop?.();
       } catch { }
     }
+    getAdaptiveMultiplexer().terminateAll();
   }
 }
 

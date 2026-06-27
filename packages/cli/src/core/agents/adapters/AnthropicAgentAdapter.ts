@@ -1,3 +1,4 @@
+import { extractFileChanges } from '../../parsers/ResponseParser.js';
 import { EamilOSAgent, AgentRequest, AgentResponse, AgentKind, AgentCapabilities, RegisteredAgent } from '../EamilOSAgent.js';
 
 export class AnthropicAgentAdapter implements EamilOSAgent {
@@ -84,11 +85,12 @@ export class AnthropicAgentAdapter implements EamilOSAgent {
       const data = await response.json() as any;
       const content = data.content?.[0]?.text || '';
 
+      const fileChanges = extractFileChanges(content, this.id);
       return {
         agentId: this.id,
         success: true,
         content,
-        fileChanges: [],
+        fileChanges,
         tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
         costUsd: undefined,
         durationMs: Date.now() - start,

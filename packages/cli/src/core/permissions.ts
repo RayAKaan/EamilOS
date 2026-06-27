@@ -3,6 +3,13 @@ import { EventEmitter } from 'events';
 export type Permission = 'file:read' | 'file:write' | 'file:delete' | 'command:execute' | 'network:access';
 
 export type PermissionDecision = 'allow-once' | 'allow-session' | 'deny' | 'deny-session';
+export type ApprovalMode = 'interactive' | 'auto-approve' | 'auto-deny';
+
+export interface WaitForDecisionOptions {
+  timeout?: number;
+  defaultDeny?: boolean;
+  mode?: ApprovalMode;
+}
 
 export interface PermissionRequest {
   id: string;
@@ -44,10 +51,23 @@ export class PermissionService extends EventEmitter {
     });
   }
 
-  waitForDecision(request: PermissionRequest): Promise<PermissionDecision> {
-    this.pendingResolvers.set(request.id, undefined!);
+  waitForDecision(request: PermissionRequest, options?: WaitForDecisionOptions): Promise<PermissionDecision> {
+    const timeout = options?.timeout ?? 30000;
+    const defaultDeny = options?.defaultDeny ?? true;
+
+    if (options?.mode === 'auto-deny') return Promise.resolve('deny');
+    if (options?.mode === 'auto-approve') return Promise.resolve('allow-once');
+
     return new Promise<PermissionDecision>((resolve) => {
-      this.pendingResolvers.set(request.id, resolve);
+      const timer = setTimeout(() => {
+        this.pendingResolvers.delete(request.id);
+        resolve(defaultDeny ? 'deny' : 'allow-once');
+      }, timeout);
+
+      this.pendingResolvers.set(request.id, (decision: PermissionDecision) => {
+        clearTimeout(timer);
+        resolve(decision);
+      });
     });
   }
 

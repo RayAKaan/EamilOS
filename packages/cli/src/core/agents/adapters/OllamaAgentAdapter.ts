@@ -1,3 +1,4 @@
+import { extractFileChanges } from '../../parsers/ResponseParser.js';
 import { EamilOSAgent, AgentRequest, AgentResponse, AgentKind, AgentCapabilities, RegisteredAgent } from '../EamilOSAgent.js';
 
 export class OllamaAgentAdapter implements EamilOSAgent {
@@ -106,11 +107,12 @@ export class OllamaAgentAdapter implements EamilOSAgent {
       const data = await response.json() as any;
       const content = data.message?.content || '';
 
+      const fileChanges = extractFileChanges(content, this.id);
       return {
         agentId: this.id,
         success: true,
         content,
-        fileChanges: [],
+        fileChanges,
         durationMs: Date.now() - start,
       };
     } catch (err) {

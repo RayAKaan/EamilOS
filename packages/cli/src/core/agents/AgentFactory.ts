@@ -6,6 +6,7 @@ import { GeminiCliAgent } from '../../multi-agent/agents/GeminiCliAgent.js';
 import { AiderAgent } from '../../multi-agent/agents/AiderAgent.js';
 import { GooseAgent } from '../../multi-agent/agents/GooseAgent.js';
 import { CodexCliAgent } from '../../multi-agent/agents/CodexCliAgent.js';
+import { extractFileChanges } from '../parsers/ResponseParser.js';
 import { OpenAIAgentAdapter } from './adapters/OpenAIAgentAdapter.js';
 import { AnthropicAgentAdapter } from './adapters/AnthropicAgentAdapter.js';
 import { OllamaAgentAdapter } from './adapters/OllamaAgentAdapter.js';
@@ -98,11 +99,12 @@ class OpenCodeAgentAdapter implements EamilOSAgent {
     const start = Date.now();
     try {
       const msg = await this.inner.send(request.prompt);
+      const fileChanges = extractFileChanges(msg.content, this.id);
       return {
         agentId: this.id,
         success: true,
         content: msg.content,
-        fileChanges: [],
+        fileChanges,
         rawOutput: msg.raw,
         durationMs: Date.now() - start,
       };
@@ -158,11 +160,12 @@ class ClaudeCodeAgentAdapter implements EamilOSAgent {
     const start = Date.now();
     try {
       const msg = await this.inner.send(request.prompt);
+      const fileChanges = extractFileChanges(msg.content, this.id);
       return {
         agentId: this.id,
         success: true,
         content: msg.content,
-        fileChanges: [],
+        fileChanges,
         rawOutput: msg.raw,
         durationMs: Date.now() - start,
       };
@@ -218,11 +221,12 @@ class GeminiCliAgentAdapter implements EamilOSAgent {
     const start = Date.now();
     try {
       const msg = await this.inner.send(request.prompt);
+      const fileChanges = extractFileChanges(msg.content, this.id);
       return {
         agentId: this.id,
         success: true,
         content: msg.content,
-        fileChanges: [],
+        fileChanges,
         rawOutput: msg.raw,
         durationMs: Date.now() - start,
       };
@@ -278,11 +282,12 @@ class AiderAgentAdapter implements EamilOSAgent {
     const start = Date.now();
     try {
       const msg = await this.inner.send(request.prompt);
+      const fileChanges = extractFileChanges(msg.content, this.id);
       return {
         agentId: this.id,
         success: true,
         content: msg.content,
-        fileChanges: [],
+        fileChanges,
         rawOutput: msg.raw,
         durationMs: Date.now() - start,
       };
@@ -338,11 +343,12 @@ class CodexCliAgentAdapter implements EamilOSAgent {
     const start = Date.now();
     try {
       const msg = await this.inner.send(request.prompt);
+      const fileChanges = extractFileChanges(msg.content, this.id);
       return {
         agentId: this.id,
         success: true,
         content: msg.content,
-        fileChanges: [],
+        fileChanges,
         rawOutput: msg.raw,
         durationMs: Date.now() - start,
       };
@@ -398,11 +404,12 @@ class GooseAgentAdapter implements EamilOSAgent {
     const start = Date.now();
     try {
       const msg = await this.inner.send(request.prompt);
+      const fileChanges = extractFileChanges(msg.content, this.id);
       return {
         agentId: this.id,
         success: true,
         content: msg.content,
-        fileChanges: [],
+        fileChanges,
         rawOutput: msg.raw,
         durationMs: Date.now() - start,
       };

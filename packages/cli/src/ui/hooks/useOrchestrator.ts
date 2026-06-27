@@ -1,6 +1,8 @@
 import { useStore } from '../state/store.js';
 import type { ExecutionStrategy, TerminalInfo } from '../types/ui.js';
 import { createSessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
+import type { SessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
+import { getAdaptiveMultiplexer } from '../../terminal/AdaptiveMultiplexer.js';
 import { AgentRegistry } from '../../core/agents/AgentRegistry.js';
 import { CallsignRegistry } from '../../core/identity/CallsignRegistry.js';
 import { initEamilOS } from '../../core/index.js';
@@ -30,6 +32,7 @@ function formatDisplayContent(raw: string): string {
 
 let abortRef = false;
 let currentStartTime = 0;
+let activeSession: SessionOrchestrator | null = null;
 
 export function normalizeStrategyForSession(s: string): 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual' {
   const valid = ['single', 'single-fallback', 'fallback', 'swarm', 'manual'] as const;
@@ -179,6 +182,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     maxRetries: 2,
     timeoutMs: 120000,
   });
+  activeSession = session;
 
   try {
     state.updateMessage(sysId, { content: 'Strategy: ' + strat + ' -- Running...' });
@@ -304,6 +308,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     const msg = execErr instanceof Error ? execErr.message : String(execErr);
     state.addMessage({ type: 'error', content: 'Execution failed: ' + msg });
   } finally {
+    activeSession = null;
     const latest = useStore.getState();
     latest.addSession({
       id: uiSessionId,
@@ -319,6 +324,9 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
 
 export function cancel(): void {
   abortRef = true;
+  activeSession?.stop().catch(() => {});
+  getAdaptiveMultiplexer().terminateAll();
+  activeSession = null;
   const state = useStore.getState();
   state.setRunning(false);
   state.addMessage({ type: 'system', content: 'Execution cancelled by user.' });
