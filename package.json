@@ -10,6 +10,7 @@
   "scripts": {
     "build": "npm run build -w @eamilos/cli",
     "test": "npm run test -w @eamilos/cli",
+    "typecheck": "npm run typecheck -w @eamilos/cli",
     "clean": "npm run clean -w @eamilos/cli",
     "reset": "rm -rf node_modules packages/*/node_modules packages/*/dist",
     "cli": "npx eamilos"

@@ -12,6 +12,7 @@ interface InputBoxProps {
 }
 
 const STRATEGIES: ExecutionStrategy[] = [
+  'single-fallback',
   'opencode-first',
   'gemini-first',
   'parallel',
@@ -29,7 +30,7 @@ const TTYInput: React.FC<{
   useInput((input, key) => {
     if (isRunning) return;
     if (key.upArrow && lastPrompt && !value) setValue(lastPrompt);
-    if (['1', '2', '3', '4'].includes(input) && !value) {
+    if (/^[1-5]$/.test(input) && !value) {
       const idx = parseInt(input, 10) - 1;
       const strat = STRATEGIES[idx];
       if (strat) onStrategyChange(strat);
@@ -110,7 +111,7 @@ export const InputBox: React.FC<InputBoxProps> = ({
 
       <Box paddingX={1}>
         <Text dimColor wrap="truncate">
-          ↑repeat │ 1-4strategy │ Ctrl+Alt+Ggraph │ Ctrl+Lclear │ Ctrl+Ccancel
+          ↑repeat │ 1-5strategy │ Ctrl+Alt+Ggraph │ Ctrl+Lclear │ Ctrl+Ccancel
         </Text>
       </Box>
     </Box>

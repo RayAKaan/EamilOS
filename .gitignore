@@ -31,9 +31,16 @@ Thumbs.db
 *.swp
 *.swo
 
-# Generated session state
+# EamilOS runtime/session state
 .eamilos/
-.eamilos/**
+packages/*/.eamilos/
+packages/**/.eamilos/
+
+# EamilOS generated session/cache files
+**/.eamilos/sessions/
+**/.eamilos/tmp/
+**/.eamilos/cache/
+**/.eamilos/logs/
 
 # Editor
 *.bak
