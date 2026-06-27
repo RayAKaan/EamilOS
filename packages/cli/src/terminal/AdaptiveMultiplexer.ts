@@ -126,8 +126,10 @@ export class AdaptiveMultiplexer extends EventEmitter {
       term.title = `[${term.callsign}] ${term.agentId.toUpperCase()} (${newMode.toUpperCase()})`;
       this.emit('multiplexer:mode-switched', { callsign, mode: newMode });
 
-      if (process.env.TMUX) {
-        const pane = spawn('tmux', ['select-pane', '-t', term.callsign], { stdio: 'ignore' });
+      if (term.paneId && AdaptiveMultiplexer.detectEnvironment() === 'tmux') {
+        const pane = spawn('tmux', ['select-pane', '-t', term.paneId, '-T', term.title], {
+          stdio: 'ignore',
+        });
         pane.unref();
       }
     }
@@ -146,6 +148,8 @@ export class AdaptiveMultiplexer extends EventEmitter {
   }
 
   terminateAgent(callsign: string): boolean {
+    const paneId = this.activeTerminals.get(callsign)?.paneId;
+    this.emit('multiplexer:terminal-kill-requested', { callsign, paneId });
     const proc = this.processes.get(callsign);
 
     if (proc) {
@@ -153,9 +157,18 @@ export class AdaptiveMultiplexer extends EventEmitter {
       this.processes.delete(callsign);
     }
 
-    const paneId = this.activeTerminals.get(callsign)?.paneId;
     if (paneId && AdaptiveMultiplexer.detectEnvironment() === 'tmux') {
       const kill = spawn('tmux', ['kill-pane', '-t', paneId], { stdio: 'ignore' });
+      kill.on('exit', (code) => {
+        this.emit('multiplexer:terminal-killed', { callsign, paneId, code });
+      });
+      kill.on('error', (error) => {
+        this.emit('multiplexer:terminal-kill-failed', {
+          callsign,
+          paneId,
+          error: error.message,
+        });
+      });
       kill.unref();
     }
 
@@ -276,16 +289,7 @@ export class AdaptiveMultiplexer extends EventEmitter {
   }
 
   private spawnIterm2(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
-    const sessionsDir = resolve(cwd, '.eamilos', 'sessions', term.callsign);
-    mkdirSync(sessionsDir, { recursive: true });
-    const scriptPath = resolve(sessionsDir, 'agent.sh');
-    const escapedCommand = command.includes(' ') ? `"${command}"` : command;
-    const safeArgs = args.map((a) => a.replace(/'/g, "'\\''"));
-    const scriptContent = `#!/bin/sh
-cd "${cwd}"
-${escapedCommand} ${safeArgs.map((a) => `'${a}'`).join(' ')}
-`;
-    writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+    const scriptPath = writeAgentShellScript(cwd, term.callsign, command, args);
     const safeTitle = escapeForOsascript(term.title);
     const safeScriptPath = escapeForOsascript(scriptPath);
     const script = `

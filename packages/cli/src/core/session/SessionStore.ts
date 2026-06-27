@@ -34,9 +34,9 @@ export class SessionStore {
     }
   }
 
-  createSession(prompt: string, mode: string, strategy: string): RecordedSession {
+  createSession(prompt: string, mode: string, strategy: string, id?: string): RecordedSession {
     this.currentSession = {
-      id: `session_${Date.now()}`,
+      id: id ?? `session_${Date.now()}`,
       timestamp: Date.now(),
       prompt,
       mode,

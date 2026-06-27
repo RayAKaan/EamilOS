@@ -12,3 +12,10 @@ export {
   getConstraintEnforcer,
   ConstraintError,
 } from './ConstraintEnforcer.js';
+
+export {
+  TerminalSessionManager,
+  type TerminalSessionRequest,
+  type TerminalSessionResult,
+  type EamilOSAgentCommandProvider,
+} from './TerminalSessionManager.js';

@@ -101,4 +101,42 @@ describe('PermissionService', () => {
     const svc2 = getPermissionService();
     expect(svc1).toBe(svc2);
   });
+
+  it('waitForDecision respects timeoutMs option', async () => {
+    const result = service.checkFileWrite('s1', 'agent-a', '/tmp/test.txt', 'file:write');
+    expect(result.request).toBeDefined();
+
+    const start = Date.now();
+    const decisionPromise = service.waitForDecision(result.request!, {
+      timeoutMs: 50,
+      defaultDecision: 'deny',
+    });
+
+    const decision = await decisionPromise;
+    expect(decision).toBe('deny');
+    expect(Date.now() - start).toBeGreaterThanOrEqual(45);
+  });
+
+  it('waitForDecision respects defaultDecision option', async () => {
+    const result = service.checkFileWrite('s2', 'agent-b', '/tmp/test.txt', 'file:write');
+    expect(result.request).toBeDefined();
+
+    const start = Date.now();
+    const decision = await service.waitForDecision(result.request!, {
+      timeoutMs: 20,
+      defaultDecision: 'deny',
+    });
+    expect(decision).toBe('deny');
+  });
+
+  it('waitForDecision with defaultDecision allow-once on timeout', async () => {
+    const result = service.checkFileWrite('s3', 'agent-c', '/tmp/test.txt', 'file:write');
+    expect(result.request).toBeDefined();
+
+    const decision = await service.waitForDecision(result.request!, {
+      timeoutMs: 20,
+      defaultDecision: 'allow-once',
+    });
+    expect(decision).toBe('allow-once');
+  });
 });

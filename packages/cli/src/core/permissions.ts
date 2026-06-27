@@ -8,6 +8,8 @@ export type ApprovalMode = 'interactive' | 'auto-approve' | 'auto-deny';
 export interface WaitForDecisionOptions {
   timeout?: number;
   defaultDeny?: boolean;
+  timeoutMs?: number;
+  defaultDecision?: PermissionDecision;
   mode?: ApprovalMode;
 }
 
@@ -52,8 +54,12 @@ export class PermissionService extends EventEmitter {
   }
 
   waitForDecision(request: PermissionRequest, options?: WaitForDecisionOptions): Promise<PermissionDecision> {
-    const timeout = options?.timeout ?? 30000;
-    const defaultDeny = options?.defaultDeny ?? true;
+    const timeoutMs = options?.timeoutMs ?? options?.timeout ?? 30000;
+    const defaultDecision =
+      options?.defaultDecision ??
+      (options?.defaultDeny ? 'deny' : undefined) ??
+      'deny';
+    const timeout = timeoutMs;
 
     if (options?.mode === 'auto-deny') return Promise.resolve('deny');
     if (options?.mode === 'auto-approve') return Promise.resolve('allow-once');
@@ -61,7 +67,7 @@ export class PermissionService extends EventEmitter {
     return new Promise<PermissionDecision>((resolve) => {
       const timer = setTimeout(() => {
         this.pendingResolvers.delete(request.id);
-        resolve(defaultDeny ? 'deny' : 'allow-once');
+        resolve(defaultDecision);
       }, timeout);
 
       this.pendingResolvers.set(request.id, (decision: PermissionDecision) => {

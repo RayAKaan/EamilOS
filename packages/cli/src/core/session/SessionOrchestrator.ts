@@ -55,6 +55,7 @@ export class SessionOrchestrator extends EventEmitter {
   private sessionStore: SessionStore;
   private agents: Map<string, EamilOSAgent> = new Map();
   private startTime = 0;
+  private sessionId = '';
   private fileChanges: ProposedFileChange[] = [];
   private policy: ExecutionPolicy;
   private permissionService: ReturnType<typeof getPermissionService>;
@@ -93,6 +94,7 @@ export class SessionOrchestrator extends EventEmitter {
 
   async run(): Promise<SessionResult> {
     this.startTime = Date.now();
+    this.sessionId = `session_${this.startTime}`;
     const errors: string[] = [];
 
     this.emit('session.started', {
@@ -101,7 +103,7 @@ export class SessionOrchestrator extends EventEmitter {
       mode: this.config.mode,
     });
 
-    this.sessionStore.createSession(this.config.goal, this.config.mode, this.config.strategy);
+    this.sessionStore.createSession(this.config.goal, this.config.mode, this.config.strategy, this.sessionId);
 
     let finalResult: SessionResult | null = null;
 
@@ -215,7 +217,7 @@ export class SessionOrchestrator extends EventEmitter {
 
     const firstResult = await this.executeAgentForMode(primary, this.config.goal);
     if (firstResult.success && firstResult.errors.length === 0) {
-      return { ...firstResult, strategy: 'fallback', agentUsed: primary.id };
+      return { ...firstResult, strategy: this.config.strategy, agentUsed: primary.id };
     }
 
     const primaryError = firstResult.errors[0] ?? 'Primary agent failed';
@@ -223,7 +225,7 @@ export class SessionOrchestrator extends EventEmitter {
     if (!isFallbackTrigger(errorType)) {
       return {
         ...firstResult,
-        strategy: 'fallback',
+        strategy: this.config.strategy,
         errors: [primaryError || 'Primary agent failed, not fallback-eligible'],
       };
     }
@@ -232,7 +234,7 @@ export class SessionOrchestrator extends EventEmitter {
     if (!fallbackId) {
       return {
         ...firstResult,
-        strategy: 'fallback',
+        strategy: this.config.strategy,
         errors: [primaryError || 'Primary agent failed, no fallback available'],
       };
     }
@@ -265,11 +267,6 @@ export class SessionOrchestrator extends EventEmitter {
       this.prepareAgentLogFile(agentIds[i], this.callsignForIndex(i));
     }
 
-    const outputHandler = (data: { agentId: string; content: string }) => {
-      this.appendAgentLog(data.agentId, data.content + '\n');
-    };
-    this.on('agent.output', outputHandler);
-
     await this.startSwarmTerminals(agentIds);
 
     const promises = agentIds.map(async (id) => {
@@ -300,7 +297,6 @@ export class SessionOrchestrator extends EventEmitter {
 
     const results = await Promise.allSettled(promises);
 
-    this.off('agent.output', outputHandler);
     const successes = results.filter(
       (r): r is PromiseFulfilledResult<AgentResponse> => r.status === 'fulfilled' && r.value !== null && r.value.success
     ).map(r => r.value);
@@ -324,16 +320,21 @@ export class SessionOrchestrator extends EventEmitter {
     const resolvedChanges = await this.resolveSwarmFileChanges(successes);
     this.fileChanges = resolvedChanges;
 
+    const applyResult =
+      this.config.mode === 'execution'
+        ? await this.applyResolvedSwarmChanges(resolvedChanges)
+        : { applied: [], errors: [] };
+
     return {
-      success: true,
+      success: applyResult.errors.length === 0,
       goal: this.config.goal,
       strategy: 'swarm',
       mode: this.config.mode,
       agentUsed: best.agentId,
       primaryResult: best.content,
       fileChanges: resolvedChanges,
-      appliedChanges: [],
-      errors: [],
+      appliedChanges: applyResult.applied,
+      errors: applyResult.errors,
       duration: Date.now() - this.startTime,
     };
   }
@@ -342,10 +343,7 @@ export class SessionOrchestrator extends EventEmitter {
     const canMultiplex = AdaptiveMultiplexer.isMultiplexingSupported();
 
     if (!canMultiplex) {
-      this.emit('agent.output', {
-        agentId: 'eamilos',
-        content: 'No multiplex-capable terminal detected. Streaming agent output inside EamilOS TUI.',
-      });
+      this.emitAgentOutput('eamilos', 'No multiplex-capable terminal detected. Streaming agent output inside EamilOS TUI.\n');
       return;
     }
 
@@ -372,15 +370,18 @@ export class SessionOrchestrator extends EventEmitter {
     const spawned = await multiplexer.spawnAgentTerminals(terminals, this.config.workingDir);
 
     for (const term of spawned) {
-      this.emit('agent.output', {
-        agentId: term.agentId,
-        content: `Terminal pane spawned for ${term.callsign} (${term.mode}).`,
-      });
+      this.emitAgentOutput(term.agentId, `Terminal pane spawned for ${term.callsign} (${term.mode}).\n`);
     }
   }
 
   private prepareAgentLogFile(agentId: string, callsign: string): string {
-    const logDir = resolve(process.cwd(), '.eamilos', 'agent-logs', callsign);
+    const logDir = resolve(
+      this.config.workingDir,
+      '.eamilos',
+      'agent-logs',
+      String(this.startTime || Date.now()),
+      callsign
+    );
     mkdirSync(logDir, { recursive: true });
     const logPath = resolve(logDir, 'output.log');
     writeFileSync(logPath, `[${new Date().toISOString()}] [${callsign}] ${agentId} ready\n`);
@@ -394,6 +395,11 @@ export class SessionOrchestrator extends EventEmitter {
     try {
       appendFileSync(logPath, content);
     } catch { /* ignore */ }
+  }
+
+  private emitAgentOutput(agentId: string, content: string): void {
+    this.appendAgentLog(agentId, content.endsWith('\n') ? content : `${content}\n`);
+    this.emit('agent.output', { agentId, content });
   }
 
   private callsignForIndex(index: number): string {
@@ -472,10 +478,7 @@ export class SessionOrchestrator extends EventEmitter {
 
       resolved.push(winner ?? contentCandidates[0]!);
 
-      this.emit('agent.output', {
-        agentId: 'arbiter',
-        content: `Resolved conflict for ${path}: ${resolution.winner.callsign} (${resolution.method})`,
-      });
+      this.emitAgentOutput('arbiter', `Resolved conflict for ${path}: ${resolution.winner.callsign} (${resolution.method})\n`);
     }
 
     return resolved;
@@ -486,7 +489,7 @@ export class SessionOrchestrator extends EventEmitter {
 
     const request: AgentRequest = {
       id: `req_${Date.now()}`,
-      sessionId: `session_${Date.now()}`,
+      sessionId: this.sessionId,
       prompt: `[READ-ONLY MODE] Analyze and provide recommendations only. Do not modify any files.\n\nTask: ${this.config.goal}`,
       systemPrompt: `${SYSTEM_PROMPT}\n\nIMPORTANT: You are in READ-ONLY mode. Do not write, edit, or modify any files. Only analyze and propose changes.`,
       mode: 'communication',
@@ -534,12 +537,12 @@ export class SessionOrchestrator extends EventEmitter {
 
   private async executeAgentSafely(agent: EamilOSAgent, prompt: string, workingDir?: string): Promise<AgentResponse> {
     this.emit('agent.started', { agentId: agent.id });
-    this.emit('agent.output', { agentId: agent.id, content: `Starting ${agent.id}...` });
+    this.emitAgentOutput(agent.id, `Starting ${agent.id}...\n`);
     this.sessionStore.recordAgentSelected(agent.id);
 
     const request: AgentRequest = {
       id: `req_${Date.now()}`,
-      sessionId: `session_${Date.now()}`,
+      sessionId: this.sessionId,
       prompt,
       systemPrompt: SYSTEM_PROMPT,
       mode: this.config.mode,
@@ -578,18 +581,25 @@ export class SessionOrchestrator extends EventEmitter {
 
     const request: AgentRequest = {
       id: `req_${Date.now()}`,
-      sessionId: `session_${Date.now()}`,
+      sessionId: this.sessionId,
       prompt,
       systemPrompt: SYSTEM_PROMPT,
       mode: 'execution',
       workingDir: stagingDir,
       timeoutMs: this.config.timeoutMs ?? 240000,
+      onOutput: (chunk: string) => {
+        this.emit('agent.output', { agentId: agent.id, content: chunk });
+        this.appendAgentLog(agent.id, chunk);
+      },
     };
 
     let response: AgentResponse;
     try {
-      this.emit('agent.output', { agentId: agent.id, content: `Starting ${agent.id} in staging workspace...` });
+      this.emitAgentOutput(agent.id, `Starting ${agent.id} in staging workspace...\n`);
       response = await agent.run(request);
+      if (response.content) {
+        this.appendAgentLog(agent.id, response.content.endsWith('\n') ? response.content : `${response.content}\n`);
+      }
       this.emit('agent.completed', { agentId: agent.id, result: response });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -674,8 +684,8 @@ export class SessionOrchestrator extends EventEmitter {
         }
 
         const decision = await this.permissionService.waitForDecision(request, {
-          timeout: 300000,
-          defaultDeny: true,
+          timeoutMs: 300000,
+          defaultDecision: 'deny',
         });
 
         if (decision !== 'allow-once' && decision !== 'allow-session') {
@@ -711,6 +721,66 @@ export class SessionOrchestrator extends EventEmitter {
       appliedChanges: applyResult.applied,
       errors: applyResult.failed.map(f => `Failed to apply ${f.path}: ${f.error}`),
       duration: Date.now() - this.startTime,
+    };
+  }
+
+  private async applyResolvedSwarmChanges(changes: ProposedFileChange[]): Promise<{ applied: string[]; errors: string[] }> {
+    const fileChanges: FileChange[] = changes.map((change) => ({
+      path: change.path,
+      action: change.action === 'delete'
+        ? 'deleted'
+        : change.action === 'modify'
+          ? 'modified'
+          : 'created',
+      content: change.content ?? '',
+      agentId: change.sourceAgentId ?? 'swarm',
+    }));
+
+    const validationResult = validateChanges(fileChanges, this.policy);
+    this.emit('validation.started', {});
+
+    if (!validationResult.valid) {
+      const errors = validationResult.issues
+        .filter(i => i.severity === 'error')
+        .map(i => `[${i.path}] ${i.message}`);
+
+      this.emit('validation.failed', { errors });
+      return { applied: [], errors };
+    }
+
+    this.emit('validation.passed', {});
+
+    for (const change of fileChanges) {
+      const permCheck = this.permissionService.checkFileWrite(
+        this.sessionId,
+        change.agentId,
+        change.path,
+        'file:write'
+      );
+
+      if (!permCheck.allowed && permCheck.requireApproval) {
+        const request = permCheck.request;
+        if (!request) {
+          return { applied: [], errors: [`Permission denied: write to ${change.path}`] };
+        }
+
+        const decision = await this.permissionService.waitForDecision(request, {
+          timeoutMs: 300000,
+          defaultDecision: 'deny',
+        });
+
+        if (decision !== 'allow-once' && decision !== 'allow-session') {
+          return { applied: [], errors: [`Permission denied: write to ${change.path}`] };
+        }
+      }
+    }
+
+    const result = applyChanges(fileChanges, this.config.workingDir);
+    this.emit('changes.applied', { applied: result.applied, failed: result.failed });
+
+    return {
+      applied: result.applied,
+      errors: result.failed.map(f => `Failed to apply ${f.path}: ${f.error}`),
     };
   }
 

@@ -1,13 +1,8 @@
 import { Command } from 'commander';
-import { SwarmOrchestrator } from '../orchestrator/SwarmOrchestrator.js';
+import { createSessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
 import { AgentRegistry } from '../../core/agents/AgentRegistry.js';
 import { detectEnvironment, canMultiplex } from '../multiplexer.js';
-import {
-  getAdaptiveMultiplexer,
-  getConstraintEnforcer,
-  type AgentTerminalDef,
-} from '../../terminal/index.js';
-import type { AgentMode } from '../../core/agents/types.js';
+import type { AgentMode, ExecutionStrategy } from '../../core/agents/types.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { execSync } from 'child_process';
@@ -33,17 +28,17 @@ export function createMultiAgentCommands(): Command {
     .option('--working-dir <path>', 'Working directory', process.cwd())
     .option('--timeout <ms>', 'Timeout per agent in milliseconds', '180000')
     .option('--agent <id>', 'Preferred agent ID')
-    .option('--split', 'Spawn physical OS terminal split panes')
-    .option('--multiplex', 'Alias for --split')
+    .option('--split-preview', 'Report physical terminal split capability (preview only)')
+    .option('--split', 'Alias for --split-preview')
     .action(async (task, options) => {
-      const useSplit = options.split || options.multiplex;
+      const useSplit = options.split || options.splitPreview;
 
       if (useSplit) {
         const terminalEnv = detectEnvironment();
         if (canMultiplex()) {
-          console.log(chalk.cyan(`\n  🖥️  Split Terminal Mode Detected: ${terminalEnv}\n`));
+          console.log(chalk.cyan(`\n  🖥️  Split Terminal Capability Detected: ${terminalEnv}\n`));
         } else {
-          console.log(chalk.yellow('\n  ⚠️  --split flag ignored: Terminal does not support multiplexing.\n'));
+          console.log(chalk.yellow('\n  ⚠️  Terminal does not support multiplexing.\n'));
         }
       }
 
@@ -60,10 +55,10 @@ export function createMultiAgentCommands(): Command {
 
       spinner.succeed(`Agents ready: ${available.map(a => a.name).join(', ')}`);
 
-      const orchestrator = new SwarmOrchestrator({
+      const orchestrator = createSessionOrchestrator({
         goal: task,
         projectId: `cli_${Date.now()}`,
-        strategy: normalizeStrategy(options.strategy),
+        strategy: options.strategy as ExecutionStrategy,
         mode: (options.mode as AgentMode) || 'execution',
         workingDir: options.workingDir,
         timeoutMs: parseInt(options.timeout),
@@ -73,7 +68,7 @@ export function createMultiAgentCommands(): Command {
       spinner.start(`Executing task (strategy: ${options.strategy})...`);
 
       try {
-        const result = await orchestrator.execute(task);
+        const result = await orchestrator.run();
 
         spinner.stop();
 
@@ -106,7 +101,7 @@ export function createMultiAgentCommands(): Command {
         spinner.fail(`Execution failed: ${(err as Error).message}`);
       }
 
-      await orchestrator.terminate();
+      await orchestrator.stop();
     });
 
   command

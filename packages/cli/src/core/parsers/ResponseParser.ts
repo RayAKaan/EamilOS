@@ -1,3 +1,5 @@
+import type { ProposedFileChange } from '../agents/types.js';
+
 export interface ParsedFile {
   path: string;
   content: string;
@@ -420,8 +422,6 @@ function validateParsedObject(obj: unknown): { valid: boolean; files: ParsedFile
   
   return { valid: true, files: validFiles };
 }
-
-import type { ProposedFileChange } from '../agents/types.js';
 
 export function extractFileChanges(content: string, sourceAgentId: string = ''): ProposedFileChange[] {
   const parsed = parseResponse(content);
