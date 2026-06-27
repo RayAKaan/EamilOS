@@ -2,6 +2,22 @@ import { describe, it, expect, vi } from 'vitest';
 import { SwarmOrchestrator } from '../multi-agent/orchestrator/SwarmOrchestrator.js';
 import { TaskPlanner } from '../multi-agent/orchestrator/TaskPlanner.js';
 
+vi.mock('../core/agents/AgentRegistry.js', () => {
+  const createMockRegistry = () => ({
+    detect: vi.fn().mockResolvedValue(undefined),
+    getAvailableAgents: vi.fn().mockReturnValue([]),
+    getBestAgent: vi.fn().mockReturnValue(null),
+    getAgentInfoMap: vi.fn().mockReturnValue(new Map()),
+    getAgent: vi.fn().mockReturnValue(null),
+  });
+
+  return {
+    AgentRegistry: {
+      create: vi.fn(createMockRegistry),
+    },
+  };
+});
+
 describe('TaskPlanner', () => {
   const planner = new TaskPlanner();
 
