@@ -89,7 +89,7 @@ class OpenCodeAgentAdapter implements EamilOSAgent {
       status: result.available ? 'available' : 'not_installed',
       version: result.version,
       capabilities: this.capabilities,
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 1,
       error: result.error,
     };
@@ -154,7 +154,7 @@ class ClaudeCodeAgentAdapter implements EamilOSAgent {
       status: result.available ? 'available' : 'not_installed',
       version: result.version,
       capabilities: this.capabilities,
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 2,
       error: result.error,
     };
@@ -284,7 +284,7 @@ class AiderAgentAdapter implements EamilOSAgent {
       status: result.available ? 'available' : 'not_installed',
       version: result.version,
       capabilities: this.capabilities,
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 4,
       error: result.error,
     };
@@ -349,7 +349,7 @@ class CodexCliAgentAdapter implements EamilOSAgent {
       status: result.available ? 'available' : 'not_installed',
       version: result.version,
       capabilities: this.capabilities,
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 3,
       error: result.error,
     };
@@ -414,7 +414,7 @@ class GooseAgentAdapter implements EamilOSAgent {
       status: result.available ? 'available' : 'not_installed',
       version: result.version,
       capabilities: this.capabilities,
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 5,
       error: result.error,
     };

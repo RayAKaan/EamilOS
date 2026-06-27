@@ -5,7 +5,6 @@ import type { SessionOrchestrator } from '../../core/session/SessionOrchestrator
 import { getAdaptiveMultiplexer } from '../../terminal/AdaptiveMultiplexer.js';
 import { AgentRegistry } from '../../core/agents/AgentRegistry.js';
 import { CallsignRegistry } from '../../core/identity/CallsignRegistry.js';
-import { initEamilOS } from '../../core/index.js';
 import type { AgentMode } from '../../core/agents/types.js';
 
 type EventHandler = (...args: unknown[]) => void;
@@ -101,6 +100,19 @@ function getDefaultMode(agentId: string): AgentMode {
   return executionAgents.includes(agentId) ? 'execution' : 'communication';
 }
 
+function hasReadyAgent(): boolean {
+  const state = useStore.getState();
+  return Object.values(state.agentStatus).some((info) => info.status === 'ready');
+}
+
+function getNoAvailableAgentGuidance(): string {
+  const mode = useStore.getState().currentMode;
+  if (mode === 'communication') {
+    return 'No agents available. Set OPENAI_API_KEY or ANTHROPIC_API_KEY, or install opencode-ai / claude-code / gemini-cli and restart the TUI.';
+  }
+  return 'No agents available. Install opencode-ai, claude-code, aider, goose, or codex-cli and restart the TUI.';
+}
+
 export async function run(prompt: string, strategy?: ExecutionStrategy): Promise<void> {
   const state = useStore.getState();
   if (!prompt.trim() || state.isRunning) return;
@@ -111,7 +123,7 @@ export async function run(prompt: string, strategy?: ExecutionStrategy): Promise
   state.setRunning(true);
   state.setExecutionStart();
   state.setStrategy(strat);
-  state.updateGraphStats({ nodes: 0, edges: 0, strategy: strat, duration: undefined, toolsUsed: undefined, validated: false });
+  state.updateGraphStats({ nodes: 0, edges: 0, strategy: strat, duration: undefined, toolsUsed: undefined, validated: undefined });
   state.setLastPrompt(prompt);
 
   currentStartTime = Date.now();
@@ -122,9 +134,10 @@ export async function run(prompt: string, strategy?: ExecutionStrategy): Promise
     content: 'Strategy: ' + strat + ' -- Initializing agents...',
   });
 
-  try {
-    await initEamilOS();
-  } catch {
+  if (!hasReadyAgent()) {
+    state.updateMessage(sysId, { content: getNoAvailableAgentGuidance() });
+    state.setRunning(false);
+    return;
   }
 
   await runOrchestrator(prompt, strat, sysId);

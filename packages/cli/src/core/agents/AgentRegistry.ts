@@ -121,7 +121,7 @@ export class AgentRegistry {
       name: 'OpenCode AI',
       kind: 'cli',
       provider: 'opencode',
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 1,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: true, cloud: true, multimodal: false },
       detect: async () => {
@@ -139,7 +139,7 @@ export class AgentRegistry {
       name: 'Claude Code',
       kind: 'cli',
       provider: 'anthropic',
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 2,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: false },
       detect: async () => {
@@ -175,7 +175,7 @@ export class AgentRegistry {
       name: 'Aider',
       kind: 'cli',
       provider: 'aider',
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 4,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
@@ -193,7 +193,7 @@ export class AgentRegistry {
       name: 'Goose',
       kind: 'cli',
       provider: 'block',
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 5,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
@@ -216,7 +216,7 @@ export class AgentRegistry {
       name: 'Codex CLI',
       kind: 'cli',
       provider: 'openai',
-      supportedModes: ['execution'],
+      supportedModes: ['communication', 'execution'],
       priority: 3,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
       detect: async () => {

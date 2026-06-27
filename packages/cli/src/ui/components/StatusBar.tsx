@@ -18,7 +18,7 @@ export const StatusBar: React.FC = () => {
   const agentStatus = useStore((s) => s.agentStatus);
 
   const ocStatus = agentStatus.opencode?.status ?? 'offline';
-  const gemStatus = agentStatus.gemini?.status ?? 'offline';
+  const gemStatus = agentStatus['gemini-cli']?.status ?? 'offline';
 
   const left = [
     `mode:${MODE_LABEL[mode]}`,

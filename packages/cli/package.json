@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.6.0",
-  "description": "EamilOS v1.6.0 — Unified canonical output, borderless blessed TUI, offline kernel fallback, and multi-agent orchestration",
+  "version": "1.6.1",
+  "description": "EamilOS v1.6.1 — TUI no-provider hotfix: config-init corruption removed, no-agent preflight with setup guidance, offline WelcomeScreen/StatusBar, CLI agent communication mode",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {

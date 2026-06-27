@@ -15,7 +15,8 @@ export const WelcomeScreen: React.FC = () => {
   const agents = useStore((s) => s.agentStatus);
   const activeTerminals = useStore((s) => s.activeTerminals);
 
-  const detected = Object.entries(agents)
+  const agentEntries = Object.entries(agents);
+  const detected = agentEntries
     .filter(([, info]) => info.status === 'ready')
     .map(([id, info]) => ({
       id,
@@ -23,6 +24,10 @@ export const WelcomeScreen: React.FC = () => {
       name: info.name ?? id,
       kind: info.kind,
     }));
+
+  const anyDetected = agentEntries.length > 0;
+  const allOffline = anyDetected && detected.length === 0;
+  const detecting = !anyDetected;
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={2} paddingY={1}>
@@ -68,8 +73,15 @@ export const WelcomeScreen: React.FC = () => {
 
       <Box flexDirection="column" borderStyle="round" borderColor="blue" paddingX={1} marginBottom={1}>
         <Text bold>Detected agents</Text>
-        {detected.length === 0 ? (
-          <Text dimColor>No agents detected yet. Detection runs on startup; install OpenCode, Claude Code, Gemini CLI, Aider, Goose, or configure API/local providers.</Text>
+        {detecting ? (
+          <Text dimColor>Detecting agents on startup…</Text>
+        ) : allOffline ? (
+          <Box flexDirection="column">
+            <Text dimColor>All agents offline. Install OpenCode, Claude Code, Gemini CLI, Aider, Goose, or configure API/local providers.</Text>
+            {agentEntries.filter(([, info]) => info.error).map(([id, info]) => (
+              <Text key={id} dimColor color="red">  {info.name ?? id}: {info.error}</Text>
+            ))}
+          </Box>
         ) : (
           detected.map((agent) => (
             <Text key={agent.id}>
