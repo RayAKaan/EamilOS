@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.6.1",
-  "description": "EamilOS v1.6.1 — TUI no-provider hotfix: config-init corruption removed, no-agent preflight with setup guidance, offline WelcomeScreen/StatusBar, CLI agent communication mode",
+  "version": "1.6.2",
+  "description": "EamilOS v1.6.2 — Fix Windows agent detection: execFileSync → execSync for .cmd wrapper EINVAL",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {
