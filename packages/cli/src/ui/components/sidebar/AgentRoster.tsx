@@ -26,13 +26,31 @@ export const AgentRoster: React.FC = () => {
       <Text bold underline>Agents</Text>
       {entries.length === 0 && <Text dimColor>none detected</Text>}
       {entries.map(([id, info]) => (
-        <Box key={id}>
-          <Text color={STATUS_COLOR[info.status] ?? 'gray'}>
-            {STATUS_DOT[info.status] ?? '○'}
-          </Text>
-          <Text> </Text>
-          <Text>{id}</Text>
-          {info.version && <Text dimColor> v{info.version}</Text>}
+        <Box key={id} flexDirection="column">
+          <Box>
+            <Text color={STATUS_COLOR[info.status] ?? 'gray'}>
+              {STATUS_DOT[info.status] ?? '○'}
+            </Text>
+            <Text> </Text>
+            {info.callsign && <Text color="cyan" bold>{info.callsign}</Text>}
+            {info.callsign && <Text dimColor>:</Text>}
+            <Text> {info.name ?? id}</Text>
+          </Box>
+
+          <Box paddingLeft={2}>
+            <Text dimColor>
+              {id}
+              {info.kind ? `/${info.kind}` : ''}
+              {info.provider ? `/${info.provider}` : ''}
+              {info.version ? ` v${info.version}` : ''}
+            </Text>
+          </Box>
+
+          {info.error && info.status !== 'ready' && (
+            <Box paddingLeft={2}>
+              <Text color="red" wrap="truncate-end">{info.error}</Text>
+            </Box>
+          )}
         </Box>
       ))}
     </Box>

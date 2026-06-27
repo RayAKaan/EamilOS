@@ -2,7 +2,7 @@ import { useStore } from '../state/store.js';
 import type { ExecutionStrategy, TerminalInfo } from '../types/ui.js';
 import { createSessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
 import { AgentRegistry } from '../../core/agents/AgentRegistry.js';
-import { CLI_AGENT_DEFINITIONS } from '../../core/agents/definitions.js';
+import { CallsignRegistry } from '../../core/identity/CallsignRegistry.js';
 import { initEamilOS } from '../../core/index.js';
 import type { AgentMode } from '../../core/agents/types.js';
 
@@ -33,25 +33,56 @@ let currentStartTime = 0;
 
 export async function detectAndTrackAgents(): Promise<void> {
   const registry = AgentRegistry.create();
+  const state = useStore.getState();
 
   try {
     await registry.detect();
+
+    const allAgents = registry.getAllAgents();
     const available = registry.getAvailableAgents();
+
+    const rankedAvailable = [...available].sort((a, b) => a.priority - b.priority);
+
+    const callsigns = new CallsignRegistry();
+    await callsigns.assign(rankedAvailable.map((a) => a.id));
+
     const terminals: TerminalInfo[] = [];
 
-    for (const agent of available) {
-      const def = CLI_AGENT_DEFINITIONS.find(d => d.id === agent.id);
-      if (def) {
+    for (const agent of allAgents) {
+      const callsign = callsigns.callsignFor(agent.id);
+
+      state.setAgentStatus(agent.id, {
+        id: agent.id,
+        name: agent.name,
+        callsign,
+        kind: agent.kind,
+        provider: agent.provider,
+        version: agent.version,
+        error: agent.error,
+        status: agent.status === 'available' ? 'ready' : 'offline',
+        mode: getDefaultMode(agent.id),
+      });
+
+      if (agent.status === 'available') {
         terminals.push({
-          callsign: agent.id.toUpperCase().slice(0, 4),
+          callsign: callsign ?? agent.id.toUpperCase().slice(0, 4),
           agentId: agent.id,
           mode: getDefaultMode(agent.id),
         });
       }
     }
 
-    useStore.getState().setActiveTerminals(terminals);
-  } catch {
+    state.setActiveTerminals(terminals);
+
+    state.addLog(
+      `Detected agents: ${
+        rankedAvailable.length > 0
+          ? rankedAvailable.map((a) => `${callsigns.callsignFor(a.id) ?? '-'}:${a.id}`).join(', ')
+          : 'none'
+      }`
+    );
+  } catch (err) {
+    state.addLog(`Agent detection failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

@@ -48,6 +48,14 @@ export interface AgentInfo {
   status: AgentStatus;
   version?: string;
   error?: string;
+
+  /** UI metadata populated from AgentRegistry / CallsignRegistry */
+  id?: string;
+  name?: string;
+  callsign?: string;
+  kind?: 'cli' | 'api' | 'local' | 'plugin';
+  provider?: string;
+  mode?: AgentMode;
 }
 
 export interface TerminalInfo {

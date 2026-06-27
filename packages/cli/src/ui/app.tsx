@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, useInput } from 'ink';
 import { useStore } from './state/store.js';
 import { Container } from './components/layout/Container.js';
@@ -8,6 +8,7 @@ import { ChatPage } from './pages/ChatPage.js';
 import { LogsPage } from './pages/LogsPage.js';
 import { SessionsPage } from './pages/SessionsPage.js';
 import { AgentsPage } from './pages/AgentsPage.js';
+import { detectAndTrackAgents } from './hooks/useOrchestrator.js';
 
 const PAGE_COMPONENTS: Record<string, React.FC> = {
   chat: ChatPage,
@@ -17,6 +18,10 @@ const PAGE_COMPONENTS: Record<string, React.FC> = {
 };
 
 export const App: React.FC = () => {
+  useEffect(() => {
+    void detectAndTrackAgents();
+  }, []);
+
   const activePage = useStore((s) => s.activePage);
   const isRunning = useStore((s) => s.isRunning);
   const openOverlay = useStore((s) => s.openOverlay);
