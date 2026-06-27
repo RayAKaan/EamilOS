@@ -1,12 +1,12 @@
-import type { SessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
+import type { SessionRuntime } from '../../core/session/SessionRuntime.js';
+import type { SessionEventMap } from '../../core/session/events.js';
 import { useStore } from '../state/store.js';
 
-export function createSessionEventBridge(orchestrator: SessionOrchestrator): () => void {
+export function createSessionEventBridge(runtime: SessionRuntime): () => void {
   const unsubs: (() => void)[] = [];
 
-  const on = (event: string, handler: (...args: any[]) => void): void => {
-    (orchestrator as any).on(event, handler);
-    unsubs.push(() => { (orchestrator as any).off(event, handler); });
+  const on = <K extends keyof SessionEventMap>(event: K, handler: (data: SessionEventMap[K]) => void): void => {
+    unsubs.push(runtime.on(event, handler));
   };
 
   on('session.started', ({ goal, strategy, mode }) => {

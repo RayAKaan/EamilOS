@@ -1,18 +1,22 @@
-import type { SessionOrchestrator } from '../../core/session/SessionOrchestrator.js';
+import type { SessionRuntime } from '../../core/session/SessionRuntime.js';
 import { createSessionEventBridge } from './TuiEventBridge.js';
 
-let orchestrator: SessionOrchestrator | null = null;
+let runtime: SessionRuntime | null = null;
 
-export function setOrchestrator(inst: SessionOrchestrator): void {
-  orchestrator = inst;
+export function setRuntime(inst: SessionRuntime): void {
+  runtime = inst;
 }
 
-export function getOrchestrator(): SessionOrchestrator {
-  if (!orchestrator) throw new Error('Orchestrator not initialized');
-  return orchestrator;
+export function getRuntime(): SessionRuntime {
+  if (!runtime) throw new Error('Session runtime not initialized');
+  return runtime;
 }
 
-export function initializeServices(inst: SessionOrchestrator): () => void {
-  setOrchestrator(inst);
-  return createSessionEventBridge(inst);
+export function getOrchestrator() {
+  return getRuntime().orchestrator;
+}
+
+export function initializeServices(rt: SessionRuntime): () => void {
+  setRuntime(rt);
+  return createSessionEventBridge(rt);
 }

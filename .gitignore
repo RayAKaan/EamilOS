@@ -31,6 +31,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Generated session state
+.eamilos/
+.eamilos/**
+
 # Editor
 *.bak
 *.tmp
