@@ -41,51 +41,6 @@ function isPortOpen(port: number, host = 'localhost'): Promise<boolean> {
   });
 }
 
-export async function installProvider(providerId: string): Promise<{ success: boolean; alreadyWorking: boolean }> {
-  const installCommands: Record<string, string> = {
-    'claude-cli': 'npm install -g @anthropic-ai/claude-code',
-    'opencode-cli': 'npm install -g opencode-ai',
-    'gemini-cli': 'npm install -g @google/gemini-cli',
-    'aider-cli': 'pip install aider-chat',
-    'goose-cli': 'npm install -g @block/goose',
-    'codex-cli': 'npm install -g @openai/codex',
-  };
-  
-  const installCmds: Record<string, string> = {
-    'claude-cli': 'claude',
-    'opencode-cli': 'opencode',
-    'gemini-cli': 'gemini',
-    'aider-cli': 'aider',
-    'goose-cli': 'goose',
-    'codex-cli': 'codex',
-  };
-  
-  const cmd = installCommands[providerId];
-  const binaryCmd = installCmds[providerId];
-  
-  if (!cmd || !binaryCmd) {
-    return { success: false, alreadyWorking: false };
-  }
-  
-  try {
-    execSync(`${binaryCmd} --version`, { stdio: 'pipe', shell: true } as any);
-    return { success: true, alreadyWorking: true };
-  } catch {
-    console.log(`Installing ${providerId}...`);
-    try {
-      execSync(cmd, { stdio: 'inherit', shell: true } as any);
-      return { success: true, alreadyWorking: false };
-    } catch (e: any) {
-      const errMsg = e.message || '';
-      if (errMsg.includes('EBUSY') || errMsg.includes('locked') || errMsg.includes('busy')) {
-        console.log(`⚠️ ${providerId} is in use, assuming working...`);
-        return { success: true, alreadyWorking: true };
-      }
-      return { success: false, alreadyWorking: false };
-    }
-  }
-}
-
 export async function detectAllProviders(): Promise<ProviderStatus[]> {
   const providers: ProviderStatus[] = [];
 
@@ -163,11 +118,6 @@ export async function detectAllProviders(): Promise<ProviderStatus[]> {
     priority: 3,
   });
 
-  return providers;
-}
-
-export async function detectAndAutoInstall(): Promise<ProviderStatus[]> {
-  const providers = await detectAllProviders();
   return providers;
 }
 

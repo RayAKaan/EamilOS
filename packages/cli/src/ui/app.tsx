@@ -25,12 +25,13 @@ export const App: React.FC = () => {
   const setSidebarVisible = useStore((s) => s.setSidebarVisible);
   const sidebarVisible = useStore((s) => s.sidebarVisible);
   const activeOverlay = useStore((s) => s.activeOverlay);
+  const isInputFocused = useStore((s) => s.isInputFocused);
   const clearMessages = useStore((s) => s.clearMessages);
 
   const PageComponent = PAGE_COMPONENTS[activePage] ?? ChatPage;
 
   useInput((input, key) => {
-    if (activeOverlay) return;
+    if (activeOverlay || isInputFocused) return;
 
     if (key.ctrl && input === 'c') {
       if (isRunning) {

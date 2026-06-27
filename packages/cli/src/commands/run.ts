@@ -20,8 +20,8 @@ interface RunOptions {
   forceInit?: boolean;
 }
 
-function normalizeStrategy(raw?: string, swarmFlag?: boolean): ExecutionStrategy {
-  if (swarmFlag || raw === 'swarm' || raw === '--swarm') return 'swarm';
+function normalizeStrategy(raw?: string): ExecutionStrategy {
+  if (raw === 'swarm') return 'swarm';
   if (raw === 'single') return 'single';
   if (raw === 'single-fallback') return 'single-fallback';
   if (raw === 'manual') return 'manual';
@@ -66,7 +66,7 @@ export async function run(
   kv('Task ID', task.id);
   divider();
 
-  const strategy = normalizeStrategy(options.strategy, options.strategy === 'swarm');
+  const strategy = normalizeStrategy(options.strategy);
   const mode: AgentMode = options.mode ?? 'communication';
 
   info(`Strategy: ${strategy} | Mode: ${mode}`);

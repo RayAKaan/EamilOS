@@ -15,7 +15,7 @@ export async function connectCommand(args: ConnectArgs): Promise<void> {
     console.error(chalk.red('Error: Network key required'));
     console.log(chalk.dim('Provide a key: eamilos connect <address> --key your_secret'));
     console.log(chalk.dim('Or set environment variable: export EAMILOS_NETWORK_KEY=your_secret'));
-    process.exit(1);
+    return;
   }
 
   console.log(chalk.cyan(`Connecting to ${address}...`));
@@ -64,6 +64,5 @@ export async function connectCommand(args: ConnectArgs): Promise<void> {
   } catch (error) {
     console.log(chalk.red(`\n✗ Failed to connect`));
     console.error(chalk.red((error as Error).message));
-    process.exit(1);
   }
 }

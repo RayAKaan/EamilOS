@@ -15,7 +15,7 @@ export async function workerStartCommand(args: WorkerArgs): Promise<void> {
     console.log(chalk.dim('Provide a key: eamilos worker start --key your_secret'));
     console.log(chalk.dim('Or set environment variable: export EAMILOS_NETWORK_KEY=your_secret'));
     console.log(chalk.dim('Generate a key: openssl rand -hex 32'));
-    process.exit(1);
+    return;
   }
 
   console.log(chalk.bold('\n🔧 EamilOS Worker Node\n'));
@@ -99,7 +99,6 @@ export async function workerStartCommand(args: WorkerArgs): Promise<void> {
     await networkManager.startWorker(port);
   } catch (error) {
     console.error(chalk.red('Failed to start worker:'), error);
-    process.exit(1);
   }
 
   let shutdown = false;

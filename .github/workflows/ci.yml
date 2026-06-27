@@ -8,17 +8,28 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [20, 22]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Use Node.js 20
+      - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
+      - name: Run typecheck
+        run: npm run typecheck
+        working-directory: packages/cli
       - name: Run test suite
         run: npm test
+        working-directory: packages/cli
+      - name: Check for high-severity vulnerabilities
+        run: npm audit --audit-level=high || true
       - name: Build production bundle
         run: npm run build
+        working-directory: packages/cli

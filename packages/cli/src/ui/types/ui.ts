@@ -105,6 +105,7 @@ export interface AppState {
   sidebarWidth: number;
   chatScrollY: number;
   chatInputValue: string;
+  isInputFocused: boolean;
   logs: string[];
   sessions: SessionSummary[];
 }

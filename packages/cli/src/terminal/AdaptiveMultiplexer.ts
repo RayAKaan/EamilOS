@@ -1,4 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
+import { writeFileSync, mkdirSync } from 'fs';
+import { resolve } from 'path';
 import { EventEmitter } from 'events';
 
 export type AgentOperationalMode = 'communication_only' | 'unrestricted_execution' | 'communication' | 'execution';
@@ -182,9 +184,18 @@ export class AdaptiveMultiplexer extends EventEmitter {
   }
 
   private spawnIterm2(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
+    const sessionsDir = resolve(cwd, '.eamilos', 'sessions', term.callsign);
+    mkdirSync(sessionsDir, { recursive: true });
+    const scriptPath = resolve(sessionsDir, 'agent.sh');
+    const escapedCommand = command.includes(' ') ? `"${command}"` : command;
+    const safeArgs = args.map((a) => a.replace(/'/g, "'\\''"));
+    const scriptContent = `#!/bin/sh
+cd "${cwd}"
+${escapedCommand} ${safeArgs.map((a) => `'${a}'`).join(' ')}
+`;
+    writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
     const safeTitle = escapeForOsascript(term.title);
-    const safeCmd = escapeForOsascript(`${command} ${args.join(' ')}`);
-    const safeCwd = escapeForOsascript(cwd);
+    const safeScriptPath = escapeForOsascript(scriptPath);
     const script = `
 tell application "iTerm"
   activate
@@ -192,7 +203,7 @@ tell application "iTerm"
     set newSession to (create tab with default profile)
     tell newSession
       set name "${safeTitle}"
-      write text "cd ${safeCwd} && ${safeCmd}"
+      write text "${safeScriptPath}"
     end tell
   end tell
 end tell`;

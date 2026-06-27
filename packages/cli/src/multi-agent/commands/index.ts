@@ -55,7 +55,7 @@ export function createMultiAgentCommands(): Command {
 
       if (available.length === 0) {
         spinner.fail('No agents found. Install one: npm install -g opencode-ai');
-        process.exit(1);
+        return;
       }
 
       spinner.succeed(`Agents ready: ${available.map(a => a.name).join(', ')}`);
@@ -104,7 +104,6 @@ export function createMultiAgentCommands(): Command {
         }
       } catch (err) {
         spinner.fail(`Execution failed: ${(err as Error).message}`);
-        process.exit(1);
       }
 
       await orchestrator.terminate();

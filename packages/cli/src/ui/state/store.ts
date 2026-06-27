@@ -43,6 +43,7 @@ interface StoreActions {
   setSidebarWidth: (width: number) => void;
   setChatScrollY: (y: number) => void;
   setChatInputValue: (value: string) => void;
+  setInputFocused: (focused: boolean) => void;
   addLog: (entry: string) => void;
   clearLogs: () => void;
   setSessions: (sessions: SessionSummary[]) => void;
@@ -78,6 +79,7 @@ export const useStore = create<AppState & StoreActions>((set) => ({
   sidebarWidth: 28,
   chatScrollY: 0,
   chatInputValue: '',
+  isInputFocused: false,
   logs: [],
   sessions: [],
 
@@ -192,6 +194,7 @@ export const useStore = create<AppState & StoreActions>((set) => ({
   setChatScrollY: (y) => set({ chatScrollY: y }),
 
   setChatInputValue: (value) => set({ chatInputValue: value }),
+  setInputFocused: (focused) => set({ isInputFocused: focused }),
 
   addLog: (entry) =>
     set((s) => ({ logs: [...s.logs, entry] })),

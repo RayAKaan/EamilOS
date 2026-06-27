@@ -19,7 +19,7 @@ export async function createPluginCommand(args: CreatePluginArgs): Promise<void>
 
   if (fs.existsSync(dir)) {
     console.log(`Directory already exists: ${pluginName}`);
-    process.exit(1);
+    return;
   }
 
   console.log(`\nCreating EamilOS plugin: ${pluginName}\n`);

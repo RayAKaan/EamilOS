@@ -77,7 +77,6 @@ export async function pluginsCommand(
         console.log(`Plugin installed: ${result.pluginId}`);
       } else {
         console.log(`Installation failed: ${result.error}`);
-        process.exit(1);
       }
       break;
     }
