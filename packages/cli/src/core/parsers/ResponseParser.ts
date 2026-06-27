@@ -2,6 +2,7 @@ export interface ParsedFile {
   path: string;
   content: string;
   language?: string;
+  action?: 'create' | 'modify' | 'delete';
 }
 
 export type ExtractionMethod = 'DIRECT_PARSE' | 'CODE_BLOCK' | 'BRACE_EXTRACTION' | 'BRACE_EXTRACTION_REPAIRED' | 'NESTED_SEARCH' | 'NONE';
@@ -387,6 +388,9 @@ function validateParsedObject(obj: unknown): { valid: boolean; files: ParsedFile
     const file = item as Record<string, unknown>;
     let path = typeof file.path === 'string' ? file.path.trim() : '';
     const content = typeof file.content === 'string' ? file.content : '';
+    const action = file.action === 'create' || file.action === 'modify' || file.action === 'delete'
+      ? file.action
+      : undefined;
     
     if (!path) continue;
 
@@ -406,6 +410,7 @@ function validateParsedObject(obj: unknown): { valid: boolean; files: ParsedFile
       path,
       content: cleanContent,
       language: typeof file.language === 'string' ? file.language : undefined,
+      action,
     });
   }
   
@@ -423,7 +428,7 @@ export function extractFileChanges(content: string, sourceAgentId: string = ''):
   if (!parsed.success || !parsed.files.length) return [];
   return parsed.files.map(f => ({
     path: f.path,
-    action: 'create' as const,
+    action: f.action ?? 'modify',
     content: f.content,
     sourceAgentId,
   }));

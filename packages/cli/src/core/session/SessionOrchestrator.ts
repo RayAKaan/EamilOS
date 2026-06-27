@@ -103,8 +103,7 @@ export class SessionOrchestrator extends EventEmitter {
 
     this.sessionStore.createSession(this.config.goal, this.config.mode, this.config.strategy);
 
-    const terminalEnv = AdaptiveMultiplexer.detectEnvironment();
-    const canMultiplex = AdaptiveMultiplexer.isMultiplexingSupported();
+    let finalResult: SessionResult | null = null;
 
     try {
       await this.registry.detect();
@@ -145,6 +144,7 @@ export class SessionOrchestrator extends EventEmitter {
           result = await this.executeSingle(routing);
       }
 
+      finalResult = result;
       result.duration = Date.now() - this.startTime;
       this.emit('session.completed', { success: result.success, duration: result.duration });
       return result;
@@ -164,10 +164,10 @@ export class SessionOrchestrator extends EventEmitter {
       };
     } finally {
       this.sessionStore.recordResult(
-        !errors.length,
-        undefined,
-        Date.now() - this.startTime,
-        errors
+        finalResult?.success ?? (!errors.length),
+        finalResult?.agentUsed,
+        finalResult?.duration ?? (Date.now() - this.startTime),
+        finalResult?.errors ?? errors
       );
       await this.sessionStore.save();
       this.stagingWorkspace.cleanupAll();
@@ -193,6 +193,13 @@ export class SessionOrchestrator extends EventEmitter {
     return this.executeAgentWithChanges(agent, this.config.goal);
   }
 
+  private async executeAgentForMode(agent: EamilOSAgent, prompt: string): Promise<SessionResult> {
+    if (this.config.mode === 'communication') {
+      return this.executeInCommunicationMode(agent);
+    }
+    return this.executeAgentWithChanges(agent, prompt);
+  }
+
   private async executeFallback(routing: import('../routing/AgentRouter.js').RoutingDecision): Promise<SessionResult> {
     const fallbackChain = routing.fallbackChain.length > 0 ? routing.fallbackChain : undefined;
     const primaryId = routing.selectedAgents[0] || this.config.preferredAgent;
@@ -206,55 +213,31 @@ export class SessionOrchestrator extends EventEmitter {
 
     this.agents.set(primary.id, primary);
 
-    const firstResult = await this.executeAgentSafely(primary, this.config.goal);
-    if (firstResult.success) {
-      return {
-        success: true,
-        goal: this.config.goal,
-        strategy: 'fallback',
-        mode: this.config.mode,
-        agentUsed: primary.id,
-        primaryResult: firstResult.content,
-        fileChanges: this.fileChanges,
-        appliedChanges: [],
-        errors: [],
-        duration: Date.now() - this.startTime,
-      };
+    const firstResult = await this.executeAgentForMode(primary, this.config.goal);
+    if (firstResult.success && firstResult.errors.length === 0) {
+      return { ...firstResult, strategy: 'fallback', agentUsed: primary.id };
     }
 
-    const errorType = classifyAgentError(firstResult.error || '', '');
+    const primaryError = firstResult.errors[0] ?? 'Primary agent failed';
+    const errorType = classifyAgentError(primaryError, '');
     if (!isFallbackTrigger(errorType)) {
       return {
-        success: false,
-        goal: this.config.goal,
+        ...firstResult,
         strategy: 'fallback',
-        mode: this.config.mode,
-        agentUsed: primary.id,
-        primaryResult: firstResult.content,
-        fileChanges: this.fileChanges,
-        appliedChanges: [],
-        errors: [firstResult.error || 'Primary agent failed, not fallback-eligible'],
-        duration: Date.now() - this.startTime,
+        errors: [primaryError || 'Primary agent failed, not fallback-eligible'],
       };
     }
 
     const fallbackId = (fallbackChain && fallbackChain.length > 0) ? fallbackChain[0] : this.findFallbackAgent(primary.id);
     if (!fallbackId) {
       return {
-        success: false,
-        goal: this.config.goal,
+        ...firstResult,
         strategy: 'fallback',
-        mode: this.config.mode,
-        agentUsed: primary.id,
-        primaryResult: firstResult.content,
-        fileChanges: this.fileChanges,
-        appliedChanges: [],
-        errors: [firstResult.error || 'Primary agent failed, no fallback available'],
-        duration: Date.now() - this.startTime,
+        errors: [primaryError || 'Primary agent failed, no fallback available'],
       };
     }
 
-    this.emit('agent.fallback', { from: primary.id, to: fallbackId, reason: firstResult.error || 'primary failed' });
+    this.emit('agent.fallback', { from: primary.id, to: fallbackId, reason: primaryError });
     this.sessionStore.recordFallback(primary.id, fallbackId);
 
     const fallback = AgentFactory.createAdapter(fallbackId, {
@@ -266,7 +249,7 @@ export class SessionOrchestrator extends EventEmitter {
     }
 
     this.agents.set(fallback.id, fallback);
-    return this.executeAgentWithChanges(fallback, this.config.goal);
+    return this.executeAgentForMode(fallback, this.config.goal);
   }
 
   private async executeSwarm(routing: import('../routing/AgentRouter.js').RoutingDecision): Promise<SessionResult> {
@@ -290,14 +273,29 @@ export class SessionOrchestrator extends EventEmitter {
     await this.startSwarmTerminals(agentIds);
 
     const promises = agentIds.map(async (id) => {
+      const session = this.stagingWorkspace.createSession(id, this.config.workingDir);
+      const stagingDir = session.workspaceDir;
+      const beforeSnapshot = takeWorkspaceSnapshot(stagingDir);
+
       const adapter = AgentFactory.createAdapter(id, {
-        workingDir: this.config.workingDir,
+        workingDir: stagingDir,
         timeoutMs: this.config.timeoutMs,
       });
       if (!adapter) return null;
 
       this.agents.set(adapter.id, adapter);
-      return this.executeAgentSafely(adapter, this.config.goal);
+      const response = await this.executeAgentSafely(adapter, this.config.goal, stagingDir);
+
+      const afterSnapshot = takeWorkspaceSnapshot(stagingDir);
+      const detectedChanges = diffWorkspace(beforeSnapshot, afterSnapshot, stagingDir, id);
+      const fileChanges: ProposedFileChange[] = detectedChanges.map(d => ({
+        path: d.path,
+        action: d.action === 'deleted' ? 'delete' as const : d.action === 'modified' ? 'modify' as const : 'create' as const,
+        content: d.content,
+        sourceAgentId: id,
+      }));
+
+      return { ...response, fileChanges: [...fileChanges, ...response.fileChanges] };
     });
 
     const results = await Promise.allSettled(promises);
@@ -534,7 +532,7 @@ export class SessionOrchestrator extends EventEmitter {
     }
   }
 
-  private async executeAgentSafely(agent: EamilOSAgent, prompt: string): Promise<AgentResponse> {
+  private async executeAgentSafely(agent: EamilOSAgent, prompt: string, workingDir?: string): Promise<AgentResponse> {
     this.emit('agent.started', { agentId: agent.id });
     this.emit('agent.output', { agentId: agent.id, content: `Starting ${agent.id}...` });
     this.sessionStore.recordAgentSelected(agent.id);
@@ -545,8 +543,12 @@ export class SessionOrchestrator extends EventEmitter {
       prompt,
       systemPrompt: SYSTEM_PROMPT,
       mode: this.config.mode,
-      workingDir: this.config.workingDir,
+      workingDir: workingDir ?? this.config.workingDir,
       timeoutMs: this.config.timeoutMs ?? 240000,
+      onOutput: (chunk: string) => {
+        this.emit('agent.output', { agentId: agent.id, content: chunk });
+        this.appendAgentLog(agent.id, chunk);
+      },
     };
 
     try {
@@ -671,14 +673,10 @@ export class SessionOrchestrator extends EventEmitter {
           };
         }
 
-        this.emit('permission.requested', {
-          agentId: agent.id,
-          action: 'write',
-          details: `Write to ${change.path}`,
-          requestId: request.id,
+        const decision = await this.permissionService.waitForDecision(request, {
+          timeout: 300000,
+          defaultDeny: true,
         });
-
-        const decision = await this.permissionService.waitForDecision(request);
 
         if (decision !== 'allow-once' && decision !== 'allow-session') {
           return {

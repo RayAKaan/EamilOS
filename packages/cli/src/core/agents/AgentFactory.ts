@@ -97,6 +97,8 @@ class OpenCodeAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
+    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
+    if (onChunk) this.inner.on('chunk', onChunk);
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
@@ -118,6 +120,8 @@ class OpenCodeAgentAdapter implements EamilOSAgent {
         errorType: 'unknown',
         durationMs: Date.now() - start,
       };
+    } finally {
+      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 
@@ -158,6 +162,8 @@ class ClaudeCodeAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
+    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
+    if (onChunk) this.inner.on('chunk', onChunk);
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
@@ -179,6 +185,8 @@ class ClaudeCodeAgentAdapter implements EamilOSAgent {
         errorType: 'unknown',
         durationMs: Date.now() - start,
       };
+    } finally {
+      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 
@@ -219,6 +227,8 @@ class GeminiCliAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
+    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
+    if (onChunk) this.inner.on('chunk', onChunk);
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
@@ -240,6 +250,8 @@ class GeminiCliAgentAdapter implements EamilOSAgent {
         errorType: 'unknown',
         durationMs: Date.now() - start,
       };
+    } finally {
+      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 
@@ -280,6 +292,8 @@ class AiderAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
+    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
+    if (onChunk) this.inner.on('chunk', onChunk);
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
@@ -301,6 +315,8 @@ class AiderAgentAdapter implements EamilOSAgent {
         errorType: 'unknown',
         durationMs: Date.now() - start,
       };
+    } finally {
+      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 
@@ -341,6 +357,8 @@ class CodexCliAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
+    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
+    if (onChunk) this.inner.on('chunk', onChunk);
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
@@ -362,6 +380,8 @@ class CodexCliAgentAdapter implements EamilOSAgent {
         errorType: 'unknown',
         durationMs: Date.now() - start,
       };
+    } finally {
+      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 
@@ -402,6 +422,8 @@ class GooseAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
+    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
+    if (onChunk) this.inner.on('chunk', onChunk);
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
@@ -423,6 +445,8 @@ class GooseAgentAdapter implements EamilOSAgent {
         errorType: 'unknown',
         durationMs: Date.now() - start,
       };
+    } finally {
+      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 

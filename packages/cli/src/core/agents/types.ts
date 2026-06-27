@@ -56,6 +56,7 @@ export interface AgentRequest {
   workingDir: string;
   timeoutMs: number;
   context?: Record<string, unknown>;
+  onOutput?: (chunk: string) => void;
 }
 
 export interface ProposedFileChange {

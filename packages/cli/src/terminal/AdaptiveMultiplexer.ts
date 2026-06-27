@@ -46,8 +46,17 @@ function writeAgentShellScript(
     `exec ${shellQuote(command)} ${args.map(shellQuote).join(' ')}`,
     '',
   ].join('\n');
-
   writeFileSync(scriptPath, script, { mode: 0o755 });
+
+  const ps1Path = resolve(dir, 'run-agent.ps1');
+  const ps1Script = [
+    'Set-StrictMode -Version Latest',
+    `Set-Location -LiteralPath ${shellQuote(cwd)}`,
+    `& ${shellQuote(command)} ${args.map(a => shellQuote(a)).join(' ')}`,
+    '',
+  ].join('\n');
+  writeFileSync(ps1Path, ps1Script, { mode: 0o755 });
+
   return scriptPath;
 }
 
@@ -204,14 +213,12 @@ export class AdaptiveMultiplexer extends EventEmitter {
 
   private spawnWindowsTerminal(term: MultiplexedAgentTerminal, command: string, args: string[], cwd: string): void {
     const safeTitle = term.title.replace(/"/g, '');
-    const profileArgs = term.mode === 'communication_only' ? ['--profile', 'Command Prompt'] : [];
+    const scriptPath = writeAgentShellScript(cwd, term.callsign, command, args);
     const proc = spawn('wt', [
       '-w', '0', 'split-pane', '-V',
       '--title', safeTitle,
-      ...profileArgs,
-      'cmd.exe', '/c',
-      command,
-      ...args,
+      'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+      '-File', scriptPath.replace(/\.sh$/, '.ps1'),
     ], {
       cwd,
       stdio: 'ignore',
