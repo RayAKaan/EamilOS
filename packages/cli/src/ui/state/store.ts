@@ -34,6 +34,8 @@ interface StoreActions {
   setTerminalSize: (width: number, height: number) => void;
   setActiveTerminals: (terminals: TerminalInfo[]) => void;
   addTerminal: (terminal: TerminalInfo) => void;
+  updateTerminal: (callsign: string, updates: Partial<TerminalInfo>) => void;
+  removeTerminal: (callsign: string) => void;
   addPermissionRequest: (req: Omit<PermissionRequest, 'id' | 'timestamp'>) => string;
   resolvePermissionRequest: (id: string, approved: boolean) => void;
   setActivePage: (page: PageId) => void;
@@ -167,6 +169,18 @@ export const useStore = create<AppState & StoreActions>((set) => ({
       if (exists) return s;
       return { activeTerminals: [...s.activeTerminals, terminal] };
     }),
+
+  updateTerminal: (callsign, updates) =>
+    set((s) => ({
+      activeTerminals: s.activeTerminals.map((t) =>
+        t.callsign === callsign ? { ...t, ...updates } : t
+      ),
+    })),
+
+  removeTerminal: (callsign) =>
+    set((s) => ({
+      activeTerminals: s.activeTerminals.filter((t) => t.callsign !== callsign),
+    })),
 
   addPermissionRequest: (req) => {
     const id = nanoid();

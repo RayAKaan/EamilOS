@@ -8,6 +8,7 @@ import { ChatPage } from './pages/ChatPage.js';
 import { LogsPage } from './pages/LogsPage.js';
 import { SessionsPage } from './pages/SessionsPage.js';
 import { AgentsPage } from './pages/AgentsPage.js';
+import { TerminalsPage } from './pages/TerminalsPage.js';
 import { detectAndTrackAgents } from './hooks/useOrchestrator.js';
 
 const PAGE_COMPONENTS: Record<string, React.FC> = {
@@ -15,6 +16,7 @@ const PAGE_COMPONENTS: Record<string, React.FC> = {
   logs: LogsPage,
   sessions: SessionsPage,
   agents: AgentsPage,
+  terminals: TerminalsPage,
 };
 
 export const App: React.FC = () => {
@@ -77,6 +79,7 @@ export const App: React.FC = () => {
     if (input === '2') { setActivePage('logs'); return; }
     if (input === '3') { setActivePage('sessions'); return; }
     if (input === '4') { setActivePage('agents'); return; }
+    if (input === '5') { setActivePage('terminals'); return; }
 
     if (input === '?') {
       openOverlay('help');

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ToolCallCard } from './ToolCallCard.js';
+import { useStore } from '../../state/store.js';
 import type { Message } from '../../types/ui.js';
 
 const AGENT_COLORS: Record<string, string> = {
@@ -28,8 +29,16 @@ interface Props {
 
 export const MessageRenderer: React.FC<Props> = ({ message }) => {
   const color = AGENT_COLORS[message.type] ?? 'white';
-  const label = AGENT_LABELS[message.type] ?? message.type;
+  const baseLabel = AGENT_LABELS[message.type] ?? message.type;
   const time = new Date(message.timestamp).toLocaleTimeString();
+
+  let label = baseLabel;
+  if (message.agent) {
+    const agentInfo = useStore.getState().agentStatus[message.agent];
+    if (agentInfo?.callsign) {
+      label = `${agentInfo.callsign} · ${message.agent}`;
+    }
+  }
 
   return (
     <Box flexDirection="column" marginY={0}>

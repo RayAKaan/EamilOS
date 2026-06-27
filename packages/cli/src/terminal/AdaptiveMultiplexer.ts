@@ -21,6 +21,33 @@ export interface AgentTerminalDef {
   command: string;
   args: string[];
   mode?: AgentOperationalMode;
+  cwd?: string;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function writeAgentShellScript(
+  cwd: string,
+  callsign: string,
+  command: string,
+  args: string[]
+): string {
+  const dir = resolve(cwd, '.eamilos', 'terminal-scripts', callsign);
+  mkdirSync(dir, { recursive: true });
+
+  const scriptPath = resolve(dir, 'run-agent.sh');
+  const script = [
+    '#!/bin/sh',
+    'set -eu',
+    `cd ${shellQuote(cwd)}`,
+    `exec ${shellQuote(command)} ${args.map(shellQuote).join(' ')}`,
+    '',
+  ].join('\n');
+
+  writeFileSync(scriptPath, script, { mode: 0o755 });
+  return scriptPath;
 }
 
 function escapeForOsascript(s: string): string {
@@ -42,7 +69,7 @@ export class AdaptiveMultiplexer extends EventEmitter {
     if (process.env.WT_SESSION) return 'windows-terminal';
     if (process.env.TMUX) return 'tmux';
     if (process.env.TERM_PROGRAM === 'iTerm.app') return 'iterm2';
-    if (process.env.TERM_PROGRAM === 'vscode') return 'vscode';
+    if (process.env.TERM_PROGRAM === 'vscode') return 'single';
     return 'single';
   }
 
@@ -68,7 +95,7 @@ export class AdaptiveMultiplexer extends EventEmitter {
       this.activeTerminals.set(agent.callsign, term);
       spawned.push(term);
 
-      this.dispatchSplitCommand(term, agent.command, agent.args, env, workingDir);
+      this.dispatchSplitCommand(term, agent.command, agent.args, env, agent.cwd || workingDir);
     }
 
     if (spawned.length > 0) {
@@ -108,10 +135,38 @@ export class AdaptiveMultiplexer extends EventEmitter {
     return this.activeTerminals.get(callsign)?.mode;
   }
 
+  terminateAgent(callsign: string): boolean {
+    const proc = this.processes.get(callsign);
+
+    if (proc) {
+      proc.kill();
+      this.processes.delete(callsign);
+    }
+
+    const paneId = (this.activeTerminals.get(callsign) as any)?.paneId;
+    if (paneId && AdaptiveMultiplexer.detectEnvironment() === 'tmux') {
+      const kill = spawn('tmux', ['kill-pane', '-t', paneId], { stdio: 'ignore' });
+      kill.unref();
+    }
+
+    const existed = this.activeTerminals.delete(callsign);
+
+    if (existed) {
+      this.emit('multiplexer:terminal-closed', { callsign });
+    }
+
+    return existed;
+  }
+
   terminateAll(): void {
+    for (const callsign of Array.from(this.activeTerminals.keys())) {
+      this.terminateAgent(callsign);
+    }
+
     for (const [, proc] of this.processes) {
       proc.kill();
     }
+
     this.processes.clear();
     this.activeTerminals.clear();
     this.emit('multiplexer:terminals-closed');
@@ -132,7 +187,7 @@ export class AdaptiveMultiplexer extends EventEmitter {
           this.spawnWindowsTerminal(term, command, args, cwd);
           break;
         case 'tmux':
-          this.spawnTmux(term, cwd);
+          this.spawnTmux(term, command, args, cwd);
           break;
         case 'iterm2':
           this.spawnIterm2(term, command, args, cwd);
@@ -169,17 +224,53 @@ export class AdaptiveMultiplexer extends EventEmitter {
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'windows-terminal' });
   }
 
-  private spawnTmux(term: MultiplexedAgentTerminal, cwd: string): void {
-    const proc = spawn('tmux', ['split-window', '-c', cwd], {
-      stdio: 'ignore',
-      windowsHide: true,
+  private spawnTmux(
+    term: MultiplexedAgentTerminal,
+    command: string,
+    args: string[],
+    cwd: string
+  ): void {
+    const scriptPath = writeAgentShellScript(cwd, term.callsign, command, args);
+    const direction = this.activeTerminals.size % 2 === 0 ? '-h' : '-v';
+
+    const proc = spawn(
+      'tmux',
+      [
+        'split-window',
+        direction,
+        '-P',
+        '-F',
+        '#{pane_id}',
+        '-c',
+        cwd,
+        scriptPath,
+      ],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      }
+    );
+
+    let paneId = '';
+
+    proc.stdout?.on('data', (data: Buffer) => {
+      paneId += data.toString();
     });
-    this.processes.set(term.callsign, proc);
+
     proc.on('exit', () => {
+      const pane = paneId.trim();
+      if (pane) {
+        const titleProc = spawn('tmux', ['select-pane', '-t', pane, '-T', term.title], {
+          stdio: 'ignore',
+        });
+        titleProc.unref();
+        (term as any).paneId = pane;
+      }
+
       this.processes.delete(term.callsign);
-      const titleProc = spawn('tmux', ['select-pane', '-T', term.title], { stdio: 'ignore' });
-      titleProc.unref();
     });
+
+    this.processes.set(term.callsign, proc);
     this.emit('multiplexer:pane-spawned', { callsign: term.callsign, platform: 'tmux' });
   }
 

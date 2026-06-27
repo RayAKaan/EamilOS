@@ -275,6 +275,8 @@ export class SessionOrchestrator extends EventEmitter {
       return this.noAgentResult('No available agents for swarm');
     }
 
+    await this.startSwarmTerminals(agentIds);
+
     const promises = agentIds.map(async (id) => {
       const adapter = AgentFactory.createAdapter(id, {
         workingDir: this.config.workingDir,
@@ -304,7 +306,9 @@ export class SessionOrchestrator extends EventEmitter {
       };
     }
 
-    const best = successes.reduce((a, b) => (a.content.length > b.content.length ? a : b));
+    const best = successes.reduce((a, b) =>
+      this.scoreAgentResponse(a) >= this.scoreAgentResponse(b) ? a : b
+    );
     const resolvedChanges = await this.resolveSwarmFileChanges(successes);
     this.fileChanges = resolvedChanges;
 
@@ -320,6 +324,77 @@ export class SessionOrchestrator extends EventEmitter {
       errors: [],
       duration: Date.now() - this.startTime,
     };
+  }
+
+  private async startSwarmTerminals(agentIds: string[]): Promise<void> {
+    const canMultiplex = AdaptiveMultiplexer.isMultiplexingSupported();
+
+    if (!canMultiplex) {
+      this.emit('agent.output', {
+        agentId: 'eamilos',
+        content: 'No multiplex-capable terminal detected. Streaming agent output inside EamilOS TUI.',
+      });
+      return;
+    }
+
+    const multiplexer = getAdaptiveMultiplexer();
+
+    const terminals = agentIds.map((agentId, index) => {
+      const callsign = this.callsignForIndex(index);
+      const isolatedDir = this.constraintEnforcer.createIsolatedContext(
+        agentId,
+        this.config.workingDir
+      );
+
+      return {
+        id: agentId,
+        callsign,
+        command: 'sh',
+        args: [
+          '-lc',
+          `echo "[${callsign}] ${agentId} terminal ready"; echo "workspace: ${isolatedDir}"; exec sh`,
+        ],
+        cwd: isolatedDir,
+        mode: this.config.mode,
+      };
+    });
+
+    const spawned = await multiplexer.spawnAgentTerminals(terminals, this.config.workingDir);
+
+    for (const term of spawned) {
+      this.emit('agent.output', {
+        agentId: term.agentId,
+        content: `Terminal pane spawned for ${term.callsign} (${term.mode}).`,
+      });
+    }
+  }
+
+  private callsignForIndex(index: number): string {
+    const callsigns = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'];
+    return callsigns[index] ?? `Agent-${index + 1}`;
+  }
+
+  private scoreAgentResponse(response: AgentResponse): number {
+    let score = 0;
+
+    if (response.success) score += 100;
+    if (!response.error) score += 50;
+    if (response.fileChanges?.length) score += response.fileChanges.length * 20;
+
+    try {
+      const parsed = JSON.parse(response.content);
+      if (parsed.summary) score += 10;
+      if (Array.isArray(parsed.files)) score += 30;
+    } catch {
+      // not JSON
+    }
+
+    if (/TODO|FIXME|placeholder/i.test(response.content)) score -= 50;
+    if (/error|exception|failed/i.test(response.content.slice(0, 500))) score -= 20;
+
+    score += Math.min(response.content.length / 500, 20);
+
+    return score;
   }
 
   private async resolveSwarmFileChanges(successes: AgentResponse[]): Promise<ProposedFileChange[]> {

@@ -1,3 +1,4 @@
+import { tmpdir } from 'os';
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
 import { mkdtempSync, readdirSync, cpSync, rmSync, existsSync, mkdirSync } from 'fs';
@@ -56,15 +57,16 @@ export class ConstraintEnforcer extends EventEmitter {
   }
 
   createIsolatedContext(agentId: string, originalDir: string): string {
-    const tmpDir = mkdtempSync('eamilos-comm-');
+    const tmpDir = mkdtempSync(join(tmpdir(), 'eamilos-agent-'));
     const isoDir = join(tmpDir, 'workspace');
+    mkdirSync(isoDir, { recursive: true });
     this.isolatedDirs.set(agentId, isoDir);
 
     if (existsSync(originalDir)) {
       try {
         const entries = readdirSync(originalDir);
         for (const entry of entries) {
-          if (entry === '.git' || entry === 'node_modules') continue;
+          if (entry === '.git' || entry === 'node_modules' || entry === '.eamilos') continue;
           const src = join(originalDir, entry);
           const dst = join(isoDir, entry);
           try {

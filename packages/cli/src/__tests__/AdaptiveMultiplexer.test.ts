@@ -30,10 +30,10 @@ describe('AdaptiveMultiplexer', () => {
     expect(AdaptiveMultiplexer.detectEnvironment()).toBe('tmux');
   });
 
-  it('detects vscode', () => {
+  it('falls back to single in vscode (no reliable split API)', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CI', '');
-    expect(AdaptiveMultiplexer.detectEnvironment()).toBe('vscode');
+    expect(AdaptiveMultiplexer.detectEnvironment()).toBe('single');
   });
 
   it('defaults to single when no env matches', () => {

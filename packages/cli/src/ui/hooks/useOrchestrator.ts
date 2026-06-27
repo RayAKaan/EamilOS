@@ -74,6 +74,7 @@ export async function detectAndTrackAgents(): Promise<void> {
           callsign: callsign ?? agent.id.toUpperCase().slice(0, 4),
           agentId: agent.id,
           mode: getDefaultMode(agent.id),
+          status: 'ready',
         });
       }
     }
@@ -132,6 +133,42 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
 
   const uiSessionId = `session_${currentStartTime}`;
   let uiSessionStatus: 'completed' | 'failed' = 'failed';
+  const streamingMessageIds = new Map<string, string>();
+
+  function getAgentLabel(agentId: string): string {
+    const s = useStore.getState();
+    const terminal = s.activeTerminals.find((t) => t.agentId === agentId);
+    const callsign = terminal?.callsign;
+    return callsign ? `${callsign} · ${agentId}` : agentId;
+  }
+
+  function appendAgentOutput(agentId: string, chunk: string): void {
+    const s = useStore.getState();
+    const label = getAgentLabel(agentId);
+
+    let messageId = streamingMessageIds.get(agentId);
+
+    if (!messageId) {
+      messageId = s.addMessage({
+        type: 'system',
+        eventLabel: label,
+        content: `${label}\n${chunk}`,
+        isStreaming: true,
+      });
+      streamingMessageIds.set(agentId, messageId);
+      return;
+    }
+
+    s.appendToMessage(messageId, chunk);
+  }
+
+  function updateTerminalFromEvent(agentId: string, updates: Record<string, unknown>): void {
+    const s = useStore.getState();
+    const terminal = s.activeTerminals.find((t) => t.agentId === agentId);
+    if (terminal) {
+      s.updateTerminal(terminal.callsign, updates as any);
+    }
+  }
 
   const session = createSessionOrchestrator({
     goal: prompt,
@@ -148,7 +185,9 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
 
     session.on('agent.output', (data) => {
       if (abortRef) return;
-      state.addMessage({ type: 'system', content: `[${data.agentId}] ${data.content.slice(0, 200)}` });
+      appendAgentOutput(data.agentId, data.content);
+      state.addLog(`[${getAgentLabel(data.agentId)}] ${data.content}`);
+      updateTerminalFromEvent(data.agentId, { lastLine: data.content.split('\n').filter(Boolean).at(-1) ?? data.content });
     });
 
     session.on('agent.fallback', (data) => {
@@ -159,10 +198,23 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
 
     session.on('agent.completed', (data) => {
       state.setAgentStatus(data.agentId, { status: 'ready' });
+
+      const messageId = streamingMessageIds.get(data.agentId);
+      if (messageId) {
+        state.updateMessage(messageId, { isStreaming: false });
+      }
+
+      updateTerminalFromEvent(data.agentId, { status: 'done', endedAt: Date.now() });
     });
 
     session.on('agent.started', (data) => {
       state.setAgentStatus(data.agentId, { status: 'busy' });
+      updateTerminalFromEvent(data.agentId, { status: 'running', startedAt: Date.now() });
+    });
+
+    session.on('agent.error', (data) => {
+      state.setAgentStatus(data.agentId, { status: 'failed', error: data.error });
+      updateTerminalFromEvent(data.agentId, { status: 'failed', endedAt: Date.now(), lastLine: data.error });
     });
 
     session.on('session.completed', (data) => {

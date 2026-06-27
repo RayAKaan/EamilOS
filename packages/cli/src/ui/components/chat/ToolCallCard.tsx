@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
 import type { ToolCall } from '../../types/ui.js';
 
@@ -21,7 +21,6 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export const ToolCallCard: React.FC<Props> = ({ tool }) => {
-  const [expanded, setExpanded] = useState(false);
   const icon = STATUS_ICONS[tool.status] ?? '○';
   const sc = STATUS_COLORS[tool.status] ?? 'white';
 
@@ -31,17 +30,15 @@ export const ToolCallCard: React.FC<Props> = ({ tool }) => {
         <Text color={sc}>{icon}</Text>
         <Text> </Text>
         <Text bold>{tool.name}</Text>
-        <Text dimColor> {tool.id.slice(0, 8)}</Text>
+        <Text> </Text>
+        <Text color={sc}>{tool.status}</Text>
       </Box>
-      {expanded && (
-        <Box paddingLeft={4} flexDirection="column">
-          <Text wrap="wrap">{tool.args}</Text>
-          {tool.result && (
-            <Box marginTop={0}>
-              <Text dimColor>→ </Text>
-              <Text wrap="wrap">{tool.result}</Text>
-            </Box>
-          )}
+      <Box paddingLeft={2}>
+        <Text wrap="truncate-end" dimColor>{tool.args}</Text>
+      </Box>
+      {tool.lines !== undefined && (
+        <Box paddingLeft={2}>
+          <Text color="green">+{tool.lines} lines</Text>
         </Box>
       )}
     </Box>

@@ -65,6 +65,12 @@ export interface TerminalInfo {
   callsign: string;
   agentId: string;
   mode: 'communication_only' | 'unrestricted_execution' | 'communication' | 'execution';
+  status?: 'ready' | 'running' | 'done' | 'failed' | 'killed';
+  pid?: number;
+  paneId?: string;
+  startedAt?: number;
+  endedAt?: number;
+  lastLine?: string;
 }
 
 export interface PermissionRequest {
@@ -75,7 +81,7 @@ export interface PermissionRequest {
   timestamp: number;
 }
 
-export type PageId = 'chat' | 'logs' | 'sessions' | 'agents';
+export type PageId = 'chat' | 'logs' | 'sessions' | 'agents' | 'terminals';
 
 export type OverlayId =
   | 'permission'
