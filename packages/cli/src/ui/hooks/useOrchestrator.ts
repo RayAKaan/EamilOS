@@ -232,6 +232,11 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     session.on('agent.error', (data) => {
       state.setAgentStatus(data.agentId, { status: 'failed', error: data.error });
       updateTerminalFromEvent(data.agentId, { status: 'failed', endedAt: Date.now(), lastLine: data.error });
+      for (const [streamAgentId, messageId] of streamingMessageIds) {
+        if (streamAgentId === data.agentId) {
+          state.updateMessage(messageId, { isStreaming: false });
+        }
+      }
     });
 
     session.on('session.completed', (data) => {
@@ -266,7 +271,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
     });
 
     const result = await session.run();
-    uiSessionStatus = result.errors.length === 0 ? 'completed' : 'failed';
+    uiSessionStatus = result.success && result.errors.length === 0 ? 'completed' : 'failed';
     const duration = Date.now() - currentStartTime;
 
     const rawContent = result.primaryResult ?? '';
@@ -295,7 +300,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
       nodes: result.fileChanges?.length || 2,
       edges: result.fileChanges?.length || 0,
       toolsUsed: result.fileChanges?.length || 0,
-      validated: result.errors.length === 0,
+      validated: result.success && result.errors.length === 0,
     });
 
     state.addMessage({
@@ -306,7 +311,7 @@ async function runOrchestrator(prompt: string, strat: ExecutionStrategy, sysId: 
         toolsUsed: result.fileChanges?.length ?? 0,
         nodes: 2,
         edges: result.fileChanges?.length ?? 0,
-        validated: result.errors.length === 0,
+        validated: result.success && result.errors.length === 0,
         agentUsed: result.agentUsed,
       }),
     });

@@ -169,7 +169,7 @@ describe('TUI no-provider hotfix', () => {
 
       const state = useStore.getState();
       expect(state.isRunning).toBe(false);
-    }, 30000);
+    }, 120000);
   });
 
   describe('StatusBar gemini key', () => {

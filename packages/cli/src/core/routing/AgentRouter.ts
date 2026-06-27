@@ -38,13 +38,13 @@ export interface RouterInput {
 }
 
 const ROLE_AGENT_PREFERENCE: Record<string, string[]> = {
-  researcher: ['gemini-cli', 'opencode', 'claude-code'],
-  planner: ['gemini-cli', 'claude-code', 'opencode'],
-  coder: ['claude-code', 'opencode', 'aider', 'goose', 'codex-cli'],
-  reviewer: ['claude-code', 'opencode', 'gemini-cli'],
+  researcher: ['opencode', 'claude-code', 'gemini-cli'],
+  planner: ['opencode', 'claude-code', 'gemini-cli'],
+  coder: ['opencode', 'claude-code', 'aider', 'goose', 'codex-cli'],
+  reviewer: ['opencode', 'claude-code', 'gemini-cli'],
   tester: ['opencode', 'claude-code', 'aider'],
-  security: ['claude-code', 'gemini-cli', 'opencode'],
-  debugger: ['claude-code', 'opencode', 'aider'],
+  security: ['opencode', 'claude-code', 'gemini-cli'],
+  debugger: ['opencode', 'claude-code', 'aider'],
 };
 
 function hasCapability(agent: RegisteredAgent, capability: string): boolean {

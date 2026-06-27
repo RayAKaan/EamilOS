@@ -11,6 +11,89 @@ import { OpenAIAgentAdapter } from './adapters/OpenAIAgentAdapter.js';
 import { AnthropicAgentAdapter } from './adapters/AnthropicAgentAdapter.js';
 import { OllamaAgentAdapter } from './adapters/OllamaAgentAdapter.js';
 import { GoogleAgentAdapter } from './adapters/GoogleAgentAdapter.js';
+import type { TerminalMessage } from '../../multi-agent/agents/BaseAgent.js';
+import { classifyAgentError } from './AgentErrorClassifier.js';
+import type { AgentErrorType } from './types.js';
+
+const FAILURE_PATTERNS = [
+  /Claude Code failed:/i,
+  /opencode-ai failed:/i,
+  /@google\/gemini-cli failed:/i,
+  /Aider failed:/i,
+  /Goose failed:/i,
+  /codex-cli: timed out/i,
+  /codex-cli: spawn failed/i,
+  /codex-cli: exit code/i,
+  /Agent timed out after \d+s/i,
+  /EamilOS: no AI provider available/i,
+  /exited with code \d+/i,
+];
+
+export function terminalMessageToAgentResponse(
+  agentId: string,
+  message: TerminalMessage,
+  start: number,
+  fileChanges: AgentResponse['fileChanges']
+): AgentResponse {
+  const exitCode = message.metadata?.exitCode as number | undefined;
+  const content = message.content ?? '';
+  const rawOutput = message.raw;
+
+  let failureReason: string | undefined;
+  let errorType: AgentErrorType | undefined;
+
+  if (exitCode !== undefined && exitCode !== 0) {
+    failureReason = content || `${agentId} exited with code ${exitCode}`;
+    errorType = classifyAgentError(failureReason, rawOutput ?? '');
+  } else if (content) {
+    for (const pattern of FAILURE_PATTERNS) {
+      if (pattern.test(content)) {
+        failureReason = content;
+        errorType = classifyAgentError(failureReason, rawOutput ?? '');
+        break;
+      }
+    }
+  }
+
+  if (failureReason) {
+    return {
+      agentId,
+      success: false,
+      content: '',
+      fileChanges: [],
+      rawOutput,
+      error: failureReason,
+      errorType: errorType ?? 'unknown',
+      durationMs: Date.now() - start,
+    };
+  }
+
+  return {
+    agentId,
+    success: true,
+    content,
+    fileChanges,
+    rawOutput,
+    durationMs: Date.now() - start,
+  };
+}
+
+export function errorToAgentResponse(
+  agentId: string,
+  err: unknown,
+  start: number,
+): AgentResponse {
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    agentId,
+    success: false,
+    content: '',
+    fileChanges: [],
+    error: msg,
+    errorType: classifyAgentError(msg, ''),
+    durationMs: Date.now() - start,
+  };
+}
 
 const BASE_CAPABILITIES: Record<string, AgentCapabilities> = {
   opencode: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: true, cloud: true, multimodal: false },
@@ -102,26 +185,9 @@ class OpenCodeAgentAdapter implements EamilOSAgent {
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
-      return {
-        agentId: this.id,
-        success: true,
-        content: msg.content,
-        fileChanges,
-        rawOutput: msg.raw,
-        durationMs: Date.now() - start,
-      };
+      return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
-      return {
-        agentId: this.id,
-        success: false,
-        content: '',
-        fileChanges: [],
-        error: err instanceof Error ? err.message : String(err),
-        errorType: 'unknown',
-        durationMs: Date.now() - start,
-      };
-    } finally {
-      if (onChunk) this.inner.off('chunk', onChunk);
+      return errorToAgentResponse(this.id, err, start);
     }
   }
 
@@ -167,26 +233,9 @@ class ClaudeCodeAgentAdapter implements EamilOSAgent {
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
-      return {
-        agentId: this.id,
-        success: true,
-        content: msg.content,
-        fileChanges,
-        rawOutput: msg.raw,
-        durationMs: Date.now() - start,
-      };
+      return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
-      return {
-        agentId: this.id,
-        success: false,
-        content: '',
-        fileChanges: [],
-        error: err instanceof Error ? err.message : String(err),
-        errorType: 'unknown',
-        durationMs: Date.now() - start,
-      };
-    } finally {
-      if (onChunk) this.inner.off('chunk', onChunk);
+      return errorToAgentResponse(this.id, err, start);
     }
   }
 
@@ -232,26 +281,9 @@ class GeminiCliAgentAdapter implements EamilOSAgent {
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
-      return {
-        agentId: this.id,
-        success: true,
-        content: msg.content,
-        fileChanges,
-        rawOutput: msg.raw,
-        durationMs: Date.now() - start,
-      };
+      return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
-      return {
-        agentId: this.id,
-        success: false,
-        content: '',
-        fileChanges: [],
-        error: err instanceof Error ? err.message : String(err),
-        errorType: 'unknown',
-        durationMs: Date.now() - start,
-      };
-    } finally {
-      if (onChunk) this.inner.off('chunk', onChunk);
+      return errorToAgentResponse(this.id, err, start);
     }
   }
 
@@ -297,24 +329,9 @@ class AiderAgentAdapter implements EamilOSAgent {
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
-      return {
-        agentId: this.id,
-        success: true,
-        content: msg.content,
-        fileChanges,
-        rawOutput: msg.raw,
-        durationMs: Date.now() - start,
-      };
+      return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
-      return {
-        agentId: this.id,
-        success: false,
-        content: '',
-        fileChanges: [],
-        error: err instanceof Error ? err.message : String(err),
-        errorType: 'unknown',
-        durationMs: Date.now() - start,
-      };
+      return errorToAgentResponse(this.id, err, start);
     } finally {
       if (onChunk) this.inner.off('chunk', onChunk);
     }
@@ -362,26 +379,9 @@ class CodexCliAgentAdapter implements EamilOSAgent {
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
-      return {
-        agentId: this.id,
-        success: true,
-        content: msg.content,
-        fileChanges,
-        rawOutput: msg.raw,
-        durationMs: Date.now() - start,
-      };
+      return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
-      return {
-        agentId: this.id,
-        success: false,
-        content: '',
-        fileChanges: [],
-        error: err instanceof Error ? err.message : String(err),
-        errorType: 'unknown',
-        durationMs: Date.now() - start,
-      };
-    } finally {
-      if (onChunk) this.inner.off('chunk', onChunk);
+      return errorToAgentResponse(this.id, err, start);
     }
   }
 
@@ -427,24 +427,9 @@ class GooseAgentAdapter implements EamilOSAgent {
     try {
       const msg = await this.inner.send(request.prompt);
       const fileChanges = extractFileChanges(msg.content, this.id);
-      return {
-        agentId: this.id,
-        success: true,
-        content: msg.content,
-        fileChanges,
-        rawOutput: msg.raw,
-        durationMs: Date.now() - start,
-      };
+      return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
-      return {
-        agentId: this.id,
-        success: false,
-        content: '',
-        fileChanges: [],
-        error: err instanceof Error ? err.message : String(err),
-        errorType: 'unknown',
-        durationMs: Date.now() - start,
-      };
+      return errorToAgentResponse(this.id, err, start);
     } finally {
       if (onChunk) this.inner.off('chunk', onChunk);
     }

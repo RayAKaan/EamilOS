@@ -126,7 +126,7 @@ export class AgentRegistry {
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: true, cloud: true, multimodal: false },
       detect: async () => {
         try {
-          execSync('npx --no-install opencode-ai --version', { timeout: 2000, stdio: 'pipe', windowsHide: true });
+          execSync('npx --no-install opencode-ai --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
           return { available: true, version: 'CLI' };
         } catch {
           return { available: false, error: 'opencode-ai not installed. Run: npm install -g opencode-ai' };
@@ -144,7 +144,7 @@ export class AgentRegistry {
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: false },
       detect: async () => {
         try {
-          execSync('npx --no-install @anthropic-ai/claude-code --version', { timeout: 2000, stdio: 'pipe', windowsHide: true });
+          execSync('npx --no-install @anthropic-ai/claude-code --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
           return { available: true, version: 'CLI' };
         } catch {
           return { available: false, error: '@anthropic-ai/claude-code not installed' };
@@ -162,7 +162,7 @@ export class AgentRegistry {
       capabilities: { codeGeneration: false, fileEditing: false, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: true },
       detect: async () => {
         try {
-          execSync('npx --no-install @google/gemini-cli --version', { timeout: 2000, stdio: 'pipe', windowsHide: true });
+          execSync('npx --no-install @google/gemini-cli --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
           return { available: true, version: 'CLI' };
         } catch {
           return { available: false, error: '@google/gemini-cli not installed' };
@@ -180,7 +180,7 @@ export class AgentRegistry {
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
         try {
-          execSync('aider --version', { timeout: 2000, stdio: 'pipe', windowsHide: true });
+          execSync('aider --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
           return { available: true, version: 'CLI' };
         } catch {
           return { available: false, error: 'aider not installed. Run: pip install aider-chat' };
@@ -198,11 +198,11 @@ export class AgentRegistry {
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
         try {
-          execSync('npx --no-install @block/goose --version', { timeout: 2000, stdio: 'pipe', windowsHide: true });
+          execSync('npx --no-install @block/goose --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
           return { available: true, version: 'CLI' };
         } catch {
           try {
-            execSync('goose --version', { timeout: 2000, stdio: 'pipe', windowsHide: true });
+            execSync('goose --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
             return { available: true, version: 'CLI' };
           } catch {
             return { available: false, error: 'goose not installed' };
@@ -221,7 +221,7 @@ export class AgentRegistry {
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
       detect: async () => {
         try {
-          execSync('codex --version', { timeout: 2000, stdio: 'pipe', windowsHide: true });
+          execSync('codex --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
           return { available: true, version: 'CLI' };
         } catch {
           return { available: false, error: 'codex not installed. Run: npm install -g @openai/codex' };

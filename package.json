@@ -1,7 +1,7 @@
 {
   "name": "eamilos",
-  "version": "1.6.2",
-  "description": "EamilOS v1.6.2 — Fix Windows agent detection: execFileSync → execSync for .cmd wrapper EINVAL",
+  "version": "1.6.3",
+  "description": "EamilOS v1.6.3 — Fix TUI false-success on failed CLI agents and continue fallback chain",
   "type": "module",
   "private": true,
   "workspaces": [

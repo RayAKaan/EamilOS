@@ -203,55 +203,76 @@ export class SessionOrchestrator extends EventEmitter {
   }
 
   private async executeFallback(routing: import('../routing/AgentRouter.js').RoutingDecision): Promise<SessionResult> {
-    const fallbackChain = routing.fallbackChain.length > 0 ? routing.fallbackChain : undefined;
     const primaryId = routing.selectedAgents[0] || this.config.preferredAgent;
-    const primary = primaryId
+    const preferred = primaryId
       ? AgentFactory.createAdapter(primaryId, { workingDir: this.config.workingDir, timeoutMs: this.config.timeoutMs })
       : await AgentFactory.createBestAdapter(this.registry, this.config.mode);
 
-    if (!primary) {
+    if (!preferred) {
       return this.noAgentResult('No available agent found');
     }
 
-    this.agents.set(primary.id, primary);
+    const allAvailable = this.registry.getAvailableAgents(this.config.mode);
+    const remainingAvailable = allAvailable
+      .filter(a => a.id !== preferred.id && !routing.fallbackChain.includes(a.id))
+      .sort((a, b) => a.priority - b.priority)
+      .map(a => a.id);
 
-    const firstResult = await this.executeAgentForMode(primary, this.config.goal);
-    if (firstResult.success && firstResult.errors.length === 0) {
-      return { ...firstResult, strategy: this.config.strategy, agentUsed: primary.id };
+    const candidateIds = [
+      preferred.id,
+      ...routing.fallbackChain,
+      ...remainingAvailable,
+    ];
+
+    const allErrors: string[] = [];
+
+    for (let i = 0; i < candidateIds.length; i++) {
+      const agentId = candidateIds[i];
+      const adapter = AgentFactory.createAdapter(agentId, {
+        workingDir: this.config.workingDir,
+        timeoutMs: this.config.timeoutMs,
+      });
+      if (!adapter) continue;
+
+      this.agents.set(adapter.id, adapter);
+
+      if (i > 0) {
+        this.emit('agent.fallback', {
+          from: candidateIds[i - 1],
+          to: agentId,
+          reason: allErrors[allErrors.length - 1] || `${candidateIds[i - 1]} failed`,
+        });
+        this.sessionStore.recordFallback(candidateIds[i - 1], agentId);
+      }
+
+      const result = await this.executeAgentForMode(adapter, this.config.goal);
+
+      if (result.success && result.errors.length === 0) {
+        return { ...result, strategy: this.config.strategy, agentUsed: agentId };
+      }
+
+      const err = result.errors[0] ?? `${agentId} failed`;
+      allErrors.push(`${agentId}: ${err}`);
+
+      if (i < candidateIds.length - 1) {
+        const errorType = classifyAgentError(err, '');
+        if (!isFallbackTrigger(errorType)) {
+          break;
+        }
+      }
     }
 
-    const primaryError = firstResult.errors[0] ?? 'Primary agent failed';
-    const errorType = classifyAgentError(primaryError, '');
-    if (!isFallbackTrigger(errorType)) {
-      return {
-        ...firstResult,
-        strategy: this.config.strategy,
-        errors: [primaryError || 'Primary agent failed, not fallback-eligible'],
-      };
-    }
-
-    const fallbackId = (fallbackChain && fallbackChain.length > 0) ? fallbackChain[0] : this.findFallbackAgent(primary.id);
-    if (!fallbackId) {
-      return {
-        ...firstResult,
-        strategy: this.config.strategy,
-        errors: [primaryError || 'Primary agent failed, no fallback available'],
-      };
-    }
-
-    this.emit('agent.fallback', { from: primary.id, to: fallbackId, reason: primaryError });
-    this.sessionStore.recordFallback(primary.id, fallbackId);
-
-    const fallback = AgentFactory.createAdapter(fallbackId, {
-      workingDir: this.config.workingDir,
-      timeoutMs: this.config.timeoutMs,
-    });
-    if (!fallback) {
-      return this.noAgentResult('Fallback agent could not be created');
-    }
-
-    this.agents.set(fallback.id, fallback);
-    return this.executeAgentForMode(fallback, this.config.goal);
+    return {
+      success: false,
+      goal: this.config.goal,
+      strategy: this.config.strategy,
+      mode: this.config.mode,
+      agentUsed: candidateIds[candidateIds.length - 1] ?? primaryId ?? preferred.id,
+      fileChanges: [],
+      appliedChanges: [],
+      errors: allErrors,
+      duration: Date.now() - this.startTime,
+    };
   }
 
   private async executeSwarm(routing: import('../routing/AgentRouter.js').RoutingDecision): Promise<SessionResult> {
@@ -499,6 +520,24 @@ export class SessionOrchestrator extends EventEmitter {
 
     try {
       const response = await agent.run(request);
+
+      if (!response.success || response.error) {
+        const error = response.error ?? response.content ?? `${agent.id} failed`;
+        this.emit('agent.error', { agentId: agent.id, error });
+        return {
+          success: false,
+          goal: this.config.goal,
+          strategy: this.config.strategy,
+          mode: 'communication',
+          agentUsed: agent.id,
+          primaryResult: undefined,
+          fileChanges: [],
+          appliedChanges: [],
+          errors: [error],
+          duration: Date.now() - this.startTime,
+        };
+      }
+
       this.emit('agent.completed', { agentId: agent.id, result: response });
       this.sessionStore.recordTerminalOutput(agent.id, response.content);
 
@@ -599,6 +638,22 @@ export class SessionOrchestrator extends EventEmitter {
       response = await agent.run(request);
       if (response.content) {
         this.appendAgentLog(agent.id, response.content.endsWith('\n') ? response.content : `${response.content}\n`);
+      }
+      if (!response.success || response.error) {
+        const error = response.error ?? response.content ?? `${agent.id} failed`;
+        this.emit('agent.error', { agentId: agent.id, error });
+        return {
+          success: false,
+          goal: this.config.goal,
+          strategy: this.config.strategy,
+          mode: this.config.mode,
+          agentUsed: agent.id,
+          primaryResult: undefined,
+          fileChanges: [],
+          appliedChanges: [],
+          errors: [error],
+          duration: Date.now() - this.startTime,
+        };
       }
       this.emit('agent.completed', { agentId: agent.id, result: response });
     } catch (err) {
