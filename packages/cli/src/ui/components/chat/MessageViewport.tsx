@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box } from 'ink';
 import { MessageRenderer } from './MessageRenderer.js';
+import { WelcomeScreen } from './WelcomeScreen.js';
 import type { Message } from '../../types/ui.js';
 
 interface Props {
@@ -9,13 +10,7 @@ interface Props {
 
 export const MessageViewport: React.FC<Props> = ({ messages }) => {
   if (messages.length === 0) {
-    return (
-      <Box flexGrow={1} justifyContent="center" alignItems="center">
-        <Box>
-          {'Welcome to EamilOS TUI'}
-        </Box>
-      </Box>
-    );
+    return <WelcomeScreen />;
   }
 
   return (
