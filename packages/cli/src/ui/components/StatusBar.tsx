@@ -8,7 +8,7 @@ const MODE_LABEL: Record<AgentMode, string> = {
   execution: 'EXEC',
 };
 
-const DOCS_URL = 'https://opencode.ai';
+const DOCS_URL = 'https://github.com/RayAKaan/EamilOS';
 
 export const StatusBar: React.FC = () => {
   const strategy = useStore((s) => s.currentStrategy);

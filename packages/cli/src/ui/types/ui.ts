@@ -42,6 +42,9 @@ export interface GraphStats {
   duration?: number;
   toolsUsed?: number;
   validated?: boolean;
+  tokensUsed?: number;
+  estimatedCostUsd?: number;
+  actualCostUsd?: number;
 }
 
 export interface AgentInfo {
