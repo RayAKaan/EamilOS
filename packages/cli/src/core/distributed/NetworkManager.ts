@@ -354,7 +354,7 @@ export class NetworkManager extends EventEmitter {
     return String(data);
   }
 
-  private handleMessage(socket: { on: EventHandler; send: (data: string) => void; close: () => void }, data: unknown, remoteIP: string): void {
+  private async handleMessage(socket: { on: EventHandler; send: (data: string) => void; close: () => void }, data: unknown, remoteIP: string): Promise<void> {
     const rawMessage = parseMessage(data as string);
     if (!rawMessage) {
       this.emit('network:invalid-message', { issues: ['Failed to parse message'] });
@@ -418,6 +418,15 @@ export class NetworkManager extends EventEmitter {
       case 'task:error':
         this.handleTaskError(message);
         break;
+      case 'task:assign': {
+        const { TaskExecutor } = await import('./TaskExecutor.js');
+        const executor = new TaskExecutor(this);
+        void executor.execute(
+          message.payload as import('./types.js').RemoteTaskPayload,
+          socket
+        );
+        break;
+      }
       case 'control:disconnect':
         this.handleDisconnect(message);
         break;

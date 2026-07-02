@@ -30,7 +30,5 @@
   "devDependencies": {
     "esbuild": "^0.28.1"
   },
-  "dependencies": {
-    "opencode-ai": "^1.17.13"
-  }
+  "dependencies": {}
 }

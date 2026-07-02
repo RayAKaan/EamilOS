@@ -15,6 +15,10 @@ import { setupCommand } from './commands/setup.js';
 import { pluginsCommand } from './commands/plugins.js';
 import { helloCommand } from './commands/hello.js';
 import { hiCommand } from './commands/hi.js';
+import { registerAgentsCommand } from './commands/agents.js';
+import { registerCostCommand } from './commands/cost.js';
+import { registerDecisionsCommand } from './commands/decisions.js';
+import { registerHistoryCommand } from './commands/history.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -402,6 +406,11 @@ program
   });
 
 program.addCommand(createMultiAgentCommands());
+
+registerAgentsCommand(program);
+registerCostCommand(program);
+registerDecisionsCommand(program);
+registerHistoryCommand(program);
 
 program.parse(process.argv);
 
