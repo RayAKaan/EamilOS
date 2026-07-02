@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import { WebSocket, WebSocketServer, type RawData } from 'ws';
+import type http from 'http';
 import type {
   NodeRole,
   NodeIdentity,
@@ -19,12 +21,14 @@ import type {
 } from './types.js';
 import {
   generateUUID,
+  generateChallenge,
   createHMAC,
   verifyMessage,
   validateMessage,
   serializeMessageToString,
   parseMessage,
 } from './protocol.js';
+import { NodeCapabilityScanner } from './NodeCapabilityScanner.js';
 
 type EventHandler = (...args: unknown[]) => void;
 
@@ -40,13 +44,12 @@ export class NetworkManager extends EventEmitter {
   private processedMessageIds: Set<string> = new Set();
   private heartbeatIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private heartbeatTimeouts: Map<string, ReturnType<typeof setInterval>> = new Map();
-  private pendingAuth: Map<string, {
-    socket: unknown;
-    address: string;
-    name?: string;
+  private pendingAuth: Map<WebSocket, {
     resolve: (value: NodeStatus) => void;
     reject: (error: Error) => void;
+    timeout: ReturnType<typeof setTimeout>;
   }> = new Map();
+  private wss: WebSocketServer | null = null;
   private nodeMetrics: Map<string, NodeMetrics> = new Map();
   private pausedStreams: Set<string> = new Set();
 
@@ -207,85 +210,91 @@ export class NetworkManager extends EventEmitter {
       throw new Error('Cannot start worker on a controller node');
     }
 
-    this.emit('network:worker-started', { port: port || this.config.worker?.port || 7890 });
+    const resolvedPort = port || this.config.worker?.port || 7890;
+    const host = this.config.worker?.host || '0.0.0.0';
+
+    return new Promise((resolve, reject) => {
+      const wss = new WebSocketServer({ host, port: resolvedPort });
+
+      wss.on('listening', () => {
+        this.wss = wss;
+        this.emit('network:worker-started', { port: resolvedPort, host });
+        resolve();
+      });
+
+      wss.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          reject(new Error(`Port ${resolvedPort} is already in use — is another eamilos worker already running?`));
+        } else {
+          reject(err);
+        }
+      });
+
+      wss.on('connection', (socket: WebSocket, request: http.IncomingMessage) => {
+        this.handleIncomingConnection(socket, request);
+      });
+    });
   }
 
   async connectToWorker(address: string, name?: string): Promise<NodeStatus> {
     this.validateTLS(address);
 
-    const connectionId = generateUUID();
-
     return new Promise((resolve, reject) => {
-      this.pendingAuth.set(connectionId, {
-        socket: null,
-        address,
-        name,
-        resolve,
-        reject,
-      });
+      const socket = new WebSocket(address);
 
-      setTimeout(() => {
-        if (this.pendingAuth.has(connectionId)) {
-          this.pendingAuth.delete(connectionId);
+      const timeout = setTimeout(() => {
+        if (this.pendingAuth.has(socket)) {
+          this.pendingAuth.delete(socket);
+          socket.close();
           reject(new Error(`Connection timeout to ${address}`));
         }
       }, 10000);
 
-      const nodeId = generateUUID();
-      const sessionId = generateUUID();
+      this.pendingAuth.set(socket, { resolve, reject, timeout });
 
-      const nodeStatus: NodeStatus = {
-        identity: {
-          id: nodeId,
-          name: name || 'remote-worker',
-          role: 'worker',
-          version: '1.0.0',
-          startedAt: Date.now(),
-        },
-        capabilities: {
-          cpuCores: 8,
-          totalRAMBytes: 16 * 1024 * 1024 * 1024,
-          availableRAMBytes: 8 * 1024 * 1024 * 1024,
-          gpus: [],
-          providers: [],
-          models: [
-            { modelId: 'phi3:mini', provider: 'ollama', loaded: true, maxContextLength: 4096 },
-          ],
-          maxConcurrentTasks: 2,
-          currentLoad: 0,
-          platform: 'linux',
-          arch: 'x64',
-        },
-        connectionState: 'ready',
-        lastHeartbeat: Date.now(),
-        activeTasks: [],
-        score: 70,
-      };
-
-      const connection: WorkerConnection = {
-        socket: null,
-        nodeId,
-        sessionId,
-        address,
-        status: nodeStatus,
-        connectedAt: Date.now(),
-      };
-
-      this.connectedWorkers.set(nodeId, connection);
-
-      this.emit('network:worker-connected', {
-        nodeId: nodeId,
-        name: name || 'remote-worker',
-        models: ['phi3:mini'],
-        gpus: [],
+      socket.on('open', () => {
+        const challenge = generateChallenge();
+        const challengeMsg: NetworkMessage = {
+          protocolVersion: 1,
+          messageId: generateUUID(),
+          timestamp: Date.now(),
+          type: 'auth:challenge',
+          from: this.identity.id,
+          to: '',
+          payload: {
+            challenge,
+            controllerNodeId: this.identity.id,
+            protocolVersion: 1,
+          } as AuthChallengePayload,
+        };
+        socket.send(serializeMessageToString(challengeMsg, this.sharedKey, this.isCompressionEnabled()));
       });
 
-      resolve(nodeStatus);
+      socket.on('message', (data: RawData) => {
+        const text = Array.isArray(data)
+          ? Buffer.concat(data).toString('utf-8')
+          : data.toString('utf-8');
+        this.handleMessage(socket as unknown as { on: EventHandler; send: (data: string) => void; close: () => void }, text, address);
+      });
+
+      socket.on('error', (err: Error) => {
+        if (this.pendingAuth.has(socket)) {
+          clearTimeout(this.pendingAuth.get(socket)!.timeout);
+          this.pendingAuth.delete(socket);
+          reject(err);
+        }
+      });
+
+      socket.on('close', () => {
+        this.emit('network:socket-closed', { address });
+      });
     });
   }
 
-  handleIncomingConnection(socket: unknown, request?: { socket?: { remoteAddress?: string; getPeerCertificate?: () => unknown } }): void {
-    const remoteIP = (request?.socket?.remoteAddress) || 'unknown';
+  handleIncomingConnection(socket: unknown, request?: http.IncomingMessage | { socket?: { remoteAddress?: string; getPeerCertificate?: () => unknown } }): void {
+    const remoteIP = (request as http.IncomingMessage)?.socket?.remoteAddress
+      || (request as { socket?: { remoteAddress?: string } })?.socket?.remoteAddress
+      || 'unknown';
 
     if (this.isIPBanned(remoteIP)) {
       this.emit('network:connection-rejected', { reason: 'IP banned', ip: remoteIP });
@@ -293,7 +302,7 @@ export class NetworkManager extends EventEmitter {
     }
 
     if (this.config.security.trustedFingerprints?.length) {
-      const cert = request?.socket;
+      const cert = (request as http.IncomingMessage)?.socket;
       const fingerprint = this._extractFingerprint(cert);
       if (!this._validateCertificateFingerprint(fingerprint)) {
         this.emit('network:connection-rejected', { reason: 'Invalid TLS fingerprint', ip: remoteIP });
@@ -323,12 +332,26 @@ export class NetworkManager extends EventEmitter {
 
   private setupSocketHandlers(socket: { on: EventHandler; send: (data: string) => void; close: () => void }, remoteIP: string): void {
     socket.on('message', (data: unknown) => {
-      this.handleMessage(socket, data, remoteIP);
+      const text = this.normalizeRawData(data);
+      this.handleMessage(socket, text, remoteIP);
     });
 
     socket.on('close', () => {
       this.emit('network:socket-closed', { remoteIP });
     });
+  }
+
+  private normalizeRawData(data: unknown): string {
+    if (Buffer.isBuffer(data)) {
+      return data.toString('utf-8');
+    }
+    if (Array.isArray(data)) {
+      return Buffer.concat(data as Buffer[]).toString('utf-8');
+    }
+    if (data instanceof ArrayBuffer) {
+      return Buffer.from(data).toString('utf-8');
+    }
+    return String(data);
   }
 
   private handleMessage(socket: { on: EventHandler; send: (data: string) => void; close: () => void }, data: unknown, remoteIP: string): void {
@@ -369,7 +392,10 @@ export class NetworkManager extends EventEmitter {
 
     switch (message.type) {
       case 'auth:challenge':
-        this.handleAuthChallenge(socket, message);
+        void this.handleAuthChallenge(socket, message);
+        break;
+      case 'auth:result':
+        this.handleAuthResult(socket as WebSocket, message);
         break;
       case 'heartbeat:ping':
         this.handleHeartbeatPing(socket, message);
@@ -426,9 +452,13 @@ export class NetworkManager extends EventEmitter {
     this.emit('task:rejected', payload);
   }
 
-  private handleAuthChallenge(socket: { on: EventHandler; send: (data: string) => void; close: () => void }, message: NetworkMessage): void {
+  private async handleAuthChallenge(
+    socket: { on: EventHandler; send: (data: string) => void; close: () => void },
+    message: NetworkMessage
+  ): Promise<void> {
     const challenge = (message.payload as AuthChallengePayload).challenge;
     const response = createHMAC('sha256', this.sharedKey, challenge);
+    const capabilities = await NodeCapabilityScanner.scan();
 
     const responseMsg: NetworkMessage = {
       protocolVersion: 1,
@@ -442,13 +472,18 @@ export class NetworkManager extends EventEmitter {
         workerNodeId: this.identity.id,
         workerName: this.identity.name,
         protocolVersion: 1,
+        capabilities,
       } as AuthResponsePayload,
     };
 
     socket.send(serializeMessageToString(responseMsg));
   }
 
-  private handleAuthResponse(socket: { on: EventHandler; send: (data: string) => void; close: () => void }, message: NetworkMessage, remoteIP: string): void {
+  private handleAuthResponse(
+    socket: { on: EventHandler; send: (data: string) => void; close: () => void },
+    message: NetworkMessage,
+    remoteIP: string
+  ): void {
     const payload = message.payload as AuthResponsePayload;
     const sessionId = generateUUID();
 
@@ -460,18 +495,7 @@ export class NetworkManager extends EventEmitter {
         version: '',
         startedAt: Date.now(),
       },
-      capabilities: {
-        cpuCores: 8,
-        totalRAMBytes: 32 * 1024 * 1024 * 1024,
-        availableRAMBytes: 16 * 1024 * 1024 * 1024,
-        gpus: [],
-        providers: [],
-        models: [],
-        maxConcurrentTasks: 4,
-        currentLoad: 0,
-        platform: 'linux',
-        arch: 'x64',
-      },
+      capabilities: payload.capabilities,
       connectionState: 'ready',
       lastHeartbeat: Date.now(),
       activeTasks: [],
@@ -511,6 +535,33 @@ export class NetworkManager extends EventEmitter {
       name: payload.workerName,
       models: nodeStatus.capabilities.models.map((m) => m.modelId),
       gpus: nodeStatus.capabilities.gpus.map((g) => g.name),
+    });
+
+    const pending = this.pendingAuth.get(socket as WebSocket);
+    if (pending) {
+      clearTimeout(pending.timeout);
+      this.pendingAuth.delete(socket as WebSocket);
+      pending.resolve(nodeStatus);
+    }
+  }
+
+  private handleAuthResult(socket: WebSocket, message: NetworkMessage): void {
+    const payload = message.payload as AuthResultPayload;
+    if (!payload.accepted) {
+      this.emit('network:auth-rejected', {
+        reason: payload.reason || 'Authentication rejected by controller',
+      });
+      return;
+    }
+
+    this.identity = {
+      ...this.identity,
+      id: this.identity.id,
+    };
+
+    this.emit('network:auth-accepted', {
+      sessionId: payload.sessionId,
+      sessionExpiresAt: payload.sessionExpiresAt,
     });
   }
 
@@ -668,7 +719,7 @@ export class NetworkManager extends EventEmitter {
   }
 
   getNetworkCapacity(): NetworkCapacity {
-    let totalModels = new Set<string>();
+    const totalModels = new Set<string>();
     let totalGPUs = 0;
     let totalRAM = 0;
     let totalSlots = 0;
@@ -720,6 +771,17 @@ export class NetworkManager extends EventEmitter {
     this.heartbeatIntervals.clear();
     this.heartbeatTimeouts.clear();
     this.connectedWorkers.clear();
+
+    if (this.wss) {
+      this.wss.close();
+      this.wss = null;
+    }
+
+    for (const [socket, pending] of this.pendingAuth) {
+      clearTimeout(pending.timeout);
+      socket.close();
+    }
+    this.pendingAuth.clear();
   }
 }
 

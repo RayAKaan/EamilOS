@@ -178,6 +178,7 @@ export interface AuthResponsePayload {
   workerNodeId: string;
   workerName: string;
   protocolVersion: number;
+  capabilities: NodeCapabilities;
 }
 
 export interface AuthResultPayload {

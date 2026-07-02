@@ -409,6 +409,26 @@ Every behavior is tunable. Every default is battle-tested.
 
 ---
 
+## Build Troubleshooting
+
+EamilOS uses `better-sqlite3` for local metrics persistence. On some systems, this requires a native C++ compilation step during `npm install`.
+
+**If `npm install -g @eamilos/cli` fails** with a node-gyp or prebuild error:
+
+```bash
+# Ensure you have a C++ compiler and Python installed:
+# - Windows: npm install -g windows-build-tools (as admin), or install Visual Studio Build Tools
+# - macOS: xcode-select --install
+# - Linux: sudo apt install build-essential python3
+
+# Then retry:
+npm install -g @eamilos/cli
+```
+
+If you cannot install native dependencies, you can still use EamilOS — metrics persistence will be unavailable but all other features work.
+
+---
+
 ## Status
 
 | Layer | Status |

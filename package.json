@@ -1,7 +1,7 @@
 {
   "name": "eamilos",
-  "version": "1.7.0",
-  "description": "EamilOS v1.7.0 — Full-screen TUI replaces Ink/React renderer",
+  "version": "1.8.0",
+  "description": "EamilOS v1.8.0 — Full-screen TUI replaces Ink/React renderer",
   "type": "module",
   "private": true,
   "workspaces": [

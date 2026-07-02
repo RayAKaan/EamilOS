@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.7.0",
-  "description": "EamilOS v1.7.0 — Full-screen TUI replaces Ink/React renderer",
+  "version": "1.8.0",
+  "description": "EamilOS v1.8.0 — Full-screen TUI replaces Ink/React renderer",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {
@@ -71,25 +71,20 @@
   "dependencies": {
     "acorn": "^8.16.0",
     "better-sqlite3": "^11.8.0",
-    "blessed": "^0.1.81",
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
     "execa": "^9.5.0",
     "nanoid": "^5.1.0",
     "ora": "^8.2.0",
     "simple-git": "^3.27.0",
+    "ws": "^8.21.0",
     "yaml": "^2.7.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
-    "@types/blessed": "^0.1.27",
     "@types/node": "^22.10.0",
-    "@types/react": "^18.3.0",
-    "ink": "^4.4.1",
-    "ink-text-input": "^5.0.1",
-    "react": "^18.3.1",
-    "zustand": "^5.0.0",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.2",
     "esbuild": "^0.28.1",
     "rimraf": "^5.0.0",
