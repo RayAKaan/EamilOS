@@ -35,7 +35,7 @@ function makeTaskPayload(overrides?: Partial<RemoteTaskPayload>): RemoteTaskPayl
   return {
     taskId: 'task-123',
     task: { description: 'echo hello', type: 'execution' },
-    agent: { id: 'opencode', name: 'OpenCode', model: 'gpt-4' },
+    agent: { id: 'opencode', type: 'cli', role: 'executor', model: 'gpt-4' },
     contextMessages: [{ role: 'user', content: 'do something' }],
     executionConfig: { timeout: 5000 },
     ...overrides,
@@ -89,7 +89,7 @@ describe('TaskExecutor', () => {
     const { AgentFactory } = await import('../../agents/AgentFactory.js');
     vi.spyOn(AgentFactory, 'createAdapter').mockReturnValue(null);
 
-    await executor.execute(makeTaskPayload({ agent: { id: 'nonexistent', name: 'No' } }), {} as any);
+    await executor.execute(makeTaskPayload({ agent: { id: 'nonexistent', type: 'unknown', role: 'executor' } }), {} as any);
 
     expect(nm.sendMessage).toHaveBeenCalledWith(
       {},

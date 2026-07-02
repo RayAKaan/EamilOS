@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { initNetworkManager, NodeCapabilityScanner } from '../core/index.js';
+import { TailscaleDiscovery } from '../core/distributed/TailscaleDiscovery.js';
 
 interface WorkerArgs {
   port?: number;
@@ -21,9 +22,14 @@ export async function workerStartCommand(args: WorkerArgs): Promise<void> {
   console.log(chalk.bold('\n🔧 EamilOS Worker Node\n'));
 
   const capabilities = await NodeCapabilityScanner.scan();
+  const tailscaleIP = await TailscaleDiscovery.getSelfIP();
+  const tailscaleHost = await TailscaleDiscovery.getSelfHostname();
 
   console.log(chalk.bold('╭─ Worker Status ──────────────────────────────────────╮'));
   console.log(`│  Port: ${port}`.padEnd(55) + '│');
+  if (tailscaleIP) {
+    console.log(`│  Tailscale: ${tailscaleIP} (${tailscaleHost || 'unknown'})`.padEnd(55) + '│');
+  }
   console.log(`│  CPU Cores: ${capabilities.cpuCores}`.padEnd(55) + '│');
   console.log(`│  RAM: ${(capabilities.availableRAMBytes / (1024 ** 3)).toFixed(1)}GB free`.padEnd(55) + '│');
   console.log(`│  Models: ${capabilities.models.length > 0 ? capabilities.models.map(m => m.modelId).join(', ') : 'none'}`.padEnd(55) + '│');
@@ -32,6 +38,9 @@ export async function workerStartCommand(args: WorkerArgs): Promise<void> {
   console.log(chalk.bold('╰──────────────────────────────────────────────────────╯'));
   console.log('');
   console.log(chalk.green(`✔ Worker listening on port ${port}`));
+  if (tailscaleIP) {
+    console.log(chalk.dim(`  Tailscale address: ws://${tailscaleIP}:${port}`));
+  }
   console.log(chalk.dim(`  Waiting for controller connections...`));
   console.log(chalk.dim(`  Press Ctrl+C to stop\n`));
 

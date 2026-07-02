@@ -19,6 +19,8 @@ import { registerAgentsCommand } from './commands/agents.js';
 import { registerCostCommand } from './commands/cost.js';
 import { registerDecisionsCommand } from './commands/decisions.js';
 import { registerHistoryCommand } from './commands/history.js';
+import { connectCommand } from './commands/connect.js';
+import { workerStartCommand } from './commands/worker.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -407,12 +409,39 @@ program
 
 program.addCommand(createMultiAgentCommands());
 
-registerAgentsCommand(program);
-registerCostCommand(program);
-registerDecisionsCommand(program);
-registerHistoryCommand(program);
+  registerAgentsCommand(program);
+  registerCostCommand(program);
+  registerDecisionsCommand(program);
+  registerHistoryCommand(program);
 
-program.parse(process.argv);
+  program
+    .command('connect [address]')
+    .description('Connect to a worker node (direct address or --tailscale for auto-discovery)')
+    .option('-k, --key <key>', 'Network shared key (or set EAMILOS_NETWORK_KEY)')
+    .option('-n, --name <name>', 'Worker display name')
+    .option('--tailscale', 'Auto-discover workers via Tailscale')
+    .action(async (address?: string, opts?: { key?: string; name?: string; tailscale?: boolean }) => {
+      try {
+        await connectCommand({ address, key: opts?.key, name: opts?.name, tailscale: opts?.tailscale });
+      } catch (error) {
+        handleFatalError(error);
+      }
+    });
+
+  program
+    .command('worker')
+    .description('Start a worker node that accepts remote tasks')
+    .option('-p, --port <port>', 'Port to listen on', '7890')
+    .option('-k, --key <key>', 'Network shared key (or set EAMILOS_NETWORK_KEY)')
+    .action(async (opts?: { port?: string; key?: string }) => {
+      try {
+        await workerStartCommand({ port: opts?.port ? parseInt(opts.port) : undefined, key: opts?.key });
+      } catch (error) {
+        handleFatalError(error);
+      }
+    });
+
+  program.parse(process.argv);
 
 function handleFatalError(error: unknown, debug = false): void {
   if (debug) {
