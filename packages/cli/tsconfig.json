@@ -7,5 +7,5 @@
     "noUnusedParameters": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/ui/**/*.tsx", "src/ui/**/*.ts", "src/ui-v2/**/*.ts"]
+  "exclude": ["node_modules", "dist", "src/ui/**/*.tsx", "src/ui/**/*.ts", "src/ui-v2/**/*.ts", "src/tui/**/*.ts"]
 }

@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..');
 
 await esbuild.build({
-  entryPoints: [join(root, 'src', 'ui-v2', 'index.ts')],
+  entryPoints: [join(root, 'src', 'tui', 'index.ts')],
   bundle: true,
   platform: 'node',
   target: 'node20',

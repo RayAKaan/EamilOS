@@ -14,6 +14,6 @@
     "noUnusedParameters": false
   },
   "include": [
-    "src/ui-v2/**/*.ts"
+    "src/tui/**/*.ts"
   ]
 }

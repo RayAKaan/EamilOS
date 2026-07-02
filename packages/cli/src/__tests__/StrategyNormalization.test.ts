@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeStrategyForSession } from '../ui-v2/app.js';
+import { normalizeStrategyForSession } from '../tui/app.js';
 
 describe('normalizeStrategyForSession', () => {
   it('passes through valid core strategies', () => {

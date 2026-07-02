@@ -8,8 +8,50 @@
 [![npm downloads](https://img.shields.io/npm/dm/@eamilos/cli.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@eamilos/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg?style=flat-square)](https://nodejs.org)
+[![CI](https://img.shields.io/github/actions/workflow/status/RayAKaan/EamilOS/ci.yml?style=flat-square&label=CI&color=green)](https://github.com/RayAKaan/EamilOS/actions)
+[![TypeScript](https://img.shields.io/badge/typescript-99.4%25-blue?style=flat-square)](https://www.typescriptlang.org)
 
 </div>
+
+---
+
+## Repository Overview
+
+| Attribute | Value |
+|-----------|-------|
+| **Package** | [`@eamilos/cli`](https://www.npmjs.com/package/@eamilos/cli) |
+| **Language** | TypeScript (99.4%) |
+| **Source files** | ~370 `.ts` / `.js` files |
+| **Source lines** | ~60,000 LOC |
+| **Architecture** | Monorepo (`packages/cli`) |
+| **Runtime** | Node.js >= 18 (ESM) |
+| **Author** | [Rayyan Ahmed Khan](https://github.com/RayAKaan) |
+| **License** | MIT |
+
+### Project Structure
+
+```
+eamilos/
+├── packages/cli/          # @eamilos/cli — the core package
+│   ├── src/
+│   │   ├── commands/      # 26 CLI command handlers
+│   │   ├── core/          # ~130 files across 30 modules (engine)
+│   │   ├── detection/     # Provider auto-detection
+│   │   ├── multi-agent/   # Multi-agent orchestration (8 agent types)
+│   │   ├── terminal/      # Terminal multiplexing
+│   │   ├── tui/           # Full-screen TUI (blessed)
+│   │   └── __tests__/     # 15 test suites (Vitest)
+│   ├── bin/eamilos        # CLI entry point
+│   └── dist/              # Built output
+├── .github/workflows/     # CI (Linux/macOS/Windows, Node 20/22)
+└── README.md
+```
+
+### CI Pipeline
+
+[![CI](https://img.shields.io/github/actions/workflow/status/RayAKaan/EamilOS/ci.yml?style=flat-square&label=CI&color=green)](https://github.com/RayAKaan/EamilOS/actions)
+Runs on every push/PR to `main` across **Linux, macOS, Windows** with Node 20 & 22.
+Steps: typecheck → test → audit → build.
 
 ---
 
@@ -393,6 +435,34 @@ The model leaks a secret → the scanner blocks the write.
 The model is slow → the router picks a faster one next time.
 
 The model is a component. **The system is the product.**
+
+---
+
+---
+
+## Development
+
+```bash
+# Clone and install
+git clone https://github.com/RayAKaan/EamilOS.git
+cd EamilOS
+npm install
+
+# Type-check
+npm run typecheck
+
+# Test
+npm test                          # vitest run
+npm run test:coverage             # with coverage
+
+# Build
+npm run build
+
+# Run locally
+npm run cli -- run "your task"    # npx eamilos
+```
+
+Requires Node >= 18 and at least one AI provider ([Ollama](https://ollama.ai), OpenAI, or Anthropic).
 
 ---
 

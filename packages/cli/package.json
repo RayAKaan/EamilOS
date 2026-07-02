@@ -41,14 +41,14 @@
     "README.md"
   ],
   "scripts": {
-    "build": "npm run typecheck && node src/ui-v2/bundle.js",
+    "build": "npm run typecheck && node src/tui/bundle.js",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.ui.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "postinstall": "exit 0",
-    "ui": "node src/ui-v2/bundle.js && node dist/eamilos-ui.js"
+    "ui": "node src/tui/bundle.js && node dist/eamilos-ui.js"
   },
   "repository": {
     "type": "git",
