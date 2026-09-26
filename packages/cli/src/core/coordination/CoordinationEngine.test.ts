@@ -3,6 +3,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { describe, expect, it } from 'vitest';
 import { MissionEngine } from '../mission/MissionEngine.js';
+import { MissionStore } from '../mission/MissionStore.js';
 import { CoordinationStore } from './CoordinationStore.js';
 import { CoordinationEngine } from './CoordinationEngine.js';
 import { ProposalReconciler } from './ProposalReconciler.js';
@@ -10,17 +11,12 @@ import type { TaskProposal } from './types.js';
 
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), 'eamilos-1-5-'));
-  const missions = new MissionEngine(new (requireStore(dir))());
+  const missions = new MissionEngine(new MissionStore(join(dir, 'missions')));
   const coordination = new CoordinationEngine(missions, new CoordinationStore(join(dir, 'coordination')));
   const mission = missions.createMission({ id: 'm15', goal: 'Phase 1.5', workingDir: dir });
   return { dir, missions, coordination, mission };
 }
 
-function requireStore(dir: string) {
-  return class extends (require('../mission/MissionStore.js').MissionStore) {
-    constructor() { super(join(dir, 'missions')); }
-  };
-}
 
 function proposal(overrides: Partial<TaskProposal> = {}): TaskProposal {
   return {
