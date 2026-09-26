@@ -35,6 +35,44 @@ export function registerMissionCommand(program: Command): void {
       console.log(JSON.stringify(new MissionEngine().start(missionId), null, 2));
     });
 
+
+  mission
+    .command('add-task <missionId> <title>')
+    .description('Add a task to a mission')
+    .option('--description <text>', 'Task description')
+    .option('--depends-on <ids...>', 'Task IDs that must complete first')
+    .option('--priority <priority>', 'CRITICAL, HIGH, MEDIUM, LOW', 'MEDIUM')
+    .action((missionId: string, title: string, options: { description?: string; dependsOn?: string[]; priority: string }) => {
+      const task = new MissionEngine().addTask(missionId, {
+        title,
+        description: options.description ?? title,
+        dependencies: options.dependsOn,
+        priority: options.priority.toUpperCase() as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
+      });
+      console.log(JSON.stringify(task, null, 2));
+    });
+
+  mission
+    .command('schedule <missionId>')
+    .description('Show deterministic ready-task schedule')
+    .action(async (missionId: string) => {
+      const { MissionRuntime } = await import('../core/mission/MissionRuntime.js');
+      console.log(JSON.stringify(new MissionRuntime(new MissionEngine()).schedule(missionId), null, 2));
+    });
+
+  mission
+    .command('claim <missionId> <owner>')
+    .description('Claim the highest-priority ready task with a lease')
+    .option('--ttl <ms>', 'Lease duration in milliseconds', '120000')
+    .action(async (missionId: string, owner: string, options: { ttl: string }) => {
+      const { MissionRuntime } = await import('../core/mission/MissionRuntime.js');
+      console.log(JSON.stringify(
+        new MissionRuntime(new MissionEngine()).claimNext(missionId, owner, Number(options.ttl)),
+        null,
+        2,
+      ));
+    });
+
   mission
     .command('check <missionId>')
     .description('Evaluate deterministic mission completion')
