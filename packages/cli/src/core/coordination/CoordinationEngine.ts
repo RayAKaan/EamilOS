@@ -53,7 +53,7 @@ export class CoordinationEngine {
   } {
     const mission = this.missions.snapshot(missionId).mission;
     const coordination = this.snapshot(missionId);
-    const graph = this.missions.snapshot(missionId).tasks;
+    let graph = this.missions.snapshot(missionId).tasks;
     const accepted: TaskProposal[] = [];
     const merged: string[] = [];
     const rescheduled: string[] = [];
@@ -94,6 +94,7 @@ export class CoordinationEngine {
         });
         coordination.version.graphVersion += 1;
         proposal.globalTaskId = task.id;
+        graph = this.missions.snapshot(missionId).tasks;
       }
 
       coordination.proposals.push(proposal);
