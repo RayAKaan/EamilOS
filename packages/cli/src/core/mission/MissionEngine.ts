@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
 import { CompletionEngine } from './CompletionEngine.js';
 import { LeaseManager } from './LeaseManager.js';
-import { MissionStore, type MissionSnapshot } from './MissionStore.js';
+import { MissionStore } from './MissionStore.js';
+import type { MissionSnapshot } from './types.js';
 import { TaskGraph } from './TaskGraph.js';
 import {
   EvidenceSchema,
