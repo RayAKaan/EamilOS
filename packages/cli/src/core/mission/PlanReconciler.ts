@@ -26,7 +26,7 @@ export class PlanReconciler {
         for (const ca of a.todos.flatMap((todo) => todo.resources)) {
           for (const cb of b.todos.flatMap((todo) => todo.resources)) {
             if (!overlaps(ca.resource, cb.resource)) continue;
-            const conflict = writes(ca) && (writes(cb) || ca.exclusive || cb.exclusive);
+            const conflict = writes(ca) || writes(cb) || ca.exclusive || cb.exclusive;
             if (!conflict) continue;
 
             const key = [normalize(ca.resource), normalize(cb.resource)].sort().join('|');
