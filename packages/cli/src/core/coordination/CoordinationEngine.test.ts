@@ -72,7 +72,7 @@ describe('Phase 1.5 coordination', () => {
   });
 
   it('reschedules a read/write overlap without arbitrary write ordering', () => {
-    const { dir, coordination, mission } = setup();
+    const { dir, coordination, mission, missions } = setup();
     const a = proposal({ proposalId: 'a', agentId: 'a1', idempotencyKey: 'a', globalTaskId: 'task-a', writeSet: [{ id: 'shared', kind: 'file', mode: 'write' }] });
     const b = proposal({ proposalId: 'b', agentId: 'b1', idempotencyKey: 'b', globalTaskId: 'task-b', readSet: [{ id: 'shared', kind: 'file', mode: 'read' }], writeSet: [] });
     coordination.submitProposals(mission.id, [a]);
