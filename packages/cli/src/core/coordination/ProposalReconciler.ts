@@ -151,7 +151,7 @@ export class ProposalReconciler {
         type: conflictType(proposal, related[0]),
         action: 'RESCHEDULE',
         proposalIds: [related[0].proposalId, proposal.proposalId],
-        taskIds: [related[0].globalTaskId, proposal.globalTaskId].filter((x): x is string),
+        taskIds: [related[0].globalTaskId, proposal.globalTaskId].filter((x): x is string => Boolean(x)),
         resourceIds: resources(proposal)
           .filter((r) => resources(related[0]).some((other) => overlaps(r, other)))
           .map(resourceId),
