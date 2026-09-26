@@ -69,7 +69,7 @@ describe('Phase 1 mission runtime', () => {
       description: 'Test leasing',
     });
 
-    const lease = engine.acquireLease(mission.id, 'worker-a', 10);
+    const lease = engine.acquireLease(mission.id, 'lease_task', 'worker-a', 10);
     expect(engine.snapshot(mission.id).tasks[0].state).toBe('CLAIMED');
 
     const expired = engine.expireLeases(mission.id, Date.parse(lease.expiresAt) + 1);
