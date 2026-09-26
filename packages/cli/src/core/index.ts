@@ -339,4 +339,38 @@ export {
   type AgentTerminalDef,
 } from '../terminal/index.js';
 
-export * from './mission/index.js';
+export {
+  MissionEngine,
+  MissionStore,
+  TaskGraph,
+  GraphScheduler,
+  LeaseManager,
+  CompletionEngine,
+  MissionRuntime,
+} from './mission/index.js';
+export type {
+  Mission,
+  MissionStatus,
+  MissionEvidence,
+  TaskCheckpoint,
+  TaskNode,
+  TaskState,
+  MissionRequirements,
+  MissionConstraints,
+  CompletionCriterion,
+  MissionEvent,
+  MissionEventType,
+  TaskLease,
+  MissionSnapshot,
+} from './mission/index.js';
+export {
+  MissionStatusSchema,
+  TaskStateSchema,
+  EvidenceSchema,
+  CheckpointSchema,
+  TaskNodeSchema,
+  CompletionCriterionSchema,
+  MissionRequirementsSchema,
+  MissionConstraintsSchema,
+  MissionSchema,
+} from './mission/index.js';
