@@ -60,9 +60,8 @@ export class CoordinationEngine {
     const escalations: string[] = [];
     const results: ReconciliationResult[] = [];
 
-    const ordered = proposals.map((p) => TaskProposalSchema.parse(p)).sort((a, b) =>
-      a.proposalId.localeCompare(b.proposalId),
-    );
+    const parsed = proposals.map((p) => TaskProposalSchema.parse(p));
+    const ordered = this.orderProposals(parsed);
 
     for (const proposal of ordered) {
       if (proposal.missionId !== missionId) throw new Error(`Proposal ${proposal.proposalId} belongs to another mission`);
@@ -106,6 +105,53 @@ export class CoordinationEngine {
     coordination.version.updatedAt = new Date().toISOString();
     this.store.save(coordination);
     return { accepted, merged, rescheduled, escalations, results };
+  }
+
+  private orderProposals(proposals: TaskProposal[]): TaskProposal[] {
+    const byTask = new Map<string, TaskProposal>();
+    for (const proposal of proposals) {
+      if (proposal.globalTaskId) byTask.set(proposal.globalTaskId, proposal);
+    }
+
+    const indegree = new Map<string, number>();
+    const outgoing = new Map<string, string[]>();
+    for (const proposal of proposals) {
+      indegree.set(proposal.proposalId, 0);
+      outgoing.set(proposal.proposalId, []);
+    }
+
+    for (const proposal of proposals) {
+      for (const dependency of proposal.dependencies) {
+        const dependencyProposal = byTask.get(dependency);
+        if (!dependencyProposal) continue;
+        indegree.set(proposal.proposalId, (indegree.get(proposal.proposalId) ?? 0) + 1);
+        outgoing.get(dependencyProposal.proposalId)?.push(proposal.proposalId);
+      }
+    }
+
+    const queue = proposals
+      .filter((proposal) => indegree.get(proposal.proposalId) === 0)
+      .sort((a, b) => a.proposalId.localeCompare(b.proposalId));
+    const ordered: TaskProposal[] = [];
+
+    while (queue.length > 0) {
+      const next = queue.shift()!;
+      ordered.push(next);
+      for (const dependentId of outgoing.get(next.proposalId) ?? []) {
+        const degree = (indegree.get(dependentId) ?? 0) - 1;
+        indegree.set(dependentId, degree);
+        if (degree === 0) {
+          const dependent = proposals.find((proposal) => proposal.proposalId === dependentId)!;
+          queue.push(dependent);
+          queue.sort((a, b) => a.proposalId.localeCompare(b.proposalId));
+        }
+      }
+    }
+
+    if (ordered.length !== proposals.length) {
+      return [...proposals].sort((a, b) => a.proposalId.localeCompare(b.proposalId));
+    }
+    return ordered;
   }
 
   buildLocalPlan(
