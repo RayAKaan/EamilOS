@@ -73,6 +73,33 @@ export function registerMissionCommand(program: Command): void {
       ));
     });
 
+
+  mission
+    .command('plan <missionId> <taskId> <agentId>')
+    .description('Submit an agent-local TODO plan proposal')
+    .requiredOption('--objective <text>', 'Agent objective')
+    .requiredOption('--todo <json>', 'JSON array of TODOs with resource claims')
+    .action((missionId: string, taskId: string, agentId: string, options: { objective: string; todo: string }) => {
+      const { AgentPlanCoordinator } = require('../core/mission/AgentPlanCoordinator.js') as typeof import('../core/mission/AgentPlanCoordinator.js');
+      const todos = JSON.parse(options.todo);
+      const result = new AgentPlanCoordinator().submit({
+        missionId,
+        taskId,
+        agentId,
+        objective: options.objective,
+        todos,
+      });
+      console.log(JSON.stringify(result, null, 2));
+    });
+
+  mission
+    .command('plans <taskId>')
+    .description('Show all agent-local plans submitted for a task')
+    .action((taskId: string) => {
+      const { AgentPlanStore } = require('../core/mission/AgentPlanStore.js') as typeof import('../core/mission/AgentPlanStore.js');
+      console.log(JSON.stringify(new AgentPlanStore().listForTask(taskId), null, 2));
+    });
+
   mission
     .command('check <missionId>')
     .description('Evaluate deterministic mission completion')
