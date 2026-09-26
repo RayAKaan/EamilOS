@@ -22,6 +22,7 @@ import { registerHistoryCommand } from './commands/history.js';
 import { connectCommand } from './commands/connect.js';
 import { workerStartCommand } from './commands/worker.js';
 import { registerMissionCommand } from './commands/mission.js';
+import { registerCoordinationCommand } from './commands/coordination.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -415,6 +416,7 @@ program.addCommand(createMultiAgentCommands());
   registerDecisionsCommand(program);
   registerHistoryCommand(program);
   registerMissionCommand(program);
+  registerCoordinationCommand(program);
 
   program
     .command('connect [address]')
