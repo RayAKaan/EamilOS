@@ -338,3 +338,5 @@ export {
   type TerminalEnvironment,
   type AgentTerminalDef,
 } from '../terminal/index.js';
+
+export * from './mission/index.js';
