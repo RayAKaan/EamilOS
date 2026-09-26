@@ -5,6 +5,7 @@ import { join } from 'path';
 import { MissionEngine } from './MissionEngine.js';
 import { MissionStore } from './MissionStore.js';
 import { TaskGraph } from './TaskGraph.js';
+import { GraphScheduler } from './GraphScheduler.js';
 
 function tempStore(): MissionStore {
   return new MissionStore(mkdtempSync(join(tmpdir(), 'eamilos-phase1-')));
@@ -116,6 +117,41 @@ describe('Phase 1 mission runtime', () => {
 
     expect(engine.evaluateCompletion(mission.id).complete).toBe(true);
     expect(engine.snapshot(mission.id).mission.status).toBe('completed');
+  });
+
+  it('deduplicates task creation by idempotency key', () => {
+    const store = tempStore();
+    const engine = new MissionEngine(store);
+    const mission = engine.createMission({ id: 'idem_mission', goal: 'Idempotency', workingDir: '/tmp/project' });
+    const first = engine.addTask(mission.id, {
+      title: 'Same task',
+      description: 'First submission',
+      idempotencyKey: 'idem-1',
+    });
+    const second = engine.addTask(mission.id, {
+      title: 'Same task',
+      description: 'Duplicate submission',
+      idempotencyKey: 'idem-1',
+    });
+    expect(second.id).toBe(first.id);
+    expect(engine.snapshot(mission.id).tasks).toHaveLength(1);
+  });
+
+  it('schedules ready work by dependency and priority', () => {
+    const store = tempStore();
+    const engine = new MissionEngine(store);
+    const mission = engine.createMission({
+      id: 'schedule_mission',
+      goal: 'Schedule',
+      workingDir: '/tmp/project',
+      constraints: { maxConcurrentTasks: 1 },
+    });
+    engine.addTask(mission.id, { id: 'low', title: 'Low', description: 'Low', priority: 'LOW' });
+    engine.addTask(mission.id, { id: 'high', title: 'High', description: 'High', priority: 'HIGH' });
+    const snapshot = engine.snapshot(mission.id);
+    const plan = new GraphScheduler(snapshot.mission.constraints).plan(new TaskGraph(snapshot.tasks));
+    expect(plan.ready.map((task) => task.id)).toEqual(['high']);
+    expect(plan.availableSlots).toBe(1);
   });
 
   it('lists persisted missions', () => {
