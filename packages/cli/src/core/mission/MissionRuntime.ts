@@ -1,5 +1,6 @@
 import { GraphScheduler, type SchedulePlan } from './GraphScheduler.js';
 import { MissionEngine } from './MissionEngine.js';
+import { TaskGraph } from './TaskGraph.js';
 import type { TaskNode } from './types.js';
 
 export class MissionRuntime {
@@ -8,7 +9,7 @@ export class MissionRuntime {
   schedule(missionId: string): SchedulePlan {
     const snapshot = this.engine.snapshot(missionId);
     const scheduler = new GraphScheduler(snapshot.mission.constraints);
-    return scheduler.plan(new (requireTaskGraph())(snapshot.tasks));
+    return scheduler.plan(new TaskGraph(snapshot.tasks));
   }
 
   claimNext(missionId: string, owner: string, ttlMs?: number): { task: TaskNode; leaseId: string } | null {
@@ -16,14 +17,8 @@ export class MissionRuntime {
     const next = plan.ready[0];
     if (!next) return null;
     const lease = this.engine.acquireLease(missionId, next.id, owner, ttlMs);
-    return { task: this.engine.snapshot(missionId).tasks.find((task) => task.id === next.id)!, leaseId: lease.id };
+    const task = this.engine.snapshot(missionId).tasks.find((item) => item.id === next.id);
+    if (!task) throw new Error(`Claimed task disappeared: ${next.id}`);
+    return { task, leaseId: lease.id };
   }
 }
-
-function requireTaskGraph() {
-  // Kept as a tiny indirection to make this runtime tree-shakable and avoid
-  // circular initialization between runtime and engine exports.
-  return requireGraph;
-}
-
-import { TaskGraph as requireGraph } from './TaskGraph.js';
