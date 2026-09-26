@@ -21,6 +21,8 @@ interface MissionFile {
   events: MissionEvent[];
 }
 
+export type { MissionSnapshot } from './types.js';
+
 export class MissionStore {
   private readonly baseDir: string;
 
