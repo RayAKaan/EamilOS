@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import {
   CheckpointSchema,
@@ -10,6 +10,7 @@ import {
   type TaskCheckpoint,
   type TaskNode,
   type MissionEvent,
+  type MissionSnapshot,
 } from './types.js';
 
 interface MissionFile {
@@ -70,16 +71,22 @@ export class MissionStore {
 
   delete(id: string): void {
     const file = this.path(id);
-    if (existsSync(file)) {
-      // Keep this store intentionally filesystem-only and dependency-free.
-      // eslint/typecheck does not require fs.rmSync in older Node typings.
-      renameSync(file, `${file}.deleted.${Date.now()}`);
-    }
+    if (existsSync(file)) renameSync(file, `${file}.deleted.${Date.now()}`);
   }
 
   list(): Mission[] {
     if (!existsSync(this.baseDir)) return [];
-    return [];
+    return readdirSync(this.baseDir)
+      .filter((file) => file.endsWith('.json'))
+      .map((file) => {
+        try {
+          const raw = JSON.parse(readFileSync(join(this.baseDir, file), 'utf8')) as MissionFile;
+          return MissionSchema.parse(raw.mission);
+        } catch {
+          return null;
+        }
+      })
+      .filter((mission): mission is Mission => mission !== null);
   }
 
   private write(data: MissionFile): void {
@@ -88,12 +95,4 @@ export class MissionStore {
     writeFileSync(temp, JSON.stringify(data, null, 2), 'utf8');
     renameSync(temp, target);
   }
-}
-
-export interface MissionSnapshot {
-  mission: Mission;
-  tasks: TaskNode[];
-  checkpoints: TaskCheckpoint[];
-  evidence: MissionEvidence[];
-  events: MissionEvent[];
 }
