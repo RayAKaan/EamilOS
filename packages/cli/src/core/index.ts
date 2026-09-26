@@ -374,3 +374,26 @@ export {
   MissionConstraintsSchema,
   MissionSchema,
 } from './mission/index.js';
+
+export {
+  CoordinationEngine,
+  CoordinationStore,
+  ProposalReconciler,
+  LocalPlanBuilder,
+} from './coordination/index.js';
+export type {
+  ResourceKind,
+  ResourceRef,
+  ConflictType,
+  ReconciliationAction,
+  TaskProposal,
+  LocalTodo,
+  LocalPlan,
+  PlanRevision,
+  CoordinationConflict,
+  ResourceLease,
+  TaskReservation,
+  PlanVersion,
+  CoordinationSnapshot,
+  ReconciliationResult,
+} from './coordination/index.js';
