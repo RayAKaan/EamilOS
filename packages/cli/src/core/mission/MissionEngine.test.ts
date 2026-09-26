@@ -42,14 +42,20 @@ describe('Phase 1 mission runtime', () => {
   });
 
   it('rejects dependency cycles', () => {
-    const graph = new TaskGraph();
-    graph.add({ id: 'a', missionId: 'm', title: 'A', description: 'A' });
-    graph.add({ id: 'b', missionId: 'm', title: 'B', description: 'B', dependencies: ['a'] });
-    expect(() => graph.update('a', { inputs: { dependsOn: ['b'] } })).not.toThrow();
-    expect(() => new TaskGraph([
-      { ...graph.get('a')!, dependencies: ['b'] },
-      graph.get('b')!,
-    ])).toThrow(/cycle/i);
+    const now = new Date().toISOString();
+    const a = {
+      id: 'a', missionId: 'm', title: 'A', description: 'A', state: 'PENDING' as const,
+      priority: 'MEDIUM' as const, dependencies: ['b'], requiredCapabilities: [],
+      acceptanceCriteria: [], inputs: {}, outputs: {}, artifacts: [], evidenceIds: [],
+      attempt: 0, maxAttempts: 3, idempotencyKey: 'm:a', createdAt: now, updatedAt: now,
+    };
+    const b = {
+      id: 'b', missionId: 'm', title: 'B', description: 'B', state: 'PENDING' as const,
+      priority: 'MEDIUM' as const, dependencies: ['a'], requiredCapabilities: [],
+      acceptanceCriteria: [], inputs: {}, outputs: {}, artifacts: [], evidenceIds: [],
+      attempt: 0, maxAttempts: 3, idempotencyKey: 'm:b', createdAt: now, updatedAt: now,
+    };
+    expect(() => new TaskGraph([a, b])).toThrow(/cycle/i);
   });
 
   it('enforces leases and recovers expired work', () => {
