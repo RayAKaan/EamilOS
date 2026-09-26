@@ -50,6 +50,26 @@ describe('Phase 1.5 coordination', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('materializes same-batch dependencies in deterministic graph order', () => {
+    const { dir, coordination, mission, missions } = setup();
+    const child = proposal({
+      proposalId: 'b',
+      globalTaskId: 'task-b',
+      idempotencyKey: 'b',
+      dependencies: ['task-a'],
+    });
+    const parent = proposal({
+      proposalId: 'a',
+      globalTaskId: 'task-a',
+      idempotencyKey: 'a',
+    });
+    const result = coordination.submitProposals(mission.id, [child, parent]);
+    expect(result.escalations).toEqual([]);
+    expect(missions.snapshot(mission.id).tasks.map((task) => task.id)).toEqual(['task-a', 'task-b']);
+    expect(missions.snapshot(mission.id).tasks[1].dependencies).toEqual(['task-a']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('merges duplicate proposals by idempotency key', () => {
     const { dir, coordination, mission } = setup();
     const first = coordination.submitProposals(mission.id, [proposal()]);
