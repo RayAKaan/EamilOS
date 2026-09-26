@@ -106,6 +106,13 @@ export class MissionEngine {
     idempotencyKey?: string;
   }): TaskNode {
     const snapshot = this.load(missionId);
+    const existing = input.idempotencyKey
+      ? snapshot.tasks.find((candidate) => candidate.idempotencyKey === input.idempotencyKey)
+      : input.id
+        ? snapshot.tasks.find((candidate) => candidate.id === input.id)
+        : undefined;
+    if (existing) return existing;
+
     const graph = new TaskGraph(snapshot.tasks);
     const task = graph.add({ missionId, ...input });
     snapshot.tasks = graph.all();
