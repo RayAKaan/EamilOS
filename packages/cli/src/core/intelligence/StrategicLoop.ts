@@ -44,6 +44,16 @@ export class StrategicLoop {
         continue;
       }
       const action = evaluation.decision.action;
+      if ((action === 'DECOMPOSE' && !this.config.policies.allowTaskCreation) ||
+          (action === 'REPLAN' && !this.config.policies.allowReplanning) ||
+          (action === 'PARALLELIZE' && !this.config.policies.allowParallelization) ||
+          (action === 'ABORT' && !this.config.policies.allowTaskCancellation)) {
+        messages.push('Decision withheld by intelligence policy: ' + action);
+        loop.consecutiveNoProgress += 1;
+        currentTrigger = 'PLAN_REJECTED';
+        this.store.updateLoop(missionId, loop);
+        continue;
+      }
       if (action === 'REPLAN' || action === 'DECOMPOSE' || action === 'SEQUENCE') {
         loop.replans += 1;
         if (loop.replans > this.config.loop.maxReplans) return this.result('BUDGET_EXHAUSTED', loop, messages);
