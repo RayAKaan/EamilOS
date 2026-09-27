@@ -25,6 +25,7 @@ import { registerMissionCommand } from './commands/mission.js';
 import { registerCoordinationCommand } from './commands/coordination.js';
 import { registerIntelligenceCommand } from './commands/intelligence.js';
 import { graphShow, graphVerify, graphWhy } from './commands/graph.js';
+import { registerLoopCommand } from './commands/loop.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -420,6 +421,7 @@ program.addCommand(createMultiAgentCommands());
   registerMissionCommand(program);
   registerCoordinationCommand(program);
   registerIntelligenceCommand(program);
+  registerLoopCommand(program);
 
   const graphCommand = program.command('graph').description('Inspect the Cognitive Execution Graph');
   graphCommand.command('show <missionId>').option('--json', 'Output JSON').action(async (missionId: string, options: { json?: boolean }) => {

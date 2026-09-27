@@ -408,3 +408,5 @@ export * from './distributed-mission/index.js';
 export * from './cognitive-graph/index.js';
 
 export { GitHubWorkspaceManager } from './git/GitHubWorkspaceManager.js';
+
+export * from './loop/index.js';
