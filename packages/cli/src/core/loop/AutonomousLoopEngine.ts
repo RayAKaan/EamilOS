@@ -23,7 +23,7 @@ export class AutonomousLoopEngine {
     private readonly components: AutonomousLoopComponents,
     private readonly policy: AutonomousLoopPolicy,
     private readonly states = new LoopStateStore(),
-    private readonly events = new LoopEventLog(),
+    private readonly eventLog = new LoopEventLog(),
   ) {}
 
   async run(missionId: string, initialTrigger: DecisionTrigger = 'USER_REQUESTED'): Promise<AutonomousLoopResult> {
@@ -252,7 +252,7 @@ export class AutonomousLoopEngine {
   }
 
   async events(missionId: string) {
-    return this.events.all(missionId);
+    return this.eventLog.all(missionId);
   }
 
   private async terminate(state: AutonomousLoopState, status: AutonomousLoopState['status'], reason: string): Promise<AutonomousLoopResult> {
@@ -266,7 +266,7 @@ export class AutonomousLoopEngine {
   }
 
   private async event(state: AutonomousLoopState, type: string, payload: Record<string, unknown> = {}) {
-    await this.events.append({
+    await this.eventLog.append({
       missionId: state.missionId,
       iteration: state.iteration,
       phase: state.phase,
