@@ -1,4 +1,4 @@
-import { GraphBuilder, GraphValidator } from '../cognitive-graph/index.js';
+import { GraphBuilder, GraphValidator, SelfModifyingGraphEngine } from '../cognitive-graph/index.js';
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
@@ -30,7 +30,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
   const decisions = options.decisions ?? new DecisionStore();
   const config = options.config ?? defaultConfig();
   const intelligence = options.intelligence ?? createIntelligenceRuntime({ missions, coordination, registry, config });
-  const contextBuilder = new DecisionContextBuilder(missions, coordination, new ExecutionStore(), decisions, registry);
+  const contextBuilder = new DecisionContextBuilder(missions, coordination, new ExecutionStore(), decisions, registry);\n  const selfModifyingGraph = new SelfModifyingGraphEngine(missions, {\n    allowTaskCreation: config.policies.allowTaskCreation,\n    allowDependencyChanges: true,\n    allowTaskInputChanges: true,\n    maxMutationsPerIteration: 2,\n    maxAdaptationsPerMission: config.loop.maxReplans,\n    requireGraphConsistency: true,\n  });
   // Phase 10 owns the loop lifecycle while reusing the existing validated Jev/Laya
   // runtime and deterministic decision applier.
   const components: AutonomousLoopComponents = {
@@ -119,6 +119,15 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
       };
     },
     adapt: async (missionId, observation, measurement, validation, interpretation) => {
+      const adaptation = selfModifyingGraph.adapt(observation, measurement, validation, measurement.execution);
+      if (adaptation.changed) {
+        return {
+          action: 'REPLAN',
+          trigger: validation.passed ? 'PERIODIC_REVIEW' : 'VALIDATION_FAILED',
+          progress: false,
+          message: adaptation.messages.join('; '),
+        };
+      }
       if (validation.passed && measurement.progressDelta > 0) return { action: 'CONTINUE', trigger: 'TASK_COMPLETED', progress: true, message: 'Validated progress; continuing the mission loop.' };
       if (measurement.execution?.status === 'QUOTA_EXHAUSTED' || measurement.execution?.status === 'WORKER_LOST') {
         return { action: 'RECOVER', trigger: measurement.execution.status === 'QUOTA_EXHAUSTED' ? 'QUOTA_EXHAUSTED' : 'WORKER_LOST', progress: false, message: 'Execution resource failed; next iteration will observe and recover.' };
