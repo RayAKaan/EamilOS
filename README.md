@@ -497,3 +497,50 @@ Used in real-world workflows to generate validated code with 0 manual fixes.
 MIT License
 
 </div>
+
+
+## Phase 3 — Jev + Laya Intelligence
+
+Phase 3 adds the strategic intelligence layer above the authoritative mission graph and Phase 2 execution fabric.
+
+```
+Mission / Task Graph
+        ↓
+DecisionContext
+        ↓
+Jev (BYOK)
+        ↓
+validated bounded decision
+        ↓
+Laya (local)
+        ↓
+authoritative EamilOS coordination
+        ↓
+Phase 2 HarnessScheduler
+        ↓
+checkpoint / validation / evidence
+        ↓
+Jev feedback loop
+```
+
+EamilOS remains the authority: Jev cannot directly mutate mission state, and Laya cannot directly create global tasks. Jev produces bounded decisions; Laya produces non-authoritative proposals; EamilOS validates and reconciles both.
+
+### Intelligence environment
+
+- `EAMILOS_JEV_URL` — user-provided Jev decision endpoint.
+- `EAMILOS_JEV_API_KEY` — user-provided Jev API key; EamilOS does not provide or proxy Jev credentials.
+- `EAMILOS_JEV_HEALTH_URL` — optional Jev health endpoint.
+- `EAMILOS_LAYA_COMMAND` — local Laya executable/runtime command.
+- `EAMILOS_LAYA_ARGS` — optional JSON array of Laya command arguments.
+- `EAMILOS_INTELLIGENCE_MOCK=1` — deterministic Jev mock for tests/development.
+
+### Intelligence commands
+
+```bash
+eamilos intelligence context <missionId>
+eamilos intelligence decide <missionId>
+eamilos intelligence run <missionId>
+eamilos intelligence history <missionId>
+```
+
+The strategic loop is bounded by decision/replan budgets and a stagnation threshold. Invalid, stale, conflicting, or policy-disallowed decisions are never executed.
