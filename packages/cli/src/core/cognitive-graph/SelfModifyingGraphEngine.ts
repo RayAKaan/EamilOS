@@ -38,7 +38,7 @@ export class SelfModifyingGraphEngine {
       return rebuilt;
     }
 
-    if (persisted.stateHash !== rebuilt.stateHash) {
+    if (this.semanticHash(persisted) !== this.semanticHash(rebuilt)) {
       const nextVersion = Math.max(persisted.version + 1, rebuilt.version);
       const next = {
         ...rebuilt,
@@ -100,6 +100,12 @@ export class SelfModifyingGraphEngine {
     }
 
     return result;
+  }
+
+  private semanticHash(snapshot: GraphSnapshot): string {
+    const nodes = snapshot.nodes.map(node => ({ ...node, version: 0 }));
+    const edges = snapshot.edges.map(edge => ({ ...edge, version: 0 }));
+    return graphStateHash(nodes, edges);
   }
 
   async state(missionId: string): Promise<SelfModifyingGraphState> {
