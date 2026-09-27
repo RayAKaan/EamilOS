@@ -28,16 +28,17 @@ export const A2AArtifactSchema = z.object({
 });
 export type A2AArtifact = z.infer<typeof A2AArtifactSchema>;
 
-export interface A2ATask {
-  id: string;
-  contextId: string;
-  state: A2ATaskState;
-  messages: A2AMessage[];
-  artifacts: A2AArtifact[];
-  metadata: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-}
+export const A2ATaskSchema = z.object({
+  id: z.string().min(1),
+  contextId: z.string().min(1),
+  state: A2ATaskStateSchema,
+  messages: z.array(A2AMessageSchema),
+  artifacts: z.array(A2AArtifactSchema),
+  metadata: z.record(z.unknown()).default({}),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type A2ATask = z.infer<typeof A2ATaskSchema>;
 
 export interface A2AAgentCard {
   name: string;
