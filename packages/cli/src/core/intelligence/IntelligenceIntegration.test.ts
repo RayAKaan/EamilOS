@@ -14,10 +14,12 @@ import type { DecisionContext } from './types.js';
 function contextFor(missionId: string, version = 0): DecisionContext {
   return {
     schemaVersion: '1.0',
+    project: { workspace: { workingDir: process.cwd() }, relevantFiles: [] },
+    agents: [],
     mission: { id: missionId, goal: 'Build feature', status: 'active', constraints: {}, completionCriteria: [], requirements: {}, graphVersion: version },
     taskGraph: { version, tasks: [], dependencies: [], readyTasks: [], runningTasks: [], blockedTasks: [], completedTasks: [], failedTasks: [] },
     coordination: { conflicts: [], activeReservations: [], activeLeases: [], localPlans: [] },
-    executions: [], failures: [], checkpoints: [], evidence: [], decisions: [],
+    executions: [], failures: [], checkpoints: [], evidence: [], artifacts: { files: [], diffs: [], evidence: [] }, decisions: [],
     progress: { totalTasks: 0, completedTasks: 0, runningTasks: 0, blockedTasks: 0, failedTasks: 0, readyTasks: 0, completionRatio: 0, progressSinceLastDecision: true },
     timestamp: new Date().toISOString(),
   };
