@@ -8,3 +8,8 @@ export { diffGraphs } from './GraphDiff.js';
 export { FilesystemGraphStore } from './GraphStore.js';
 export { GraphEventLog } from './GraphEventLog.js';
 export { GraphReplay } from './GraphReplay.js';
+
+export { GraphAdaptationEngine } from './GraphAdaptationEngine.js';
+export type { GraphAdaptationKind, GraphAdaptationPolicy, GraphAdaptationProposal, GraphAdaptationResult } from './GraphAdaptationEngine.js';
+export { SelfModifyingGraphEngine } from './SelfModifyingGraphEngine.js';
+export type { SelfModifyingGraphPolicy, SelfModifyingGraphState } from './SelfModifyingGraphEngine.js';

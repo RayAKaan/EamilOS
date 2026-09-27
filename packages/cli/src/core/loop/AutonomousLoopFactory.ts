@@ -1,4 +1,4 @@
-import { GraphBuilder, GraphValidator } from '../cognitive-graph/index.js';
+import { GraphValidator, SelfModifyingGraphEngine } from '../cognitive-graph/index.js';
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
@@ -31,12 +31,20 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
   const config = options.config ?? defaultConfig();
   const intelligence = options.intelligence ?? createIntelligenceRuntime({ missions, coordination, registry, config });
   const contextBuilder = new DecisionContextBuilder(missions, coordination, new ExecutionStore(), decisions, registry);
+  const selfModifyingGraph = new SelfModifyingGraphEngine(missions, {
+    allowTaskCreation: config.policies.allowTaskCreation,
+    allowDependencyChanges: true,
+    allowTaskInputChanges: true,
+    maxMutationsPerIteration: 2,
+    maxAdaptationsPerMission: config.loop.maxReplans,
+    requireGraphConsistency: true,
+  });
   // Phase 10 owns the loop lifecycle while reusing the existing validated Jev/Laya
   // runtime and deterministic decision applier.
   const components: AutonomousLoopComponents = {
     observe: async (missionId, iteration) => {
       const context = contextBuilder.build(missionId);
-      const graph = new GraphBuilder().build(missions.snapshot(missionId));
+      const graph = await selfModifyingGraph.observe(missionId);
       const graphHealth = new GraphValidator().validate(graph);
       return {
         missionId, iteration, observedAt: new Date().toISOString(), graph, graphHealth, context,
@@ -94,7 +102,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
           const next = after.taskGraph.tasks.find(item => item.id === task.id);
           return count + (next?.state !== task.state ? 1 : 0);
         }, 0),
-        graphVersion: new GraphBuilder().build(missions.snapshot(missionId)).version,
+        graphVersion: (await selfModifyingGraph.observe(missionId)).version,
         execution,
       };
     },
@@ -119,6 +127,15 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
       };
     },
     adapt: async (missionId, observation, measurement, validation, interpretation) => {
+      const adaptation = await selfModifyingGraph.adapt(observation, measurement, validation, measurement.execution);
+      if (adaptation.changed) {
+        return {
+          action: 'REPLAN',
+          trigger: validation.passed ? 'PERIODIC_REVIEW' : 'VALIDATION_FAILED',
+          progress: false,
+          message: adaptation.messages.join('; '),
+        };
+      }
       if (validation.passed && measurement.progressDelta > 0) return { action: 'CONTINUE', trigger: 'TASK_COMPLETED', progress: true, message: 'Validated progress; continuing the mission loop.' };
       if (measurement.execution?.status === 'QUOTA_EXHAUSTED' || measurement.execution?.status === 'WORKER_LOST') {
         return { action: 'RECOVER', trigger: measurement.execution.status === 'QUOTA_EXHAUSTED' ? 'QUOTA_EXHAUSTED' : 'WORKER_LOST', progress: false, message: 'Execution resource failed; next iteration will observe and recover.' };
