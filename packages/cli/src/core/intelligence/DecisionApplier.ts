@@ -81,7 +81,13 @@ export class DecisionApplier {
         progress = true;
         messages.push('Verified ' + taskId + '.');
       } else {
-        messages.push('Validation did not pass for ' + taskId + '.');
+        const hasValidation = execution.result?.validation !== undefined;
+        if (hasValidation) {
+          this.missions.transitionTask(context.mission.id, taskId, 'RECOVERABLE');
+          messages.push('Validation did not pass for ' + taskId + '; task marked recoverable.');
+        } else {
+          messages.push('Validation did not pass for ' + taskId + '.');
+        }
       }
     }
     return { action: decision.action, changed: progress, progress, messages, executions: [] };
