@@ -38,7 +38,7 @@ export class DecisionApplier {
       case 'COMPLETE': return this.complete(context);
       case 'ESCALATE': return this.escalate(context, decision);
       case 'ABORT':
-        await this.missions.cancelProject?.(context.mission.id);
+        this.missions.cancel(context.mission.id);
         return { action: decision.action, changed: true, progress: false, messages: ['Mission cancellation requested by validated decision.'], executions: [] };
     }
   }
