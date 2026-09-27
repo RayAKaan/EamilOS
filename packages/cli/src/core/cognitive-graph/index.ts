@@ -6,3 +6,5 @@ export { GraphMutationEngine } from './GraphMutationEngine.js';
 export { GraphBuilder } from './GraphBuilder.js';
 export { diffGraphs } from './GraphDiff.js';
 export { FilesystemGraphStore } from './GraphStore.js';
+export { GraphEventLog } from './GraphEventLog.js';
+export { GraphReplay } from './GraphReplay.js';
