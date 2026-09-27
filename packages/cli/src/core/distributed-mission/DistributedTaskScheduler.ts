@@ -15,7 +15,7 @@ export interface DistributedSchedulerOptions {
 export class DistributedTaskScheduler {
   constructor(
     private readonly ledger: DistributedMissionLedger,
-    private readonly graph: TaskGraph,
+    readonly graph: TaskGraph,
     private readonly nodes: () => DistributedNodeView[],
     private readonly options: DistributedSchedulerOptions = {},
   ) {}
