@@ -56,6 +56,8 @@ describe('ExecutionStore', () => {
       createdAt: first,
       progress: { completedSteps: ['one'], remainingSteps: ['two'] },
       output: 'one',
+      artifacts: [],
+      metadata: {},
     });
 
     store.saveCheckpoint({
@@ -68,6 +70,8 @@ describe('ExecutionStore', () => {
       createdAt: second,
       progress: { completedSteps: ['one', 'two'], remainingSteps: [] },
       output: 'two',
+      artifacts: [],
+      metadata: {},
     });
 
     expect(store.getLatestCheckpoint('mission_1', 'task_1')?.id).toBe('checkpoint_2');
