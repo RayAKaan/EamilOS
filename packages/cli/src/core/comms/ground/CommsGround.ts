@@ -82,6 +82,14 @@ export class CommsGround {
     return receipt;
   }
 
+  async publishArtifact(senderId: string, artifact: unknown, topic = 'artifact.published') {
+    return this.broadcast(senderId, topic, 'ARTIFACT', artifact);
+  }
+
+  async publishMemory(senderId: string, memory: unknown, topic = 'memory.published') {
+    return this.broadcast(senderId, topic, 'MEMORY', memory);
+  }
+
   async broadcast(senderId: string, topic: string, kind: CommsMessage['kind'], payload: unknown, metadata: Record<string, unknown> = {}) {
     return this.publish({
       conversationId: randomUUID(),
