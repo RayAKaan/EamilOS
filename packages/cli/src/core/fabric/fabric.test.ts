@@ -80,7 +80,7 @@ describe('Phase 6 device fabric', () => {
       const tb = new FabricTransport(b, [{ nodeId: a.nodeId, publicKey: a.nodeIdentity.publicKey, address: '' }]);
       const port = await tb.start(0);
       const received = new Promise<void>((resolve) => ta.on('peer:connected', () => resolve()));
-      await ta.connect({ nodeId: b.nodeId, publicKey: b.nodeIdentity.publicKey, address: \`ws://127.0.0.1:\${port}\` });
+      await ta.connect({ nodeId: b.nodeId, publicKey: b.nodeIdentity.publicKey, address: 'ws://127.0.0.1:' + port });
       await received;
       expect(ta.connectedPeers()).toContain(b.nodeId);
       expect(tb.connectedPeers()).toContain(a.nodeId);
