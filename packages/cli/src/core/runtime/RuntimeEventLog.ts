@@ -29,3 +29,5 @@ export class RuntimeEventLog {
   }
   async recent(missionId:string,limit=50){const events=await this.load(missionId);return events.slice(-limit);}
 }
+
+function canonical(value:unknown):string{if(value===null||typeof value!=='object')return JSON.stringify(value);if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';const object=value as Record<string,unknown>;return '{'+Object.keys(object).sort().map(key=>JSON.stringify(key)+':'+canonical(object[key])).join(',')+'}';}
