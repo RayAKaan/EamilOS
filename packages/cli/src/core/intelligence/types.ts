@@ -118,7 +118,7 @@ export interface DecisionContext {
     activeLeases: CoordinationSnapshot['resourceLeases'];
     localPlans: CoordinationSnapshot['localPlans'];
   };
-  executions: ExecutionContext[];
+  executions: IntelligenceExecutionContext[];
   failures: FailureContext[];
   checkpoints: CheckpointContext[];
   evidence: EvidenceContext[];
@@ -127,7 +127,7 @@ export interface DecisionContext {
   timestamp: string;
 }
 
-export interface ExecutionContext {
+export interface IntelligenceExecutionContext {
   executionId: string;
   taskId: string;
   harnessId?: string;
