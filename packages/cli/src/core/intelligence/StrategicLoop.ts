@@ -57,6 +57,9 @@ export class StrategicLoop {
       }
       try {
         const applied = await this.applier.apply(context, evaluation.decision);
+        record.status = applied.changed ? 'PARTIALLY_APPLIED' : 'ACCEPTED';
+        record.appliedActions = applied.messages;
+        this.store.saveDecision(record);
         messages.push(...applied.messages);
         loop.consecutiveNoProgress = applied.progress ? 0 : loop.consecutiveNoProgress + 1;
         const after = this.contextBuilder.build(missionId);
@@ -64,6 +67,9 @@ export class StrategicLoop {
         if (after.mission.status === 'cancelled') return this.result('ABORTED', loop, messages);
         currentTrigger = this.nextTrigger(applied, after);
       } catch (error) {
+        record.status = 'FAILED';
+        record.rejectionReason = error instanceof Error ? error.message : String(error);
+        this.store.saveDecision(record);
         messages.push(error instanceof Error ? error.message : String(error));
         loop.consecutiveNoProgress += 1;
         currentTrigger = 'EXECUTION_FAILED';
