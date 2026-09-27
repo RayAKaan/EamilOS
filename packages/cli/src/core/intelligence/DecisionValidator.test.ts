@@ -4,6 +4,8 @@ import type { DecisionContext } from './types.js';
 
 const context: DecisionContext = {
   schemaVersion: '1.0',
+  project: { workspace: { workingDir: process.cwd() }, relevantFiles: [] },
+  agents: [],
   mission: {
     id: 'mission-1',
     goal: 'test',
@@ -31,6 +33,7 @@ const context: DecisionContext = {
   failures: [],
   checkpoints: [],
   evidence: [],
+  artifacts: { files: [], diffs: [], evidence: [] },
   decisions: [],
   progress: { totalTasks: 2, completedTasks: 1, runningTasks: 0, blockedTasks: 0, failedTasks: 0, readyTasks: 1, completionRatio: 0.5, progressSinceLastDecision: true },
   timestamp: new Date().toISOString(),
