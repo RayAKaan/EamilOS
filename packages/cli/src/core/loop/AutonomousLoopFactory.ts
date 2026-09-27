@@ -30,7 +30,15 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
   const decisions = options.decisions ?? new DecisionStore();
   const config = options.config ?? defaultConfig();
   const intelligence = options.intelligence ?? createIntelligenceRuntime({ missions, coordination, registry, config });
-  const contextBuilder = new DecisionContextBuilder(missions, coordination, new ExecutionStore(), decisions, registry);\n  const selfModifyingGraph = new SelfModifyingGraphEngine(missions, {\n    allowTaskCreation: config.policies.allowTaskCreation,\n    allowDependencyChanges: true,\n    allowTaskInputChanges: true,\n    maxMutationsPerIteration: 2,\n    maxAdaptationsPerMission: config.loop.maxReplans,\n    requireGraphConsistency: true,\n  });
+  const contextBuilder = new DecisionContextBuilder(missions, coordination, new ExecutionStore(), decisions, registry);
+  const selfModifyingGraph = new SelfModifyingGraphEngine(missions, {
+    allowTaskCreation: config.policies.allowTaskCreation,
+    allowDependencyChanges: true,
+    allowTaskInputChanges: true,
+    maxMutationsPerIteration: 2,
+    maxAdaptationsPerMission: config.loop.maxReplans,
+    requireGraphConsistency: true,
+  });
   // Phase 10 owns the loop lifecycle while reusing the existing validated Jev/Laya
   // runtime and deterministic decision applier.
   const components: AutonomousLoopComponents = {
