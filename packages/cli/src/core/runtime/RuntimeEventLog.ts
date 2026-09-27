@@ -10,7 +10,7 @@ export class RuntimeEventLog {
     const list = await this.load(input.missionId);
     const previous = list.at(-1);
     const base = {...input,eventId:randomUUID(),sequence:list.length,timestamp:input.timestamp ?? new Date().toISOString(),previousEventHash:previous?.hash};
-    const hash=createHash('sha256').update(JSON.stringify(base)).digest('hex');
+    const hash=createHash('sha256').update(canonical(base)).digest('hex');
     const event=RuntimeEventSchema.parse({...base,hash});
     list.push(event); this.cache.set(event.missionId,list);
     if(this.file){await mkdir(dirname(this.file),{recursive:true});await appendFile(this.file,JSON.stringify(event)+'\n','utf8');}
@@ -24,7 +24,7 @@ export class RuntimeEventLog {
   }
   async replay(missionId:string):Promise<RuntimeEvent[]> {
     const events=await this.load(missionId);let previous:string|undefined;
-    for(const event of events){if(event.previousEventHash!==previous)throw new Error('Runtime event chain is broken at sequence '+event.sequence);const {hash: _hash, ...copy}=event;void _hash;const expected=createHash('sha256').update(JSON.stringify(copy)).digest('hex');if(expected!==event.hash)throw new Error('Runtime event hash mismatch at sequence '+event.sequence);previous=event.hash;}
+    for(const event of events){if(event.previousEventHash!==previous)throw new Error('Runtime event chain is broken at sequence '+event.sequence);const {hash: _hash, ...copy}=event;void _hash;const expected=createHash('sha256').update(canonical(copy)).digest('hex');if(expected!==event.hash)throw new Error('Runtime event hash mismatch at sequence '+event.sequence);previous=event.hash;}
     return events;
   }
   async recent(missionId:string,limit=50){const events=await this.load(missionId);return events.slice(-limit);}
