@@ -2,11 +2,15 @@ import type { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import type { MissionEngine } from '../mission/MissionEngine.js';
 import type { Mission, TaskNode } from '../mission/types.js';
 import type { DecisionContext, EvidenceContext, TaskSummary } from './types.js';
+import { ExecutionStore } from '../execution/ExecutionStore.js';
+import { DecisionStore } from './DecisionStore.js';
 
 export class DecisionContextBuilder {
   constructor(
     private readonly missions: MissionEngine,
     private readonly coordination: CoordinationEngine,
+    private readonly executions: ExecutionStore = new ExecutionStore(),
+    private readonly decisions: DecisionStore = new DecisionStore(),
   ) {}
 
   build(missionId: string): DecisionContext {
@@ -61,8 +65,28 @@ export class DecisionContextBuilder {
         activeLeases: coordination.resourceLeases.filter(r => r.status === 'ACTIVE'),
         localPlans: coordination.localPlans,
       },
-      executions: [],
-      failures: [],
+      executions: this.executions.getOrCreate(missionId).executions.map((execution) => ({
+        executionId: execution.executionId,
+        taskId: execution.taskId,
+        harnessId: execution.harnessId,
+        workerId: execution.nodeId,
+        status: execution.state,
+        startedAt: execution.startedAt,
+        durationMs: execution.result?.metrics.durationMs,
+        checkpointId: execution.checkpointId,
+        metrics: execution.result?.metrics.tokensUsed !== undefined ? { tokensUsed: execution.result.metrics.tokensUsed } : undefined,
+      })),
+      failures: this.executions.getOrCreate(missionId).executions.filter((execution) => execution.failure).map((execution) => ({
+        id: execution.executionId,
+        type: execution.failure!,
+        taskId: execution.taskId,
+        executionId: execution.executionId,
+        harnessId: execution.harnessId,
+        workerId: execution.nodeId,
+        recoverable: execution.state === 'RECOVERABLE' || execution.failure === 'QUOTA_EXHAUSTED',
+        details: execution.result?.error?.message ?? execution.failure!,
+        timestamp: execution.updatedAt,
+      })),
       checkpoints: snapshot.checkpoints.map(c => ({
         id: c.id, taskId: c.taskId, status: c.status,
         completedSteps: c.completedSteps, remainingSteps: c.remainingSteps,
@@ -72,7 +96,13 @@ export class DecisionContextBuilder {
         id: e.id, type: e.type, passed: e.passed,
         description: e.description, reference: e.reference,
       })),
-      decisions: [],
+      decisions: this.decisions.getDecisions(missionId).map((decision) => ({
+        decisionId: decision.decisionId,
+        trigger: decision.trigger,
+        action: decision.decision.action,
+        status: decision.status,
+        createdAt: decision.createdAt,
+      })),
       progress: {
         totalTasks: counts.total,
         completedTasks: counts.completed,
