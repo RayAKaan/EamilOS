@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { DecisionContext, DecisionEvaluation, DecisionRecord, DecisionTrigger, JevDecision, JevProvider } from './types.js';
+import type { DecisionContext, DecisionEvaluation, DecisionRecord, DecisionTrigger, JevDecision, JevProvider, JevProviderResponse } from './types.js';
 import { DecisionValidator } from './DecisionValidator.js';
 
 export class DecisionRuntime {
@@ -13,7 +13,7 @@ export class DecisionRuntime {
     evaluation: DecisionEvaluation;
     record: DecisionRecord;
   }> {
-    let response;
+    let response: JevProviderResponse | undefined;
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       try {
