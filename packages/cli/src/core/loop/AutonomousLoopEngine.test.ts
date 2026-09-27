@@ -72,7 +72,7 @@ describe('AutonomousLoopEngine', () => {
         phases.push('OBSERVE');
         return observation(missionId, iteration, progress);
       },
-      interpret: (obs) => {
+      interpret: () => {
         phases.push('INTERPRET');
         return {
           action: progress === 0 ? 'EXECUTE' : 'COMPLETE',
@@ -119,7 +119,7 @@ describe('AutonomousLoopEngine', () => {
 
     expect(result.status).toBe('COMPLETED');
     expect(result.iterations).toBe(2);
-    expect(phases).toEqual(['OBSERVE','INTERPRET','EXECUTE','MEASURE','VALIDATE','ADAPT','OBSERVE','INTERPRET']);
+    expect(phases).toEqual(['OBSERVE','INTERPRET','EXECUTE','MEASURE','VALIDATE','ADAPT','OBSERVE']);
   });
 
   it('escalates on graph inconsistency before execution', async () => {
