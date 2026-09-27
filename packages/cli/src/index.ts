@@ -24,6 +24,7 @@ import { workerStartCommand } from './commands/worker.js';
 import { registerMissionCommand } from './commands/mission.js';
 import { registerCoordinationCommand } from './commands/coordination.js';
 import { registerIntelligenceCommand } from './commands/intelligence.js';
+import { graphShow, graphVerify, graphWhy } from './commands/graph.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -419,6 +420,17 @@ program.addCommand(createMultiAgentCommands());
   registerMissionCommand(program);
   registerCoordinationCommand(program);
   registerIntelligenceCommand(program);
+
+  const graphCommand = program.command('graph').description('Inspect the Cognitive Execution Graph');
+  graphCommand.command('show <missionId>').option('--json', 'Output JSON').action(async (missionId: string, options: { json?: boolean }) => {
+    try { await graphShow(missionId, options); } catch (error) { handleFatalError(error); }
+  });
+  graphCommand.command('verify <missionId>').option('--json', 'Output JSON').action(async (missionId: string, options: { json?: boolean }) => {
+    try { await graphVerify(missionId, options); } catch (error) { handleFatalError(error); }
+  });
+  graphCommand.command('why <missionId> <taskId>').option('--json', 'Output JSON').action(async (missionId: string, taskId: string, options: { json?: boolean }) => {
+    try { await graphWhy(missionId, taskId, options); } catch (error) { handleFatalError(error); }
+  });
 
   program
     .command('connect [address]')

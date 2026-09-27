@@ -405,5 +405,6 @@ export * from './runtime/index.js';
 export * from './fabric/index.js';
 
 export * from './distributed-mission/index.js';
+export * from './cognitive-graph/index.js';
 
 export { GitHubWorkspaceManager } from './git/GitHubWorkspaceManager.js';
