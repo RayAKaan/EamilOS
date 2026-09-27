@@ -69,4 +69,5 @@ export interface FabricClusterConfig {
   eamilosVersion: string;
   heartbeatIntervalMs?: number;
   nodeTimeoutMs?: number;
+  trustedPeers?: Array<{ nodeId: string; publicKey: string }>;
 }
