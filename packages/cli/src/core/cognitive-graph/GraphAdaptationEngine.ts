@@ -110,7 +110,7 @@ export class GraphAdaptationEngine {
     validation: LoopValidation,
     execution?: RuntimeExecutionResult,
   ): GraphAdaptationResult {
-    const current = new GraphBuilder().build(this.missions.snapshot(observation.missionId));
+    const current = observation.graph;
     const validator = new GraphValidator();
     if (this.policy.requireGraphConsistency) validator.assertValid(current);
 
