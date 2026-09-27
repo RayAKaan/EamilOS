@@ -82,6 +82,7 @@ export const ExecutionStateSchema = z.enum([
   'INTERRUPTED',
   'QUOTA_EXHAUSTED',
   'AUTH_FAILED',
+  'ESCALATED',
   'RECOVERABLE',
   'RESCHEDULED',
 ]);
