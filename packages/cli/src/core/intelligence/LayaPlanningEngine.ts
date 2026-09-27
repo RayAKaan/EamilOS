@@ -44,6 +44,7 @@ export class LayaPlanningEngine {
 
   private normalize(raw: LayaPlan, context: DecisionContext, policy: PlanningPolicy): LayaPlan {
     if (raw.tasks.length > policy.maxTasksPerPlan) throw new Error('Laya plan exceeds maxTasksPerPlan');
+    if (context.taskGraph.tasks.length + raw.tasks.length > policy.maxTotalTasks) throw new Error('Laya plan exceeds maxTotalTasks');
     if (raw.dependencies.length > policy.maxDependencyEdges) throw new Error('Laya plan exceeds maxDependencyEdges');
     const proposals: TaskProposal[] = raw.tasks.map((item, index) => TaskProposalSchema.parse({
       ...item,
