@@ -3,3 +3,7 @@ export * from './ParallelExecutor.js';
 export * from './types.js';
 export * from './HarnessAdapter.js';
 export * from './ExecutionStore.js';
+export * from './AgentFactoryHarnessAdapter.js';
+export * from './HarnessRegistry.js';
+export * from './CandidateSelector.js';
+export * from './FailurePolicy.js';
