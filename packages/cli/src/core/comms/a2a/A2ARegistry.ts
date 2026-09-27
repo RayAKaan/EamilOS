@@ -1,0 +1,2 @@
+import type { A2AAgentCard } from './types.js';
+export class A2ARegistry { private cards=new Map<string,A2AAgentCard>(); register(endpoint:string,card:A2AAgentCard){this.cards.set(endpoint,card);return card;} unregister(endpoint:string){return this.cards.delete(endpoint);} get(endpoint:string){return this.cards.get(endpoint);} list(){return [...this.cards.entries()].map(([endpoint,card])=>({endpoint,card}));} }
