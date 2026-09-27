@@ -198,6 +198,8 @@ export class AutonomousLoopEngine {
           message: adaptation.message,
         });
 
+        if (adaptation.action === 'RECOVER') state.counters.recoveries += 1;
+
         if (adaptation.progress || measurement.progressDelta > 0) {
           state.counters.stagnantIterations = 0;
           state.lastProgressMetric = measurement.progressMetric;
