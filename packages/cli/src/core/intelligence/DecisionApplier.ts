@@ -27,8 +27,8 @@ export class DecisionApplier {
   async apply(context: DecisionContext, decision: JevDecision): Promise<AppliedDecision> {
     switch (decision.action) {
       case 'DECOMPOSE':
-      case 'REPLAN':
-      case 'SEQUENCE': return this.plan(context, decision);
+      case 'REPLAN': return this.plan(context, decision);
+      case 'SEQUENCE': return this.sequence(context, decision);
       case 'EXECUTE':
       case 'CONTINUE':
       case 'RETRY':
@@ -48,6 +48,21 @@ export class DecisionApplier {
     const task = target ? context.taskGraph.tasks.find((item) => item.id === target) : undefined;
     const result = await this.planner.plan(context, task?.title ?? context.mission.goal, target, decision.recovery as PlanningPolicy | undefined);
     return { action: decision.action, changed: result.submitted.accepted.length > 0, progress: result.submitted.accepted.length > 0, messages: ['Laya submitted ' + result.submitted.accepted.length + ' authoritative proposal(s).'], executions: [], planId: result.plan.planId };
+  }
+
+  private sequence(context: DecisionContext, decision: JevDecision): AppliedDecision {
+    const ids = this.targetTaskIds(context, decision);
+    if (ids.length < 2) {
+      return { action: decision.action, changed: false, progress: false, messages: ['Sequence requires at least two task targets.'], executions: [] };
+    }
+    for (let index = 1; index < ids.length; index += 1) {
+      const current = this.missions.snapshot(context.mission.id).tasks.find((task) => task.id === ids[index]);
+      if (!current) throw new Error('Sequence target not found: ' + ids[index]);
+      this.missions.updateTask(context.mission.id, current.id, {
+        dependencies: Array.from(new Set([...current.dependencies, ids[index - 1]])),
+      });
+    }
+    return { action: decision.action, changed: true, progress: true, messages: ['Sequenced ' + ids.length + ' tasks deterministically.'], executions: [] };
   }
 
   private async execute(context: DecisionContext, decision: JevDecision): Promise<AppliedDecision> {
