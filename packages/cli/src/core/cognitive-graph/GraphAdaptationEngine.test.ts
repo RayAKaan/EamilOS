@@ -1,18 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { MissionEngine } from '../mission/MissionEngine.js';
+import { GraphBuilder } from './GraphBuilder.js';
+import { GraphValidator } from './GraphValidator.js';
 import { GraphAdaptationEngine } from './GraphAdaptationEngine.js';
 import type { LoopMeasurement, LoopObservation, LoopValidation } from '../loop/types.js';
 
 function observation(missions: MissionEngine): LoopObservation {
   const snapshot = missions.snapshot('mission_test');
-  const graph = {
-    missionId: snapshot.mission.id,
-    version: 1,
-    nodes: [],
-    edges: [],
-    stateHash: 'test',
-    createdAt: new Date().toISOString(),
-  };
+  const graph = new GraphBuilder().build(snapshot);
+  const graphHealth = new GraphValidator().validate(graph);
   return {
     missionId: snapshot.mission.id,
     iteration: 1,
@@ -26,11 +22,11 @@ function observation(missions: MissionEngine): LoopObservation {
       schemaVersion: '1.0',
       mission: {
         id: snapshot.mission.id, goal: snapshot.mission.goal, status: snapshot.mission.status,
-        constraints: {}, completionCriteria: [], requirements: {}, graphVersion: 1,
+        constraints: {}, completionCriteria: [], requirements: {}, graphVersion: graph.version,
       },
       project: { workspace: { workingDir: snapshot.mission.workingDir }, relevantFiles: [] },
       agents: [], taskGraph: {
-        version: 1, tasks: snapshot.tasks.map(t => ({
+        version: graph.version, tasks: snapshot.tasks.map(t => ({
           id: t.id, title: t.title, state: t.state, priority: t.priority,
           dependencies: t.dependencies, requiredCapabilities: t.requiredCapabilities,
           acceptanceCriteria: t.acceptanceCriteria, attempt: t.attempt,
