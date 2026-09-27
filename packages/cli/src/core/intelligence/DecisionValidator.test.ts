@@ -32,7 +32,7 @@ const context: DecisionContext = {
   checkpoints: [],
   evidence: [],
   decisions: [],
-  progress: { totalTasks: 2, completedTasks: 1, runningTasks: 0, blockedTasks: 0, failedTasks: 0, completionRatio: 0.5, progressSinceLastDecision: true },
+  progress: { totalTasks: 2, completedTasks: 1, runningTasks: 0, blockedTasks: 0, failedTasks: 0, readyTasks: 1, completionRatio: 0.5, progressSinceLastDecision: true },
   timestamp: new Date().toISOString(),
 };
 
