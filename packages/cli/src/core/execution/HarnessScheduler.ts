@@ -208,6 +208,10 @@ export class HarnessScheduler {
         if (result.status === 'COMPLETED') {
           this.missions.transitionTask(missionId, taskId, 'VALIDATING');
           this.missions.releaseLease(missionId, lease.id);
+          if (reservationId) {
+            this.coordination.releaseReservation(missionId, reservationId);
+            reservationId = undefined;
+          }
           return {
             completed: false,
             validationRequired: true,
