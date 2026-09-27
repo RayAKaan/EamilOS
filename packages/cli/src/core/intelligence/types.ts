@@ -138,6 +138,13 @@ export interface DecisionContext {
   artifacts: { files: string[]; diffs: string[]; evidence: string[] };
   decisions: DecisionRecordSummary[];
   progress: MissionProgress;
+  fleet?: {
+    nodes: Array<{ nodeId: string; state: string; capabilities: string[]; activeTasks: number; maxConcurrentTasks: number; lastSeenAt: number }>;
+    healthyNodeCount: number;
+    capableNodeCount: number;
+    activeAssignments: number;
+    recoverableAssignments: number;
+  };
   timestamp: string;
 }
 
