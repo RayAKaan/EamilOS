@@ -1,10 +1,11 @@
 import { randomUUID } from 'crypto';
+import type { TaskGraph } from '../mission/TaskGraph.js';
 import type { TaskNode } from '../mission/types.js';
-import type { DistributedMissionLedger, } from './DistributedMissionLedger.js';
+import type { DistributedMissionLedger } from './DistributedMissionLedger.js';
 import type {
   DistributedAssignment,
   DistributedNodeView,
-  TaskAssignmentCandidate;
+  TaskAssignmentCandidate
 } from './types.js';
 
 export interface DistributedSchedulerOptions {
