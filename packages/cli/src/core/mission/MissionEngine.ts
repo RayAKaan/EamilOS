@@ -214,7 +214,7 @@ export class MissionEngine {
     return value;
   }
 
-  updateTask(missionId: string, taskId: string, updates: Partial<Pick<TaskNode, 'outputs' | 'artifacts' | 'evidenceIds' | 'error' | 'inputs'>>): TaskNode {
+  updateTask(missionId: string, taskId: string, updates: Partial<Pick<TaskNode, 'outputs' | 'artifacts' | 'evidenceIds' | 'error' | 'inputs' | 'dependencies'>>): TaskNode {
     const snapshot = this.load(missionId);
     const graph = new TaskGraph(snapshot.tasks);
     const task = graph.update(taskId, updates);
