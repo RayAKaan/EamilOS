@@ -1,4 +1,4 @@
-import { GraphBuilder, GraphValidator, SelfModifyingGraphEngine } from '../cognitive-graph/index.js';
+import { GraphValidator, SelfModifyingGraphEngine } from '../cognitive-graph/index.js';
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
@@ -94,7 +94,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
           const next = after.taskGraph.tasks.find(item => item.id === task.id);
           return count + (next?.state !== task.state ? 1 : 0);
         }, 0),
-        graphVersion: new GraphBuilder().build(missions.snapshot(missionId)).version,
+        graphVersion: (await selfModifyingGraph.observe(missionId)).version,
         execution,
       };
     },
