@@ -2,7 +2,7 @@ import { CLI_AGENT_DEFINITIONS } from '../agents/definitions.js';
 import {
   createCliHarnessAdapter,
   AgentFactoryHarnessAdapter,
-} from './AgentFactoryHarnessAdapter.js';
+} from './AgentFactoryHarnessAdapter.js';\nimport type { HarnessAdapter } from './HarnessAdapter.js';
 import type {
   HarnessAvailability,
   HarnessDescriptor,
@@ -59,7 +59,7 @@ export class HarnessRegistry {
   async refresh(harnessId?: string): Promise<HarnessDescriptor[]> {
     const adapters = harnessId
       ? [this.adapters.get(harnessId)].filter(
-          (adapter): adapter is AgentFactoryHarnessAdapter => Boolean(adapter),
+          (adapter): adapter is HarnessAdapter => Boolean(adapter),
         )
       : Array.from(this.adapters.values());
 
