@@ -77,7 +77,7 @@ describe('ExecutionStore', () => {
     const store = makeStore();
     const now = new Date().toISOString();
 
-    for (const [index, state] of ['RUNNING', 'VALIDATING', 'COMPLETED'] as const).entries()) {
+    for (const [index, state] of (['RUNNING', 'VALIDATING', 'COMPLETED'] as const).entries()) {
       store.saveExecution({
         executionId: `exec_${index}`,
         missionId: 'mission_1',
