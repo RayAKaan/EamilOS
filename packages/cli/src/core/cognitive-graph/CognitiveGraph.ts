@@ -17,7 +17,11 @@ export function canonicalJson(value: unknown): string {
 }
 
 export function graphStateHash(nodes: GraphNode[], edges: GraphEdge[]): string {
-  return createHash('sha256').update(canonicalJson({ nodes, edges })).digest('hex');
+  // Hash only semantic graph state. Wall-clock timestamps are provenance metadata
+  // and must not make equivalent graph states hash differently across runs.
+  const stableNodes = nodes.map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...node }) => node);
+  const stableEdges = edges.map(({ createdAt: _createdAt, ...edge }) => edge);
+  return createHash('sha256').update(canonicalJson({ nodes: stableNodes, edges: stableEdges })).digest('hex');
 }
 
 export class CognitiveGraph {
