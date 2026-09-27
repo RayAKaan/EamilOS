@@ -39,11 +39,20 @@ export class DistributedMissionCoordinator {
     if (!assignment) throw new Error(`Assignment not found: ${assignmentId}`);
     if (assignment.state !== 'OFFERED') throw new Error(`Assignment is not claimable: ${assignment.state}`);
     this.ledger.updateAssignment(assignmentId, 'LEASED', { leaseId, leaseExpiresAt });
+    const task = this.scheduler['graph'].get(assignment.taskId);
+    if (task) {
+      task.owner = assignment.nodeId;
+      task.leaseId = leaseId;
+      task.leaseExpiresAt = leaseExpiresAt;
+      if (task.state === 'READY' || task.state === 'RECOVERABLE') this.scheduler['graph'].transition(task.id, 'CLAIMED');
+    }
   }
 
   start(assignmentId: string): void {
     const assignment = this.requireActive(assignmentId);
     this.ledger.updateAssignment(assignmentId, 'RUNNING');
+    const task = this.scheduler['graph'].get(assignment.taskId);
+    if (task?.state === 'CLAIMED') this.scheduler['graph'].transition(task.id, 'RUNNING');
     this.ledger.append('TASK_ASSIGNED', assignment.taskId, assignment.nodeId, {
       assignmentId,
       state: 'RUNNING',
@@ -62,13 +71,17 @@ export class DistributedMissionCoordinator {
       throw new Error(`No active assignment for task ${result.taskId} on node ${result.nodeId}`);
     }
     if (!result.success) {
-      this.ledger.updateAssignment(assignment.assignmentId, 'FAILED', { updatedAt: new Date().toISOString() });
+        this.ledger.updateAssignment(assignment.assignmentId, 'FAILED', { updatedAt: new Date().toISOString() });
+      const task = this.scheduler['graph'].get(result.taskId);
+      if (task && ['RUNNING', 'CHECKPOINTED', 'VALIDATING'].includes(task.state)) this.scheduler['graph'].transition(task.id, 'RECOVERABLE');
       this.ledger.append('TASK_FAILED', result.taskId, result.nodeId, { error: result.error });
       return;
     }
     this.ledger.updateAssignment(assignment.assignmentId, 'COMPLETED', {
       updatedAt: new Date().toISOString(),
     });
+    const task = this.scheduler['graph'].get(result.taskId);
+    if (task && ['RUNNING', 'CHECKPOINTED'].includes(task.state)) this.scheduler['graph'].transition(task.id, 'VALIDATING');
     this.ledger.append('TASK_COMPLETED', result.taskId, result.nodeId, {
       artifacts: result.artifacts ?? [],
       commit: result.commit,
@@ -82,6 +95,13 @@ export class DistributedMissionCoordinator {
     );
     for (const assignment of affected) {
       this.ledger.updateAssignment(assignment.assignmentId, 'REQUEUED');
+      const task = this.scheduler['graph'].get(assignment.taskId);
+      if (task) {
+        task.owner = undefined;
+        task.leaseId = undefined;
+        task.leaseExpiresAt = undefined;
+        if (['CLAIMED', 'RUNNING', 'CHECKPOINTED'].includes(task.state)) this.scheduler['graph'].transition(task.id, 'RECOVERABLE');
+      }
       this.ledger.append('NODE_LOST', assignment.taskId, nodeId, {
         assignmentId: assignment.assignmentId,
       });
