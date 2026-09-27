@@ -39,6 +39,6 @@ export class MissionEventReplicator {
   }
 
   private transportMessage(type: 'mission:events', payload: MissionEventEnvelope, to: string): FabricMessage<MissionEventEnvelope> {
-    return this.transport['node'].createMessage(type, payload, to);
+    return this.transport.createMessage(type, payload, to);
   }
 }
