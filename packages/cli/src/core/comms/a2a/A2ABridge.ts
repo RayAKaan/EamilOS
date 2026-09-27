@@ -5,7 +5,7 @@ import type { A2AAgentCard, A2AMessage, A2ATask } from './types.js';
 export class A2ABridge {
   constructor(private readonly ground: CommsGround) {}
   async publishTask(senderId: string, recipientId: string, task: A2ATask): Promise<void> {
-    await this.ground.publish({ conversationId: task.contextId, correlationId: task.id, senderId, senderRole: 'service', recipientId, topic: 'a2a.task', kind: 'TASK', delivery: 'AT_LEAST_ONCE', payload: task });
+    await this.ground.publish({ conversationId: task.contextId, correlationId: task.id, senderId, senderRole: 'service', recipientId, topic: 'a2a.task', kind: 'TASK', delivery: 'AT_LEAST_ONCE', payload: task, metadata: {} });
   }
   fromA2AMessage(message: A2AMessage) { return { conversationId: randomUUID(), messageId: message.messageId, payload: message.parts }; }
   toAgentCard(participant: { name: string; endpoint?: string; capabilities: string[] }): A2AAgentCard {
