@@ -1,0 +1,39 @@
+import type { Command } from 'commander';
+import { MissionEngine } from '../core/mission/MissionEngine.js';
+import { createIntelligenceRuntime } from '../core/intelligence/IntelligenceFactory.js';
+
+export function registerIntelligenceCommand(program: Command): void {
+  const intelligence = program.command('intelligence').description('Run Jev + Laya strategic intelligence');
+
+  intelligence.command('context <missionId>')
+    .description('Build the structured DecisionContext sent to Jev')
+    .action((missionId: string) => {
+      const runtime = createIntelligenceRuntime();
+      console.log(JSON.stringify(runtime.context.build(missionId), null, 2));
+    });
+
+  intelligence.command('decide <missionId>')
+    .description('Request and validate one bounded Jev decision')
+    .action(async (missionId: string) => {
+      const runtime = createIntelligenceRuntime();
+      const result = await runtime.decide(missionId);
+      console.log(JSON.stringify(result, null, 2));
+    });
+
+  intelligence.command('run <missionId>')
+    .description('Run the bounded autonomous Jev → Laya → EamilOS loop')
+    .action(async (missionId: string) => {
+      const missions = new MissionEngine();
+      const mission = missions.snapshot(missionId).mission;
+      if (mission.status === 'created') missions.start(missionId);
+      const runtime = createIntelligenceRuntime({ missions });
+      console.log(JSON.stringify(await runtime.run(missionId), null, 2));
+    });
+
+  intelligence.command('history <missionId>')
+    .description('Show persisted strategic decisions')
+    .action((missionId: string) => {
+      const runtime = createIntelligenceRuntime();
+      console.log(JSON.stringify(runtime.decisions.getDecisions(missionId), null, 2));
+    });
+}
