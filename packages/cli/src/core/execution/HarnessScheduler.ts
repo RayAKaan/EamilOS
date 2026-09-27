@@ -169,6 +169,22 @@ export class HarnessScheduler {
 
         lastResult = result;
 
+        const failureForResult = result.error?.type ?? this.failureFromResult(result);
+        if (result.status === 'COMPLETED') {
+          this.registry.markSuccess(candidate.harnessId);
+        } else if (failureForResult !== 'UNKNOWN') {
+          const recoveryPreview = getFailureRecoveryDecision(failureForResult);
+          if (!recoveryPreview.retrySameHarness) {
+            this.registry.markFailure(
+              candidate.harnessId,
+              failureForResult === 'QUOTA_EXHAUSTED' ? 'QUOTA_EXHAUSTED' :
+                failureForResult === 'AUTH_FAILED' || failureForResult === 'AUTH_REQUIRED' ? 'AUTH_FAILED' :
+                  'UNAVAILABLE',
+              failureForResult,
+            );
+          }
+        }
+
         const finalState = result.status === 'COMPLETED'
           ? 'VALIDATING'
           : result.status === 'TIMED_OUT'
@@ -221,7 +237,7 @@ export class HarnessScheduler {
           };
         }
 
-        const failure = result.error?.type ?? this.failureFromResult(result);
+        const failure = failureForResult;
         const recovery = getFailureRecoveryDecision(failure);
 
         if (recovery.checkpointBeforeRecovery) {
