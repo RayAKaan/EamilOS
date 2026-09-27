@@ -214,7 +214,7 @@ export class MissionEngine {
     return value;
   }
 
-  updateTask(missionId: string, taskId: string, updates: Partial<Pick<TaskNode, 'outputs' | 'artifacts' | 'evidenceIds' | 'error' | 'inputs'>>): TaskNode {
+  updateTask(missionId: string, taskId: string, updates: Partial<Pick<TaskNode, 'outputs' | 'artifacts' | 'evidenceIds' | 'error' | 'inputs' | 'dependencies'>>): TaskNode {
     const snapshot = this.load(missionId);
     const graph = new TaskGraph(snapshot.tasks);
     const task = graph.update(taskId, updates);
@@ -229,6 +229,22 @@ export class MissionEngine {
     const graph = new TaskGraph(snapshot.tasks);
     graph.refreshReadiness();
     return graph.ready();
+  }
+
+  cancel(missionId: string): Mission {
+    const snapshot = this.load(missionId);
+    snapshot.mission.status = 'cancelled';
+    for (const task of snapshot.tasks) {
+      if (!['COMPLETED', 'CANCELLED'].includes(task.state)) {
+        const graph = new TaskGraph(snapshot.tasks);
+        graph.transition(task.id, 'CANCELLED');
+        snapshot.tasks = graph.all();
+      }
+    }
+    this.touch(snapshot);
+    this.emitIn(snapshot, 'MISSION_CANCELLED', {});
+    this.persist(snapshot);
+    return snapshot.mission;
   }
 
   evaluateCompletion(missionId: string) {

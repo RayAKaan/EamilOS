@@ -1,0 +1,49 @@
+import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
+import { MissionEngine } from '../mission/MissionEngine.js';
+import { HarnessRegistry } from '../execution/HarnessRegistry.js';
+import { HarnessScheduler } from '../execution/HarnessScheduler.js';
+import { JevHttpProvider } from './JevHttpProvider.js';
+import { LayaProcessAdapter } from './LayaProcessAdapter.js';
+import { MockJevProvider } from './providers/MockJevProvider.js';
+import type { IntelligenceConfig, JevProvider, LayaModelAdapter } from './types.js';
+import { IntelligenceEngine, defaultIntelligenceConfig } from './IntelligenceEngine.js';
+
+export interface IntelligenceRuntimeOptions {
+  missions?: MissionEngine;
+  coordination?: CoordinationEngine;
+  registry?: HarnessRegistry;
+  jev?: JevProvider;
+  laya?: LayaModelAdapter;
+  config?: IntelligenceConfig;
+}
+
+export function createIntelligenceRuntime(options: IntelligenceRuntimeOptions = {}): IntelligenceEngine {
+  const missions = options.missions ?? new MissionEngine();
+  const coordination = options.coordination ?? new CoordinationEngine(missions);
+  const registry = options.registry ?? new HarnessRegistry();
+  const scheduler = new HarnessScheduler(missions, coordination, registry);
+  const config = options.config ?? defaultIntelligenceConfig();
+  const jev = options.jev ?? createJevFromEnvironment(config);
+  const laya = options.laya ?? createLayaFromEnvironment(config);
+  return new IntelligenceEngine(missions, coordination, scheduler, jev, laya, config);
+}
+
+function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
+  if (process.env.EAMILOS_INTELLIGENCE_MOCK === '1') return new MockJevProvider();
+  const endpoint = process.env.EAMILOS_JEV_URL;
+  const apiKey = process.env.EAMILOS_JEV_API_KEY;
+  if (!endpoint || !apiKey) throw new Error('Jev is enabled but EAMILOS_JEV_URL and EAMILOS_JEV_API_KEY are not configured.');
+  return new JevHttpProvider({ endpoint, apiKey, timeoutMs: config.jev.timeoutMs, healthEndpoint: process.env.EAMILOS_JEV_HEALTH_URL });
+}
+
+function createLayaFromEnvironment(config: IntelligenceConfig): LayaModelAdapter {
+  const command = process.env.EAMILOS_LAYA_COMMAND;
+  if (!command) throw new Error('Laya is enabled but EAMILOS_LAYA_COMMAND is not configured.');
+  let args: string[] = [];
+  if (process.env.EAMILOS_LAYA_ARGS) {
+    const parsed = JSON.parse(process.env.EAMILOS_LAYA_ARGS);
+    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) throw new Error('EAMILOS_LAYA_ARGS must be a JSON string array.');
+    args = parsed;
+  }
+  return new LayaProcessAdapter({ command, args, timeoutMs: config.laya.timeoutMs, cwd: process.cwd() });
+}
