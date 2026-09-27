@@ -62,9 +62,20 @@ export class LayaPlanningEngine {
       metadata: { ...(item.metadata ?? {}), layaPlanId: raw.planId },
     }));
     const known = new Set(context.taskGraph.tasks.map((task) => task.id));
-    for (const proposal of proposals) for (const dependency of proposal.dependencies) {
-      if (!known.has(dependency) && !proposals.some((candidate) => candidate.globalTaskId === dependency)) throw new Error('Laya proposal references unknown dependency ' + dependency);
+    const proposalIds = new Map(proposals.map((proposal, index) => [
+      proposal.proposalId,
+      proposal.globalTaskId ?? ('laya_task_' + raw.planId + '_' + index),
+    ]));
+    const normalized = proposals.map((proposal) => ({
+      ...proposal,
+      globalTaskId: proposalIds.get(proposal.proposalId),
+      dependencies: proposal.dependencies.map((dependency) => proposalIds.get(dependency) ?? dependency),
+    }));
+    for (const proposal of normalized) for (const dependency of proposal.dependencies) {
+      if (!known.has(dependency) && !normalized.some((candidate) => candidate.globalTaskId === dependency)) {
+        throw new Error('Laya proposal references unknown dependency ' + dependency);
+      }
     }
-    return { ...raw, tasks: proposals };
+    return { ...raw, tasks: normalized };
   }
 }
