@@ -4,6 +4,7 @@ import type { Mission, TaskNode } from '../mission/types.js';
 import type { DecisionContext, EvidenceContext, TaskSummary } from './types.js';
 import { ExecutionStore } from '../execution/ExecutionStore.js';
 import { DecisionStore } from './DecisionStore.js';
+import { HarnessRegistry } from '../execution/HarnessRegistry.js';
 
 export class DecisionContextBuilder {
   constructor(
@@ -11,6 +12,7 @@ export class DecisionContextBuilder {
     private readonly coordination: CoordinationEngine,
     private readonly executions: ExecutionStore = new ExecutionStore(),
     private readonly decisions: DecisionStore = new DecisionStore(),
+    private readonly registry: HarnessRegistry = new HarnessRegistry(),
   ) {}
 
   build(missionId: string): DecisionContext {
@@ -39,6 +41,19 @@ export class DecisionContextBuilder {
 
     const context: DecisionContext = {
       schemaVersion: '1.0',
+      project: {
+        repository: typeof snapshot.mission.metadata.repository === 'string' ? snapshot.mission.metadata.repository : undefined,
+        workspace: { workingDir: snapshot.mission.workingDir },
+        stack: Array.isArray(snapshot.mission.metadata.stack) ? snapshot.mission.metadata.stack.filter((item): item is string => typeof item === 'string') : undefined,
+        relevantFiles: Array.isArray(snapshot.mission.metadata.relevantFiles) ? snapshot.mission.metadata.relevantFiles.filter((item): item is string => typeof item === 'string') : [],
+      },
+      agents: this.registry.list().map((descriptor) => ({
+        id: descriptor.id,
+        harness: descriptor.id,
+        capabilities: Object.entries(descriptor.capabilities).filter(([, enabled]) => enabled).map(([key]) => key),
+        status: descriptor.status,
+        health: this.registry.health(descriptor.id)?.status ?? descriptor.status,
+      })),
       mission: {
         id: snapshot.mission.id,
         goal: snapshot.mission.goal,
@@ -96,6 +111,11 @@ export class DecisionContextBuilder {
         id: e.id, type: e.type, passed: e.passed,
         description: e.description, reference: e.reference,
       })),
+      artifacts: {
+        files: snapshot.tasks.flatMap((task) => task.artifacts),
+        diffs: [],
+        evidence: snapshot.evidence.map((item) => item.reference),
+      },
       decisions: this.decisions.getDecisions(missionId).map((decision) => ({
         decisionId: decision.decisionId,
         trigger: decision.trigger,
