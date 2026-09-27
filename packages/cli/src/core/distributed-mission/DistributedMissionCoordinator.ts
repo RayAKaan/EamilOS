@@ -113,7 +113,7 @@ export class DistributedMissionCoordinator {
   }
 
   expireLeases(now = Date.now()): string[] {
-    const expired = this.ledger.assignments().filter(
+    const expired = this.ledger.listAssignments().filter(
       (assignment) =>
         assignment.leaseExpiresAt &&
         Date.parse(assignment.leaseExpiresAt) <= now &&
