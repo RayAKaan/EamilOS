@@ -1,0 +1,13 @@
+import type { A2ATask } from './types.js';
+export class A2ATaskStore {
+  private tasks = new Map<string, A2ATask>();
+  put(task: A2ATask) { this.tasks.set(task.id, task); return task; }
+  get(id: string) { return this.tasks.get(id); }
+  update(id: string, patch: Partial<A2ATask>) {
+    const current = this.tasks.get(id);
+    if (!current) throw new Error(`A2A task not found: ${id}`);
+    const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    this.tasks.set(id, next);
+    return next;
+  }
+}
