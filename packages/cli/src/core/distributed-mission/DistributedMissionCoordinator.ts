@@ -89,7 +89,7 @@ export class DistributedMissionCoordinator {
   }
 
   nodeLost(nodeId: string): string[] {
-    const affected = this.ledger.assignments().filter(
+    const affected = this.ledger.listAssignments().filter(
       (assignment) => assignment.nodeId === nodeId &&
         !['COMPLETED', 'FAILED', 'REJECTED'].includes(assignment.state),
     );
