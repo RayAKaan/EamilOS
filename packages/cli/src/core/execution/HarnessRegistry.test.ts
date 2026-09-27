@@ -84,6 +84,9 @@ function fakeAdapter(id = 'fake'): HarnessAdapter {
       nodeId: 'local',
       createdAt: new Date().toISOString(),
       progress: { completedSteps: [], remainingSteps: [] },
+      output: '',
+      artifacts: [],
+      metadata: {},
     }),
     resume: async () => {
       throw new Error('not used');
