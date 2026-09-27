@@ -1,0 +1,2 @@
+import type { CommsMessage,CommsTransport } from './types.js';
+export class InMemoryTransport implements CommsTransport{readonly received:CommsMessage[]=[];constructor(readonly id:string,private readonly onReceive?:(message:CommsMessage)=>Promise<void>|void){}async send(message:CommsMessage){this.received.push(message);await this.onReceive?.(message);}}
