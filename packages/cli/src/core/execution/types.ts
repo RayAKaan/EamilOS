@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { ResourceRefSchema } from '../coordination/types.js';
-import type { ResourceRef } from '../coordination/types.js';
 
 export const HarnessKindSchema = z.enum(['cli', 'local', 'remote', 'api', 'plugin']);
 export type HarnessKind = z.infer<typeof HarnessKindSchema>;
@@ -161,7 +160,7 @@ export const ExecutionRequestSchema = z.object({
   }),
   resources: z.object({
     readSet: z.array(ResourceRefSchema),
-    writeSet: z.array(z.custom<ResourceRef>()),
+    writeSet: z.array(ResourceRefSchema),
   }),
   timeoutMs: z.number().int().positive(),
   environment: z.record(z.string()).default({}),
