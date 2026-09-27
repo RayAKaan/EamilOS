@@ -16,7 +16,6 @@ export class FabricNode extends EventEmitter {
   private identity?: FabricNodeRecord['identity'];
   private privateKey?: string;
   private readonly trustedPeers = new Map<string, string>();
-  private readonly trustedPeers: Map<string, string>;
 
   constructor(private readonly config: FabricClusterConfig) {
     super();
