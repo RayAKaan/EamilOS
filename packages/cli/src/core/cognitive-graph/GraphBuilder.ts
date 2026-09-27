@@ -34,7 +34,8 @@ export class GraphBuilder {
       graph.addNode({ id: evidence.id, type: 'EVIDENCE', source: source(evidence.id), attributes: {
         type: evidence.type, description: evidence.description, passed: evidence.passed, reference: evidence.reference,
       }});
-      if (evidence.taskId && graph.getNode(evidence.taskId)) graph.addEdge({ id: `evidence:${evidence.taskId}:${evidence.id}`, type: 'VALIDATED_BY', from: evidence.taskId, to: evidence.id, source: source(evidence.id) });
+      const taskId = typeof evidence.metadata?.taskId === 'string' ? evidence.metadata.taskId : undefined;
+      if (taskId && graph.getNode(taskId)) graph.addEdge({ id: `evidence:${taskId}:${evidence.id}`, type: 'VALIDATED_BY', from: taskId, to: evidence.id, source: source(evidence.id) });
     }
     for (const checkpoint of snapshot.checkpoints) {
       graph.addNode({ id: checkpoint.id, type: 'CHECKPOINT', source: source(checkpoint.id), attributes: {
