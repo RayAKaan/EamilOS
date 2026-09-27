@@ -32,7 +32,8 @@ export class LoopEventLog {
       previousEventHash,
       hash: '',
     } satisfies Omit<LoopEvent, 'hash'> & { hash: string };
-    event.hash = createHash('sha256').update(canonicalJson(event)).digest('hex');
+    const unsigned = { ...event, hash: undefined };
+    event.hash = createHash('sha256').update(canonicalJson(unsigned)).digest('hex');
     await appendFile(this.path(input.missionId), JSON.stringify(event) + '\n', 'utf8');
     return event;
   }
@@ -54,7 +55,7 @@ export class LoopEventLog {
     let previous: string | undefined;
     for (const event of await this.all(missionId)) {
       if (event.previousEventHash !== previous) return false;
-      const expected = createHash('sha256').update(canonicalJson(event)).digest('hex');
+      const expected = createHash('sha256').update(canonicalJson({ ...event, hash: undefined })).digest('hex');
       if (expected !== event.hash) return false;
       previous = event.hash;
     }
