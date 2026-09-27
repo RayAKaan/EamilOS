@@ -79,6 +79,7 @@ export class DecisionContextBuilder {
         runningTasks: counts.running,
         blockedTasks: counts.blocked,
         failedTasks: counts.failed,
+        readyTasks: readyTasks.length,
         completionRatio: counts.total === 0 ? 0 : counts.completed / counts.total,
         progressSinceLastDecision: true,
       },
