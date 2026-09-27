@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MissionStore } from '../mission/MissionStore.js';
+import { CoordinationStore } from '../coordination/CoordinationStore.js';
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import { LayaPlanningEngine } from './LayaPlanningEngine.js';
@@ -20,10 +25,11 @@ function contextFor(missionId: string, version = 0): DecisionContext {
 
 describe('Phase 3 intelligence', () => {
   it('materializes a Laya plan through the authoritative coordination engine', async () => {
-    const missions = new MissionEngine();
+    const root = mkdtempSync(join(tmpdir(), 'eamilos-phase3-'));
+    const missions = new MissionEngine(new MissionStore(join(root, 'missions')));
     const mission = missions.createMission({ goal: 'Build feature', workingDir: process.cwd() });
     missions.start(mission.id);
-    const coordination = new CoordinationEngine(missions);
+    const coordination = new CoordinationEngine(missions, new CoordinationStore(join(root, 'coordination')));
     const planner = new LayaPlanningEngine(coordination, new MockLayaAdapter());
 
     const result = await planner.plan(contextFor(mission.id), 'Implement the feature');
