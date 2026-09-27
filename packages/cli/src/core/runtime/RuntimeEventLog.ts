@@ -10,13 +10,7 @@ export class RuntimeEventLog {
   async append(input: Omit<RuntimeEvent, 'eventId' | 'sequence' | 'timestamp' | 'hash' | 'previousEventHash'> & { timestamp?: string }): Promise<RuntimeEvent> {
     const list = await this.load(input.missionId);
     const previous = list.at(-1);
-    const base = {
-      ...input,
-      eventId: randomUUID(),
-      sequence: list.length,
-      timestamp: input.timestamp ?? new Date().toISOString(),
-      previousEventHash: previous?.hash,
-    };
+    const base = { ...input, eventId: randomUUID(), sequence: list.length, timestamp: input.timestamp ?? new Date().toISOString(), previousEventHash: previous?.hash };
     const normalized = RuntimeEventSchema.parse({ ...base, hash: 'pending' });
     const { hash: _pendingHash, ...hashable } = normalized;
     void _pendingHash;
@@ -34,10 +28,7 @@ export class RuntimeEventLog {
   async load(missionId: string): Promise<RuntimeEvent[]> {
     const cached = this.cache.get(missionId);
     if (cached) return [...cached];
-    if (!this.file) {
-      this.cache.set(missionId, []);
-      return [];
-    }
+    if (!this.file) { this.cache.set(missionId, []); return []; }
     try {
       const raw = await readFile(this.file, 'utf8');
       const all = raw.split('\n').filter(Boolean).map((line) => RuntimeEventSchema.parse(JSON.parse(line)));
@@ -45,10 +36,7 @@ export class RuntimeEventLog {
       this.cache.set(missionId, list);
       return [...list];
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        this.cache.set(missionId, []);
-        return [];
-      }
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') { this.cache.set(missionId, []); return []; }
       throw error;
     }
   }
@@ -74,8 +62,10 @@ export class RuntimeEventLog {
 }
 
 function canonical(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (value === null) return 'null';
+  if (typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   const object = value as Record<string, unknown>;
-  return '{' + Object.keys(object).sort().map((key) => JSON.stringify(key) + ':' + canonical(object[key])).join(',') + '}';
+  const keys = Object.keys(object).filter((key) => object[key] !== undefined).sort();
+  return '{' + keys.map((key) => JSON.stringify(key) + ':' + canonical(object[key])).join(',') + '}';
 }
