@@ -12,3 +12,5 @@ export { DecisionApplier } from './DecisionApplier.js';
 export { StrategicLoop } from './StrategicLoop.js';
 export { IntelligenceEngine, defaultIntelligenceConfig } from './IntelligenceEngine.js';
 export { createIntelligenceRuntime } from './IntelligenceFactory.js';
+
+export * from './FleetIntelligence.js';

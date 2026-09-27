@@ -48,6 +48,8 @@ export class FabricTransport extends EventEmitter {
     })));
   }
 
+  createMessage<T>(type: FabricMessage<T>['type'], payload: T, to?: string): FabricMessage<T> { return this.node.createMessage(type, payload, to); }
+
   send<T>(peerNodeId: string, message: FabricMessage<T>): void {
     const socket = this.sockets.get(peerNodeId);
     if (!socket || socket.readyState !== WebSocket.OPEN) {

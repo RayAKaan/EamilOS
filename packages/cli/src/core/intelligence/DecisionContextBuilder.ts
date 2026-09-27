@@ -5,6 +5,7 @@ import type { DecisionContext, EvidenceContext, TaskSummary } from './types.js';
 import { ExecutionStore } from '../execution/ExecutionStore.js';
 import { DecisionStore } from './DecisionStore.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
+import type { FleetIntelligenceProvider } from './FleetIntelligence.js';
 
 export class DecisionContextBuilder {
   constructor(
@@ -13,6 +14,7 @@ export class DecisionContextBuilder {
     private readonly executions: ExecutionStore = new ExecutionStore(),
     private readonly decisions: DecisionStore = new DecisionStore(),
     private readonly registry: HarnessRegistry = new HarnessRegistry(),
+    private readonly fleet?: FleetIntelligenceProvider,
   ) {}
 
   build(missionId: string): DecisionContext {
@@ -123,6 +125,7 @@ export class DecisionContextBuilder {
         status: decision.status,
         createdAt: decision.createdAt,
       })),
+      fleet: this.fleet?.snapshot(missionId),
       progress: {
         totalTasks: counts.total,
         completedTasks: counts.completed,
