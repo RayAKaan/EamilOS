@@ -1,8 +1,8 @@
 import { CLI_AGENT_DEFINITIONS } from '../agents/definitions.js';
 import {
   createCliHarnessAdapter,
-  AgentFactoryHarnessAdapter,
-} from './AgentFactoryHarnessAdapter.js';\nimport type { HarnessAdapter } from './HarnessAdapter.js';
+} from './AgentFactoryHarnessAdapter.js';
+import type { HarnessAdapter } from './HarnessAdapter.js';
 import type {
   HarnessAvailability,
   HarnessDescriptor,
