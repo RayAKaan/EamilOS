@@ -9,6 +9,7 @@ const harness = (id: string, status: HarnessDescriptor['status'] = 'AVAILABLE'):
   name: id,
   kind: 'cli',
   provider: id,
+  args: [],
   capabilities: {
     codeGeneration: true,
     fileEditing: true,
