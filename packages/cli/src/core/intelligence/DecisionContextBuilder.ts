@@ -111,7 +111,7 @@ export class DecisionContextBuilder {
         failedTasks: counts.failed,
         readyTasks: readyTasks.length,
         completionRatio: counts.total === 0 ? 0 : counts.completed / counts.total,
-        progressSinceLastDecision: true,
+        progressSinceLastDecision: this.decisions.getDecisions(missionId).at(-1)?.contextVersion !== taskGraphVersion,
       },
       timestamp: new Date().toISOString(),
     };
