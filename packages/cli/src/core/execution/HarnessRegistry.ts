@@ -12,7 +12,7 @@ import type {
 import { HarnessDescriptorSchema } from './types.js';
 
 export class HarnessRegistry {
-  private readonly adapters = new Map<string, AgentFactoryHarnessAdapter>();
+  private readonly adapters = new Map<string, HarnessAdapter>();
   private readonly descriptors = new Map<string, HarnessDescriptor>();
   private readonly healthState = new Map<string, HarnessHealth>();
 
@@ -25,7 +25,7 @@ export class HarnessRegistry {
     }
   }
 
-  register(adapter: AgentFactoryHarnessAdapter): void {
+  register(adapter: HarnessAdapter): void {
     const descriptor = HarnessDescriptorSchema.parse(adapter.descriptor);
     this.adapters.set(descriptor.id, adapter);
     this.descriptors.set(descriptor.id, descriptor);
@@ -37,7 +37,7 @@ export class HarnessRegistry {
     return this.adapters.delete(harnessId);
   }
 
-  get(harnessId: string): AgentFactoryHarnessAdapter | undefined {
+  get(harnessId: string): HarnessAdapter | undefined {
     return this.adapters.get(harnessId);
   }
 
