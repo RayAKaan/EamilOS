@@ -1,19 +1,66 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { CommsGround } from './CommsGround.js';
+import { MessageStore } from './MessageStore.js';
 import { InMemoryTransport } from './InMemoryTransport.js';
 
+const participant = (id: string) => ({
+  id, name: id.toUpperCase(), role: 'agent' as const, capabilities: [],
+  authenticated: true, connected: true, lastSeen: Date.now(),
+});
+
 describe('CommsGround', () => {
-  it('routes a message and deduplicates delivery', async () => {
-    const ground=new CommsGround({sharedKey:'test-key'});
-    const transport=new InMemoryTransport('b');
-    ground.registerParticipant({id:'a',name:'A',role:'agent',capabilities:[],authenticated:true,connected:true,lastSeen:Date.now()});
-    ground.registerParticipant({id:'b',name:'B',role:'agent',capabilities:[],authenticated:true,connected:true,lastSeen:Date.now()});
-    ground.registerParticipant({id:'b',name:'B',role:'agent',capabilities:[],authenticated:true,connected:true,lastSeen:Date.now()},transport);
-    ground.subscribe('b','task.*');
-    const message=await ground.publish({conversationId:'c',senderId:'a',senderRole:'agent',topic:'task.created',kind:'EVENT',delivery:'AT_LEAST_ONCE',payload:{taskId:'t'}});
-    expect(transport.received).toHaveLength(1);
-    expect(message.signature).toBeDefined();
-    const receipt=await ground.receive(message,'b');
-    expect(receipt.duplicate).toBe(true);
+  it('routes, signs, and durably deduplicates delivery', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'eamilos-comms-'));
+    try {
+      const ground = new CommsGround({ sharedKey: 'test-key', store: new MessageStore(root) });
+      const transport = new InMemoryTransport('b');
+      ground.registerParticipant(participant('a'));
+      ground.registerParticipant(participant('b'), transport);
+      ground.subscribe('b', 'task.*');
+
+      const message = await ground.publish({
+        conversationId: 'c', senderId: 'a', senderRole: 'agent', topic: 'task.created',
+        kind: 'EVENT', delivery: 'AT_LEAST_ONCE', payload: { taskId: 't' },
+      });
+
+      expect(transport.received).toHaveLength(1);
+      expect(message.signature).toMatch(/^[0-9a-f]{64}$/);
+
+      const first = await ground.receive(message, 'b');
+      const second = await ground.receive(message, 'b');
+      expect(first.duplicate).toBe(true);
+      expect(second.duplicate).toBe(true);
+
+      const restarted = new CommsGround({ sharedKey: 'test-key', store: new MessageStore(root) });
+      restarted.registerParticipant(participant('b'));
+      expect((await restarted.receive(message, 'b')).duplicate).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects invalid signatures, wrong recipients, expired messages, and unauthenticated senders', async () => {
+    const ground = new CommsGround({ sharedKey: 'test-key' });
+    ground.registerParticipant(participant('a'));
+    ground.registerParticipant(participant('b'));
+
+    const message = await ground.publish({
+      conversationId: 'c', senderId: 'a', senderRole: 'agent', recipientId: 'b',
+      topic: 'task.created', kind: 'EVENT', delivery: 'AT_MOST_ONCE', payload: {},
+    });
+
+    await expect(ground.receive({ ...message, signature: 'bad' }, 'b')).rejects.toThrow('Invalid comms signature');
+    await expect(ground.receive(message, 'a')).rejects.toThrow('Message recipient mismatch');
+    await expect(ground.receive({ ...message, timestamp: Date.now() - 61_000 }, 'b')).rejects.toThrow('Expired or future comms message');
+
+    const unauthenticated = { ...participant('c'), authenticated: false };
+    ground.registerParticipant(unauthenticated);
+    await expect(ground.publish({
+      conversationId: 'c2', senderId: 'c', senderRole: 'agent', topic: 'task.created',
+      kind: 'EVENT', delivery: 'AT_MOST_ONCE', payload: {},
+    })).rejects.toThrow('Unauthenticated sender');
   });
 });
