@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { MissionEngine } from '../mission/MissionEngine.js';
-import type { TaskNode } from '../mission/types.js';
 import type { LoopObservation, LoopMeasurement, LoopValidation } from '../loop/types.js';
 import type { RuntimeExecutionResult } from '../runtime/types.js';
 import { GraphBuilder } from './GraphBuilder.js';
 import { GraphValidator } from './GraphValidator.js';
 import { GraphEventLog } from './GraphEventLog.js';
+import { graphStateHash } from './CognitiveGraph.js';
 import type { GraphSnapshot } from './types.js';
 
 export type GraphAdaptationKind =
@@ -188,9 +188,6 @@ export class GraphAdaptationEngine {
       idempotencyKey: proposal.idempotencyKey,
     });
 
-    // The original task remains authoritative in MissionEngine/TaskGraph.
-    // The new recovery task becomes a prerequisite, forcing the next retry
-    // through the newly created recovery path.
     this.missions.updateTask(observation.missionId, target.id, {
       dependencies: [...new Set([...target.dependencies, recovery.id])],
     });
@@ -231,11 +228,14 @@ export class GraphAdaptationEngine {
   }
 
   private withMonotonicVersion(snapshot: GraphSnapshot, version: number): GraphSnapshot {
+    const nodes = snapshot.nodes.map(node => ({ ...node, version }));
+    const edges = snapshot.edges.map(edge => ({ ...edge, version }));
     return {
       ...snapshot,
       version,
-      nodes: snapshot.nodes.map(node => ({ ...node, version })),
-      edges: snapshot.edges.map(edge => ({ ...edge, version })),
+      nodes,
+      edges,
+      stateHash: graphStateHash(nodes, edges),
     };
   }
 }
