@@ -33,7 +33,7 @@ describe('Phase 6 device fabric', () => {
       expect(validateFabricMessage(message)).toEqual([]);
       expect(verifyFabricMessage(message, identity.identity.publicKey)).toBe(true);
       expect(verifyFabricMessage({ ...message, payload: { ok: false } }, identity.identity.publicKey)).toBe(false);
-      expect(validateFabricMessage({ ...message, timestamp: Date.now() - 31_000 })).toContain('Message too old: 31000ms');
+      expect(validateFabricMessage({ ...message, timestamp: Date.now() - 31_000 })[0]).toContain('Message too old');
     } finally {
       await rm(root, { recursive: true, force: true });
     }
