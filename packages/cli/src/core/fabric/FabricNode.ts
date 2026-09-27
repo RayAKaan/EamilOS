@@ -15,11 +15,13 @@ export class FabricNode extends EventEmitter {
   readonly capabilities = new CapabilityRegistry();
   private identity?: FabricNodeRecord['identity'];
   private privateKey?: string;
+  private readonly trustedPeers: Map<string, string>;
 
   constructor(private readonly config: FabricClusterConfig) {
     super();
     this.identityStore = new FabricIdentityStore(join(config.rootDir, 'identity.json'));
     this.membership = new FabricMembershipStore(join(config.rootDir, 'membership.json'), config.clusterId);
+    this.trustedPeers = new Map((config.trustedPeers ?? []).map((peer) => [peer.nodeId, peer.publicKey]));
   }
 
   async initialize(): Promise<FabricNodeRecord> {
@@ -56,15 +58,23 @@ export class FabricNode extends EventEmitter {
     return record;
   }
 
+  trustPeer(nodeId: string, publicKey: string): void {
+    this.trustedPeers.set(nodeId, publicKey);
+  }
+
+  isTrustedPeer(nodeId: string, publicKey: string): boolean {
+    return this.trustedPeers.get(nodeId) === publicKey;
+  }
+
   createMessage<T>(type: FabricMessage<T>['type'], payload: T, to?: string): FabricMessage<T> {
     if (!this.privateKey) throw new Error('FabricNode has not been initialized');
     return createFabricMessage(type, this.nodeId, this.privateKey, payload, to);
   }
 
   verifyPeerMessage(message: FabricMessage): boolean {
-    const peer = this.capabilities.get(message.from);
-    return !!peer && validateFabricMessage(message).length === 0 &&
-      verifyFabricMessage(message, peer.identity.publicKey);
+    const knownKey = this.capabilities.get(message.from)?.identity.publicKey ?? this.trustedPeers.get(message.from);
+    return !!knownKey && validateFabricMessage(message).length === 0 &&
+      verifyFabricMessage(message, knownKey);
   }
 
   heartbeatPayload(): FabricHeartbeatPayload {
