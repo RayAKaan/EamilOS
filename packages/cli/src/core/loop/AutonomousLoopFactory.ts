@@ -1,15 +1,13 @@
-import { GraphBuilder, FilesystemGraphStore, GraphValidator } from '../cognitive-graph/index.js';
+import { GraphBuilder, GraphValidator } from '../cognitive-graph/index.js';
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
 import { HarnessScheduler } from '../execution/HarnessScheduler.js';
 import { ExecutionStore } from '../execution/ExecutionStore.js';
-import { DecisionApplier } from '../intelligence/DecisionApplier.js';
 import { DecisionContextBuilder } from '../intelligence/DecisionContextBuilder.js';
-import { DecisionRuntime } from '../intelligence/DecisionRuntime.js';
 import { DecisionStore } from '../intelligence/DecisionStore.js';
 import { createIntelligenceRuntime } from '../intelligence/IntelligenceFactory.js';
-import type { IntelligenceConfig, DecisionContext, DecisionTrigger, JevDecision } from '../intelligence/types.js';
+import type { IntelligenceConfig, DecisionTrigger, JevDecision } from '../intelligence/types.js';
 import type { RuntimeExecutionResult, RuntimeValidationResult } from '../runtime/types.js';
 import { AutonomousLoopEngine } from './AutonomousLoopEngine.js';
 import type { AutonomousLoopComponents, AutonomousLoopPolicy, LoopAdaptation, LoopInterpretation, LoopObservation, LoopPlanResult, LoopValidation } from './types.js';
@@ -33,11 +31,8 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
   const config = options.config ?? defaultConfig();
   const intelligence = options.intelligence ?? createIntelligenceRuntime({ missions, coordination, registry, config });
   const contextBuilder = new DecisionContextBuilder(missions, coordination, new ExecutionStore(), decisions, registry);
-  const decisionRuntime = new DecisionRuntime((intelligence as { runtime: DecisionRuntime }).runtime);
-  const applier = new DecisionApplier(missions, coordination, scheduler, (intelligence as { applier: DecisionApplier }).applier['planner']?.['laya'] as never);
-
-  // The public IntelligenceEngine is intentionally not used as a driver because Phase 10
-  // owns the loop lifecycle. We reuse its provider through the bounded DecisionRuntime.
+  // Phase 10 owns the loop lifecycle while reusing the existing validated Jev/Laya
+  // runtime and deterministic decision applier.
   const components: AutonomousLoopComponents = {
     observe: async (missionId, iteration) => {
       const context = contextBuilder.build(missionId);
@@ -74,7 +69,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
         const result = await intelligence.run(missionId);
         return { planned: result.status !== 'ESCALATED' && result.status !== 'ABORTED', action: interpretation.action, message: 'Delegated bounded strategic planning.' };
       }
-      const applied = await applier.apply(observation.context, interpretation.decision);
+      const applied = await intelligence.applier.apply(observation.context, interpretation.decision);
       return { planned: applied.changed || applied.progress, action: interpretation.action, message: applied.messages.join('; '), decision: interpretation.decision };
     },
     execute: async (missionId, taskId, interpretation) => {
@@ -109,7 +104,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
     },
     validate: async (missionId, taskId, execution) => {
       const context = contextBuilder.build(missionId);
-      const applied = await applier.apply(context, {
+      const applied = await intelligence.applier.apply(context, {
         decisionId: `loop_verify_${Date.now()}`,
         missionId,
         action: 'VERIFY',
