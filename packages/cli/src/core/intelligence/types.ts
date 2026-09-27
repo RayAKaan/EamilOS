@@ -164,6 +164,7 @@ export interface MissionProgress {
   runningTasks: number;
   blockedTasks: number;
   failedTasks: number;
+  readyTasks: number;
   completionRatio: number;
   progressSinceLastDecision: boolean;
 }
