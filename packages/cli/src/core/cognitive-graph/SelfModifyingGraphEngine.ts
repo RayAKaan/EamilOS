@@ -2,6 +2,8 @@ import type { MissionEngine } from '../mission/MissionEngine.js';
 import type { LoopObservation, LoopMeasurement, LoopValidation } from '../loop/types.js';
 import type { RuntimeExecutionResult } from '../runtime/types.js';
 import { GraphBuilder } from './GraphBuilder.js';
+import { FilesystemGraphStore, type GraphStore } from './GraphStore.js';
+import { GraphValidator } from './GraphValidator.js';
 import { GraphAdaptationEngine, type GraphAdaptationPolicy, type GraphAdaptationResult } from './GraphAdaptationEngine.js';
 
 export interface SelfModifyingGraphPolicy extends GraphAdaptationPolicy {
@@ -22,6 +24,7 @@ export class SelfModifyingGraphEngine {
     private readonly missions: MissionEngine,
     private readonly policy: SelfModifyingGraphPolicy,
     private readonly adaptation = new GraphAdaptationEngine(missions, policy),
+    private readonly store: GraphStore = new FilesystemGraphStore(),
   ) {}
 
   adapt(
@@ -29,10 +32,10 @@ export class SelfModifyingGraphEngine {
     measurement: LoopMeasurement,
     validation: LoopValidation,
     execution?: RuntimeExecutionResult,
-  ): GraphAdaptationResult {
+  ): Promise<GraphAdaptationResult> {
     const used = this.counts.get(observation.missionId) ?? 0;
     if (used >= this.policy.maxAdaptationsPerMission) {
-      const graph = new GraphBuilder().build(this.missions.snapshot(observation.missionId));
+      const graph = await this.observe(observation.missionId);
       return { changed: false, graph, rejectedReason: 'Mission graph adaptation budget exhausted.', messages: ['Self-modification budget exhausted; no graph mutation was applied.'] };
     }
     const result = this.adaptation.apply(observation, measurement, validation, execution);
