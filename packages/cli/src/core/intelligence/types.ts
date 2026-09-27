@@ -102,6 +102,19 @@ export interface DecisionContext {
     requirements: Record<string, unknown>;
     graphVersion: number;
   };
+  project: {
+    repository?: string;
+    workspace: { workingDir: string };
+    stack?: string[];
+    relevantFiles: string[];
+  };
+  agents: {
+    id: string;
+    harness: string;
+    capabilities: string[];
+    status: string;
+    health: string;
+  }[];
   taskGraph: {
     version: number;
     tasks: TaskSummary[];
@@ -122,6 +135,7 @@ export interface DecisionContext {
   failures: FailureContext[];
   checkpoints: CheckpointContext[];
   evidence: EvidenceContext[];
+  artifacts: { files: string[]; diffs: string[]; evidence: string[] };
   decisions: DecisionRecordSummary[];
   progress: MissionProgress;
   timestamp: string;
