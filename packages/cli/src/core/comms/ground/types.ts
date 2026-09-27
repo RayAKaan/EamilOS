@@ -1,0 +1,118 @@
+import { z } from 'zod';
+
+export const ParticipantRoleSchema = z.enum(['controller','worker','agent','harness','jev','laya','user','service']);
+export type ParticipantRole = z.infer<typeof ParticipantRoleSchema>;
+
+export const MessageKindSchema = z.enum([
+  'TASK','STATUS','REQUEST','RESPONSE','EVENT','ARTIFACT','MEMORY',
+  'DECISION','PLAN','CONTROL','HEARTBEAT','ERROR',
+]);
+export type MessageKind = z.infer<typeof MessageKindSchema>;
+
+export const DeliveryModeSchema = z.enum(['AT_MOST_ONCE','AT_LEAST_ONCE','EXACTLY_ONCE']);
+export type DeliveryMode = z.infer<typeof DeliveryModeSchema>;
+
+export const CommsMessageSchema = z.object({
+  protocolVersion: z.number().int().positive(),
+  messageId: z.string().min(1),
+  conversationId: z.string().min(1),
+  correlationId: z.string().optional(),
+  senderId: z.string().min(1),
+  senderRole: ParticipantRoleSchema,
+  recipientId: z.string().optional(),
+  topic: z.string().min(1),
+  kind: MessageKindSchema,
+  timestamp: z.number().int(),
+  expiresAt: z.number().int().optional(),
+  sequence: z.number().int().nonnegative().optional(),
+  delivery: DeliveryModeSchema.default('AT_LEAST_ONCE'),
+  payload: z.unknown(),
+  metadata: z.record(z.unknown()).default({}),
+  signature: z.string().optional(),
+});
+export type CommsMessage = z.infer<typeof CommsMessageSchema>;
+
+export interface Participant {
+  id: string;
+  name: string;
+  role: ParticipantRole;
+  capabilities: string[];
+  endpoint?: string;
+  authenticated: boolean;
+  connected: boolean;
+  lastSeen: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface Subscription {
+  id: string;
+  participantId: string;
+  topic: string;
+  createdAt: number;
+}
+
+export interface DeliveryReceipt {
+  messageId: string;
+  recipientId: string;
+  deliveredAt: number;
+  duplicate: boolean;
+}
+
+export interface CommsTransport {
+  readonly id: string;
+  send(message: CommsMessage): Promise<void>;
+  connect?(): Promise<void>;
+  disconnect?(): Promise<void>;
+  health?(): Promise<{ healthy: boolean; error?: string }>;
+}
+
+export interface CommsEvent {
+  type:
+    | 'participant.registered'
+    | 'participant.connected'
+    | 'participant.disconnected'
+    | 'message.published'
+    | 'message.delivered'
+    | 'message.duplicate'
+    | 'message.rejected'
+    | 'subscription.created'
+    | 'subscription.removed'
+    | 'artifact.published'
+    | 'memory.published';
+  timestamp: number;
+  messageId?: string;
+  participantId?: string;
+  data?: Record<string, unknown>;
+}
+
+export interface ArtifactEnvelope {
+  artifactId: string;
+  missionId: string;
+  taskId?: string;
+  path: string;
+  contentHash: string;
+  size: number;
+  type: string;
+  producerId: string;
+  version: number;
+  content?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MemoryEnvelope {
+  memoryId: string;
+  namespace: string;
+  key: string;
+  value: unknown;
+  version: number;
+  writerId: string;
+  timestamp: number;
+  contentHash: string;
+}
+
+export interface CommsSnapshot {
+  participants: Participant[];
+  subscriptions: Subscription[];
+  recentEvents: CommsEvent[];
+  receipts: DeliveryReceipt[];
+}
