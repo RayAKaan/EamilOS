@@ -6,13 +6,25 @@ export class DecisionRuntime {
   constructor(
     private readonly provider: JevProvider,
     private readonly validator = new DecisionValidator(),
+    private readonly maxRetries = 2,
   ) {}
 
   async evaluate(context: DecisionContext, trigger: DecisionTrigger): Promise<{
     evaluation: DecisionEvaluation;
     record: DecisionRecord;
   }> {
-    const response = await this.provider.decide(context);
+    let response;
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
+      try {
+        response = await this.provider.decide(context);
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt === this.maxRetries) throw error;
+      }
+    }
+    if (!response) throw (lastError instanceof Error ? lastError : new Error('Jev provider returned no response'));
     const evaluation = this.validator.validate(response.decision, context);
     const contextHash = createHash('sha256')
       .update(JSON.stringify(context))
