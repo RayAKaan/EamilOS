@@ -231,6 +231,22 @@ export class MissionEngine {
     return graph.ready();
   }
 
+  cancel(missionId: string): Mission {
+    const snapshot = this.load(missionId);
+    snapshot.mission.status = 'cancelled';
+    for (const task of snapshot.tasks) {
+      if (!['COMPLETED', 'CANCELLED'].includes(task.state)) {
+        const graph = new TaskGraph(snapshot.tasks);
+        graph.transition(task.id, 'CANCELLED');
+        snapshot.tasks = graph.all();
+      }
+    }
+    this.touch(snapshot);
+    this.emitIn(snapshot, 'MISSION_CANCELLED', {});
+    this.persist(snapshot);
+    return snapshot.mission;
+  }
+
   evaluateCompletion(missionId: string) {
     const snapshot = this.load(missionId);
     const result = this.completion.evaluate(snapshot.mission, snapshot.tasks, snapshot.evidence);
