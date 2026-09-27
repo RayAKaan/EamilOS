@@ -22,7 +22,7 @@ export class CommsRegistry {
 
   unsubscribe(id: string): boolean { return this.subscriptions.delete(id); }
   subscriptionsFor(topic: string): Subscription[] {
-    return [...this.subscriptions.values()].filter(s => s.topic === topic || s.topic === '*');
+    return [...this.subscriptions.values()].filter(s => s.topic === topic || s.topic === '*' || (s.topic.endsWith('*') && topic.startsWith(s.topic.slice(0, -1))));
   }
   snapshot() { return { participants: this.list(), subscriptions: [...this.subscriptions.values()] }; }
 }
