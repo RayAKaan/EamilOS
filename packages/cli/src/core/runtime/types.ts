@@ -1,0 +1,19 @@
+import { z } from 'zod';
+
+export const RuntimeStateSchema = z.enum(['CREATED','STARTING','PLANNING','SCHEDULING','EXECUTING','VALIDATING','RECOVERING','REPLANNING','WAITING','PAUSED','ESCALATED','COMPLETED','FAILED','ABORTED','STOPPING']);
+export type RuntimeState = z.infer<typeof RuntimeStateSchema>;
+export const RuntimeHealthSchema = z.enum(['HEALTHY','DEGRADED','RECOVERING','BLOCKED','UNAVAILABLE']);
+export type RuntimeHealth = z.infer<typeof RuntimeHealthSchema>;
+export const RuntimeEventTypeSchema = z.enum(['runtime.started','runtime.paused','runtime.resumed','runtime.stopping','runtime.stopped','runtime.recovered','runtime.failed','runtime.completed','mission.observed','planning.requested','planning.completed','scheduling.requested','execution.started','execution.completed','execution.failed','execution.checkpointed','execution.recovered','execution.reassigned','validation.started','validation.passed','validation.failed','recovery.started','recovery.completed','replan.started','worker.lost','harness.quota_exhausted','resource.reserved','resource.released','communication.received','communication.rejected','budget.exhausted','watchdog.alert']);
+export type RuntimeEventType = z.infer<typeof RuntimeEventTypeSchema>;
+export const RuntimeEventSchema = z.object({eventId:z.string().min(1),missionId:z.string().min(1),taskId:z.string().optional(),executionId:z.string().optional(),timestamp:z.string().datetime(),sequence:z.number().int().nonnegative(),type:RuntimeEventTypeSchema,actor:z.string().min(1),payload:z.record(z.unknown()).default({}),previousEventHash:z.string().optional(),hash:z.string().min(1)});
+export type RuntimeEvent = z.infer<typeof RuntimeEventSchema>;
+export const RuntimeBudgetSchema = z.object({maxWallTimeMs:z.number().int().positive().optional(),maxExecutions:z.number().int().positive().optional(),maxRetries:z.number().int().nonnegative().optional(),maxReplans:z.number().int().nonnegative().optional(),maxJevDecisions:z.number().int().positive().optional(),maxLayaPlans:z.number().int().positive().optional(),maxCostUsd:z.number().nonnegative().optional(),maxParallelExecutions:z.number().int().positive().optional()});
+export type RuntimeBudget = z.infer<typeof RuntimeBudgetSchema>;
+export interface RuntimeCounters { executions:number; retries:number; replans:number; jevDecisions:number; layaPlans:number; costUsd:number; startedAt:string; }
+export interface RuntimeSnapshot { version:number; missionId:string; state:RuntimeState; health:RuntimeHealth; counters:RuntimeCounters; activeExecutions:string[]; lastEventId?:string; lastCheckpointId?:string; updatedAt:string; }
+export interface RuntimeValidationResult { passed:boolean; checks:Array<{name:string;passed:boolean;details?:string}>; }
+export interface RuntimeExecutionResult { executionId:string; taskId:string; status:'COMPLETED'|'FAILED'|'RECOVERABLE'|'QUOTA_EXHAUSTED'|'WORKER_LOST'|'CANCELLED'; checkpointId?:string; validation?:RuntimeValidationResult; costUsd?:number; retryable?:boolean; }
+export interface RuntimeDriver { plan(missionId:string):Promise<{planned:boolean;replanned?:boolean;message?:string}>; schedule(missionId:string):Promise<{scheduled:boolean;taskId?:string;message?:string}>; execute(missionId:string,taskId:string):Promise<RuntimeExecutionResult>; validate(missionId:string,taskId:string,execution:RuntimeExecutionResult):Promise<RuntimeValidationResult>; recover?(missionId:string,execution:RuntimeExecutionResult):Promise<{recovered:boolean;taskId?:string;message?:string}>; isComplete(missionId:string):Promise<boolean>; }
+export interface RuntimePolicy { budget:RuntimeBudget; maxStagnantIterations:number; maxRuntimeEvents:number; allowAutonomousExecution:boolean; }
+export interface RuntimeStatus { snapshot:RuntimeSnapshot; recentEvents:RuntimeEvent[]; }
