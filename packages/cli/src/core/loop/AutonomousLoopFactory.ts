@@ -36,7 +36,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
   const components: AutonomousLoopComponents = {
     observe: async (missionId, iteration) => {
       const context = contextBuilder.build(missionId);
-      const graph = new GraphBuilder().build(missions.snapshot(missionId));
+      const graph = await selfModifyingGraph.observe(missionId);
       const graphHealth = new GraphValidator().validate(graph);
       return {
         missionId, iteration, observedAt: new Date().toISOString(), graph, graphHealth, context,
@@ -119,7 +119,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
       };
     },
     adapt: async (missionId, observation, measurement, validation, interpretation) => {
-      const adaptation = selfModifyingGraph.adapt(observation, measurement, validation, measurement.execution);
+      const adaptation = await selfModifyingGraph.adapt(observation, measurement, validation, measurement.execution);
       if (adaptation.changed) {
         return {
           action: 'REPLAN',
