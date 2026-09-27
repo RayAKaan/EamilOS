@@ -26,7 +26,7 @@ export class IntelligenceEngine {
   ) {
     this.context = new DecisionContextBuilder(missions, coordination);
     this.decisions = decisions;
-    this.runtime = new DecisionRuntime(jev);
+    this.runtime = new DecisionRuntime(jev, undefined, config.jev.maxRetries);
     this.applier = new DecisionApplier(missions, coordination, scheduler, laya);
     this.loop = new StrategicLoop(this.context, this.runtime, this.applier, decisions, config);
   }
