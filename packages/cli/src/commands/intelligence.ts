@@ -1,6 +1,9 @@
 import type { Command } from 'commander';
 import { MissionEngine } from '../core/mission/MissionEngine.js';
 import { createIntelligenceRuntime } from '../core/intelligence/IntelligenceFactory.js';
+import { DecisionContextBuilder } from '../core/intelligence/DecisionContextBuilder.js';
+import { DecisionStore } from '../core/intelligence/DecisionStore.js';
+import { CoordinationEngine } from '../core/coordination/CoordinationEngine.js';
 
 export function registerIntelligenceCommand(program: Command): void {
   const intelligence = program.command('intelligence').description('Run Jev + Laya strategic intelligence');
@@ -8,8 +11,10 @@ export function registerIntelligenceCommand(program: Command): void {
   intelligence.command('context <missionId>')
     .description('Build the structured DecisionContext sent to Jev')
     .action((missionId: string) => {
-      const runtime = createIntelligenceRuntime();
-      console.log(JSON.stringify(runtime.context.build(missionId), null, 2));
+      const missions = new MissionEngine();
+      const coordination = new CoordinationEngine(missions);
+      const context = new DecisionContextBuilder(missions, coordination);
+      console.log(JSON.stringify(context.build(missionId), null, 2));
     });
 
   intelligence.command('decide <missionId>')
@@ -33,7 +38,6 @@ export function registerIntelligenceCommand(program: Command): void {
   intelligence.command('history <missionId>')
     .description('Show persisted strategic decisions')
     .action((missionId: string) => {
-      const runtime = createIntelligenceRuntime();
-      console.log(JSON.stringify(runtime.decisions.getDecisions(missionId), null, 2));
+      console.log(JSON.stringify(new DecisionStore().getDecisions(missionId), null, 2));
     });
 }
