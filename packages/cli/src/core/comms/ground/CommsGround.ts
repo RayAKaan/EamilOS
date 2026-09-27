@@ -1,4 +1,4 @@
-import { randomUUID, createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
 import { CommsRegistry } from './CommsRegistry.js';
 import { MessageRouter } from './MessageRouter.js';
 import { MessageStore } from './MessageStore.js';
@@ -46,13 +46,21 @@ export class CommsGround {
   unsubscribe(id: string) { return this.registry.unsubscribe(id); }
 
   async publish(input: Omit<CommsMessage, 'protocolVersion'|'messageId'|'timestamp'|'signature'>): Promise<CommsMessage> {
-    const message: CommsMessage = {
+    const sender = this.registry.get(input.senderId);
+    if (!sender) throw new Error(`Unknown sender: ${input.senderId}`);
+    if (!sender.authenticated) throw new Error(`Unauthenticated sender: ${input.senderId}`);
+
+    const messageWithoutSignature: Omit<CommsMessage, 'signature'> = {
       ...input,
       protocolVersion: PROTOCOL_VERSION,
       messageId: randomUUID(),
       timestamp: Date.now(),
-      signature: this.sharedKey ? this.sign(input) : undefined,
     };
+    const message: CommsMessage = {
+      ...messageWithoutSignature,
+      signature: this.sharedKey ? this.sign(messageWithoutSignature) : undefined,
+    };
+
     const parsed = CommsMessageSchema.safeParse(message);
     if (!parsed.success) throw new Error(parsed.error.message);
     this.validateEnvelope(message);
@@ -68,14 +76,26 @@ export class CommsGround {
   async receive(message: unknown, recipientId: string): Promise<DeliveryReceipt> {
     const parsed = CommsMessageSchema.parse(message);
     this.validateEnvelope(parsed);
-    if (parsed.signature && this.sharedKey && !this.verify(parsed)) throw new Error('Invalid comms signature');
-    const duplicate = this.processed.has(`${parsed.messageId}:${recipientId}`);
+
+    const recipient = this.registry.get(recipientId);
+    if (!recipient) throw new Error(`Unknown recipient: ${recipientId}`);
+    if (!recipient.authenticated) throw new Error(`Unauthenticated recipient: ${recipientId}`);
+    if (parsed.recipientId && parsed.recipientId !== recipientId) throw new Error('Message recipient mismatch');
+
+    if (this.sharedKey) {
+      if (!parsed.signature || !this.verify(parsed)) throw new Error('Invalid comms signature');
+    }
+
+    const deliveryKey = `${parsed.messageId}:${recipientId}`;
+    const duplicate = this.processed.has(deliveryKey) || await this.store.hasReceipt(parsed.messageId, recipientId);
     if (duplicate) {
+      this.processed.add(deliveryKey);
       const receipt = { messageId: parsed.messageId, recipientId, deliveredAt: Date.now(), duplicate: true };
       this.emit({ type: 'message.duplicate', messageId: parsed.messageId, participantId: recipientId });
       return receipt;
     }
-    this.processed.add(`${parsed.messageId}:${recipientId}`);
+
+    this.processed.add(deliveryKey);
     await this.store.save(parsed);
     const receipt = { messageId: parsed.messageId, recipientId, deliveredAt: Date.now(), duplicate: false };
     await this.store.saveReceipt(receipt);
@@ -102,7 +122,7 @@ export class CommsGround {
   private async deliver(message: CommsMessage, recipientId: string) {
     const transport = this.transports.get(recipientId);
     if (!transport) return;
-    if (message.delivery !== 'AT_MOST_ONCE' && await this.store.hasReceipt(message.messageId, recipientId)) return;
+    if (message.delivery === 'AT_LEAST_ONCE' && await this.store.hasReceipt(message.messageId, recipientId)) return;
     await transport.send(message);
     const receipt: DeliveryReceipt = { messageId: message.messageId, recipientId, deliveredAt: Date.now(), duplicate: false };
     await this.store.saveReceipt(receipt);
@@ -112,20 +132,23 @@ export class CommsGround {
 
   private validateEnvelope(message: CommsMessage) {
     if (message.protocolVersion !== PROTOCOL_VERSION) throw new Error('Unsupported comms protocol version');
-    const age = Date.now() - message.timestamp;
+    const now = Date.now();
+    const age = now - message.timestamp;
     if (age > MAX_AGE_MS || age < -MAX_FUTURE_MS) throw new Error('Expired or future comms message');
+    if (message.expiresAt !== undefined && now > message.expiresAt) throw new Error('Comms message expired');
   }
 
-  private sign(input: Omit<CommsMessage, 'signature'>): string {
-    return createHmac('sha256', this.sharedKey!).update(JSON.stringify(input)).digest('hex');
+  private sign(message: Omit<CommsMessage, 'signature'>): string {
+    return createHmac('sha256', this.sharedKey!).update(JSON.stringify(message)).digest('hex');
   }
 
   private verify(message: CommsMessage): boolean {
     if (!message.signature) return false;
     const copy = { ...message };
     delete copy.signature;
-    const expected = createHmac('sha256', this.sharedKey!).update(JSON.stringify(copy)).digest('hex');
-    const a = Buffer.from(expected, 'hex'); const b = Buffer.from(message.signature, 'hex');
+    const expected = this.sign(copy);
+    const a = Buffer.from(expected, 'hex');
+    const b = Buffer.from(message.signature, 'hex');
     return a.length === b.length && timingSafeEqual(a, b);
   }
 
