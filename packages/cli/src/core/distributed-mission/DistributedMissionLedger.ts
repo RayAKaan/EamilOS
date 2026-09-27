@@ -106,7 +106,7 @@ export class DistributedMissionLedger {
     return this.graph.all();
   }
 
-  assignments(): DistributedAssignment[] {
+  listAssignments(): DistributedAssignment[] {
     return [...this.assignments.values()].map((assignment) => ({ ...assignment }));
   }
 
