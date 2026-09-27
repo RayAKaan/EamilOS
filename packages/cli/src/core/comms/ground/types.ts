@@ -9,7 +9,7 @@ export const MessageKindSchema = z.enum([
 ]);
 export type MessageKind = z.infer<typeof MessageKindSchema>;
 
-export const DeliveryModeSchema = z.enum(['AT_MOST_ONCE','AT_LEAST_ONCE','EXACTLY_ONCE']);
+export const DeliveryModeSchema = z.enum(['AT_MOST_ONCE','AT_LEAST_ONCE']);
 export type DeliveryMode = z.infer<typeof DeliveryModeSchema>;
 
 export const CommsMessageSchema = z.object({
