@@ -14,10 +14,7 @@ function observation(missions: MissionEngine): LoopObservation {
     iteration: 1,
     observedAt: new Date().toISOString(),
     graph,
-    graphHealth: {
-      consistent: true, nodeCount: 0, edgeCount: 0, orphanNodes: 0, orphanEdges: 0,
-      invalidReferences: 0, version: 1, stateHash: 'test',
-    },
+    graphHealth,
     context: {
       schemaVersion: '1.0',
       mission: {
