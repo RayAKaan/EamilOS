@@ -7,6 +7,7 @@ import { DecisionStore } from './DecisionStore.js';
 import { DecisionApplier } from './DecisionApplier.js';
 import { StrategicLoop, type StrategicLoopResult } from './StrategicLoop.js';
 import type { IntelligenceConfig, JevProvider, LayaModelAdapter } from './types.js';
+import type { FleetIntelligenceProvider } from './FleetIntelligence.js';
 
 export class IntelligenceEngine {
   readonly context: DecisionContextBuilder;
@@ -23,8 +24,9 @@ export class IntelligenceEngine {
     laya: LayaModelAdapter,
     config: IntelligenceConfig,
     decisions = new DecisionStore(),
+    fleet?: FleetIntelligenceProvider,
   ) {
-    this.context = new DecisionContextBuilder(missions, coordination);
+    this.context = new DecisionContextBuilder(missions, coordination, undefined, decisions, undefined, fleet);
     this.decisions = decisions;
     this.runtime = new DecisionRuntime(jev, undefined, config.jev.maxRetries);
     this.applier = new DecisionApplier(missions, coordination, scheduler, laya);
