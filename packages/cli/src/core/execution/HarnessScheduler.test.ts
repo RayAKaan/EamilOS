@@ -194,7 +194,9 @@ describe('HarnessScheduler', () => {
       executions,
     );
 
-    const result = await scheduler.execute('mission_1', 'task_1');
+    const result = await scheduler.execute('mission_1', 'task_1', {
+      preferredHarnessId: 'quota-harness',
+    });
 
     expect(result.validationRequired).toBe(true);
     expect(result.attempts).toBe(2);
