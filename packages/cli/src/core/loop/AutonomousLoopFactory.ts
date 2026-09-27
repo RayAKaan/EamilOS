@@ -47,9 +47,6 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
     },
     interpret: async (observation) => {
       if (observation.context.mission.status === 'completed') return interpretation('COMPLETE', 'MISSION_NEAR_COMPLETION', 'Mission is already complete.', []);
-      if (observation.blockedTasks.length > 0 && observation.readyTasks.length === 0 && observation.runningTasks.length === 0) {
-        return interpretation('REPLAN', 'MISSION_BLOCKED', 'Mission has no executable ready work and requires strategic replanning.', []);
-      }
       const evaluation = await intelligence.runtime.evaluate(observation.context, observation.context.progress.blockedTasks > 0 ? 'MISSION_BLOCKED' : 'PERIODIC_REVIEW');
       if (!evaluation.evaluation.accepted || !evaluation.evaluation.decision) {
         return interpretation('ESCALATE', 'PLAN_REJECTED', evaluation.evaluation.reasons.join('; '), []);
@@ -66,8 +63,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
     },
     plan: async (missionId, observation, interpretation) => {
       if (!interpretation.decision) {
-        const result = await intelligence.run(missionId);
-        return { planned: result.status !== 'ESCALATED' && result.status !== 'ABORTED', action: interpretation.action, message: 'Delegated bounded strategic planning.' };
+        return { planned: false, action: interpretation.action, message: 'No validated strategic decision was available for this planning phase.' };
       }
       const applied = await intelligence.applier.apply(observation.context, interpretation.decision);
       return { planned: applied.changed || applied.progress, action: interpretation.action, message: applied.messages.join('; '), decision: interpretation.decision };
