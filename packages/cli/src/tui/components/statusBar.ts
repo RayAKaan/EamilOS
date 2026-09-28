@@ -7,6 +7,10 @@ import { spinAt, onChrome } from '../theme.js';
 const PAGE_LABELS: Record<string, string> = {
   mission: 'M mission',
   execution: 'X execution',
+  tasks: 'T tasks',
+  artifacts: 'A artifacts',
+  sessions: 'S sessions',
+  github: 'G github',
   chat: 'C chat',
   logs: 'L logs',
   agents: 'A agents',
