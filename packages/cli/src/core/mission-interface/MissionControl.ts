@@ -32,15 +32,18 @@ export class MissionControl {
   readonly missions: MissionEngine;
   readonly policies: MissionPolicyStore;
   readonly approvals: ApprovalStore;
+  private readonly runtimeFactory?: (missions: MissionEngine, policy: MissionPolicy) => AutonomousLoopEngine;
 
   constructor(
     missions = new MissionEngine(),
     policies = new MissionPolicyStore(),
     approvals = new ApprovalStore(),
+    runtimeFactory?: (missions: MissionEngine, policy: MissionPolicy) => AutonomousLoopEngine,
   ) {
     this.missions = missions;
     this.policies = policies;
     this.approvals = approvals;
+    this.runtimeFactory = runtimeFactory;
   }
 
   async create(input: {
@@ -300,6 +303,7 @@ export class MissionControl {
   }
 
   private runtimeFor(policy: MissionPolicy): AutonomousLoopEngine {
+    if (this.runtimeFactory) return this.runtimeFactory(this.missions, policy);
     const config = defaultIntelligenceConfig();
     const intelligenceConfig: IntelligenceConfig = {
       ...config,
