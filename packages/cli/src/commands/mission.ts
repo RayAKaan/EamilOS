@@ -123,5 +123,21 @@ export function registerMissionCommand(program: Command): void {
   approvals.command('deny <approvalId>').action(async (missionId: string, approvalId: string) => console.log(JSON.stringify(await new MissionControl().deny(missionId, approvalId), null, 2)));
 
   mission.command('report <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().report(id), null, 2)));
-  mission.command('policy <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().getPolicy(id), null, 2)));
+  mission
+    .command('policy <missionId>')
+    .description('Show or update the mission human-control policy')
+    .option('--autonomy <level>', 'ASSISTED, PLANNED, or AUTONOMOUS')
+    .option('--approve <actions...>', 'Actions requiring human approval')
+    .action(async (id: string, options: { autonomy?: string; approve?: string[] }) => {
+      const control = new MissionControl();
+      if (options.autonomy || options.approve) {
+        const value = await control.setPolicy(id, {
+          autonomy: options.autonomy?.toUpperCase() as 'ASSISTED' | 'PLANNED' | 'AUTONOMOUS' | undefined,
+          requireApprovalFor: options.approve?.map(item => item.toUpperCase()) as never,
+        });
+        console.log(JSON.stringify(value, null, 2));
+      } else {
+        console.log(JSON.stringify(await control.getPolicy(id), null, 2));
+      }
+    });
 }
