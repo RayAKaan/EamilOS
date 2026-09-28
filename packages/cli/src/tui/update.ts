@@ -203,7 +203,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const now=Date.now(); const stages=model.loop.stages.map(s=>s.stage===msg.stage?{...s,status:msg.status,startedAt:s.startedAt??now,completedAt:(msg.status==='completed'||msg.status==='skipped')?now:s.completedAt,decisionId:msg.decisionId}:s);
       const iteration=model.loop.iterations.map(i=>i.number===model.loop.iteration?{...i,currentStage:msg.stage,status:msg.status==='blocked'?'blocked':i.status,decisionIds:msg.decisionId?[...i.decisionIds,msg.decisionId]:i.decisionIds}:i);
       const activeIndex=Math.max(0,LOOP_STAGES.indexOf(msg.stage)); const progress=Math.round(activeIndex/(LOOP_STAGES.length-1)*100);
-      return {...model,loop:{...model.loop,currentStage:msg.stage,stages,iterations,progress,updatedAt:now}};
+      return {...model,loop:{...model.loop,currentStage:msg.stage,stages,iterations:model.loop.iterations.map(i=>i.number===model.loop.iteration?{...i,currentStage:msg.stage}:i),progress,updatedAt:now}};
     }
     case 'LOOP_ITERATION': {
       const now=Date.now(); const existing=model.loop.iterations.find(i=>i.number===msg.iteration);
