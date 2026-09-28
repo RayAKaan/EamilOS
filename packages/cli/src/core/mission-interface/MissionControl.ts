@@ -2,8 +2,6 @@ import { GraphBuilder, GraphQueryEngine, GraphValidator } from '../cognitive-gra
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { createAutonomousLoopRuntime } from '../loop/AutonomousLoopFactory.js';
 import type { AutonomousLoopEngine, LoopInterpretation } from '../loop/index.js';
-import { LoopStateStore } from '../loop/LoopStateStore.js';
-import { LoopEventLog } from '../loop/LoopEventLog.js';
 import { defaultIntelligenceConfig } from '../intelligence/IntelligenceEngine.js';
 import type { IntelligenceConfig } from '../intelligence/types.js';
 import { ApprovalStore } from './ApprovalStore.js';
