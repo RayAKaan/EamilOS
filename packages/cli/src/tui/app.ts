@@ -100,6 +100,11 @@ export class EamilOSTuiApp {
       }
 
       case 'enter': {
+        if (this.model.page === 'graph') {
+          const node = this.model.graph.nodes.find(n => n.id === this.model.graph.focus.nodeId) ?? this.model.graph.nodes[0];
+          if (node) this.dispatch({ type: 'GRAPH_FOCUS', nodeId: node.id });
+          break;
+        }
         if (this.model.running) break;
         const prompt = this.model.input.trim();
         if (!prompt) break;
@@ -127,15 +132,6 @@ export class EamilOSTuiApp {
         break;
       }
 
-      case 'enter': {
-        if (this.model.page === 'graph') {
-          const node = this.model.graph.nodes.find(n => n.id === this.model.graph.focus.nodeId) ?? this.model.graph.nodes[0];
-          if (node) this.dispatch({ type: 'GRAPH_FOCUS', nodeId: node.id });
-          break;
-        }
-        if (this.model.page === 'fleet') break;
-        this.dispatch({ type: 'SCROLL_DOWN', lines: 1 }); break;
-      }
       case 'right': {
         if (this.model.page === 'graph') { const node=this.model.graph.focus.nodeId; if(node) this.dispatch({type:'GRAPH_TOGGLE_EXPAND',nodeId:node}); }
         break;
