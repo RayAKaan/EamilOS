@@ -1,6 +1,8 @@
 import type { AgentEvent } from './events/agent-event.js';
 import type { AppModel, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
 import { nextActivityId, nextMsgId } from './model.js';
+import type { FleetDevice } from './fleet-data.js';
+import { buildMissionGraph } from './graph-builder.js';
 
 export type Msg =
   | { type: 'RESIZE'; width: number; height: number }
@@ -51,7 +53,16 @@ export type Msg =
   | { type: 'SELECT_TASK'; taskId: string }
   | { type: 'SELECT_ARTIFACT'; artifactId: string }
   | { type: 'SELECT_SESSION'; sessionId: string }
-  | { type: 'SELECT_EXECUTION'; executionId: string };
+  | { type: 'SELECT_EXECUTION'; executionId: string }
+  | { type: 'DEVICE_CONNECTED'; device: { id: string; name: string; capabilities?: string[] } }
+  | { type: 'DEVICE_DISCONNECTED'; deviceId: string }
+  | { type: 'DEVICE_STATUS'; deviceId: string; status: import('./fleet-data.js').FleetDeviceStatus }
+  | { type: 'AGENT_ASSIGNED'; agentId: string; taskId?: string; executionId?: string; deviceId?: string }
+  | { type: 'FLEET_SELECT_AGENT'; agentId: string }
+  | { type: 'FLEET_SELECT_DEVICE'; deviceId: string }
+  | { type: 'GRAPH_FOCUS'; nodeId: string }
+  | { type: 'GRAPH_TOGGLE_EXPAND'; nodeId: string }
+  | { type: 'GRAPH_TRACE'; nodeId: string };
 
 function findCallsign(model: AppModel, agentId: string): string | undefined {
   return model.agents.get(agentId)?.callsign;
@@ -71,6 +82,10 @@ function appendAgentEvent(events: AgentEvent[], event: AgentEvent): AgentEvent[]
 
 function appendActivity(items: MissionActivityItem[], item: MissionActivityItem): MissionActivityItem[] {
   return [...items, item].slice(-100);
+}
+function rebuildGraph(model: AppModel): AppModel {
+  const graph = buildMissionGraph(model);
+  return { ...model, graph: { ...graph, focus: model.graph.focus, version: model.graph.version + 1, changedAt: Date.now() } };
 }
 
 export function update(model: AppModel, msg: Msg): AppModel {
@@ -164,6 +179,43 @@ export function update(model: AppModel, msg: Msg): AppModel {
     case 'SELECT_EXECUTION':
       return { ...model, missionData: { ...model.missionData, selectedExecutionId: msg.executionId } };
 
+    case 'FLEET_SELECT_AGENT':
+      return { ...model, fleet: { ...model.fleet, selectedAgentId: msg.agentId, selectedDeviceId: undefined } };
+    case 'FLEET_SELECT_DEVICE':
+      return { ...model, fleet: { ...model.fleet, selectedDeviceId: msg.deviceId, selectedAgentId: undefined } };
+    case 'GRAPH_FOCUS':
+      return { ...model, graph: { ...model.graph, focus: { ...model.graph.focus, nodeId: msg.nodeId } } };
+    case 'GRAPH_TOGGLE_EXPAND': {
+      const expanded = new Set(model.graph.focus.expanded);
+      if (expanded.has(msg.nodeId)) expanded.delete(msg.nodeId); else expanded.add(msg.nodeId);
+      return { ...model, graph: { ...model.graph, focus: { ...model.graph.focus, nodeId: msg.nodeId, expanded: [...expanded] } } };
+    }
+    case 'GRAPH_TRACE': {
+      const from = model.graph.focus.nodeId;
+      if (!from) return model;
+      const q: string[][] = [[from]]; const seen = new Set([from]); let path: string[] = [];
+      while (q.length) { const p = q.shift()!; const cur = p[p.length - 1]!; if (cur === msg.nodeId) { path = p; break; } for (const e of model.graph.edges) { const n = e.from === cur ? e.to : e.to === cur ? e.from : undefined; if (n && !seen.has(n)) { seen.add(n); q.push([...p, n]); } } }
+      return { ...model, graph: { ...model.graph, focus: { ...model.graph.focus, nodeId: msg.nodeId, path } } };
+    }
+    case 'DEVICE_CONNECTED': {
+      const existing = model.fleet.devices.find(d => d.id === msg.device.id);
+      const device = { id: msg.device.id, name: msg.device.name, status: 'connected' as const, agentIds: existing?.agentIds ?? [], taskIds: existing?.taskIds ?? [], capabilities: msg.device.capabilities ?? existing?.capabilities ?? [], health: 'healthy' as const, lastSeenAt: Date.now() };
+      return rebuildGraph({ ...model, fleet: { ...model.fleet, devices: [...model.fleet.devices.filter(d => d.id !== device.id), device], selectedDeviceId: device.id, lastEventAt: Date.now() }, missionUi: { ...model.missionUi, deviceCount: model.fleet.devices.filter(d => d.status === 'connected').length + (existing?.status === 'connected' ? 0 : 1), activity: appendActivity(model.missionUi.activity, activity('Device connected', 'success', device.name)) } });
+    }
+    case 'DEVICE_DISCONNECTED': {
+      const devices = model.fleet.devices.map(d => d.id === msg.deviceId ? { ...d, status: 'disconnected' as const, health: 'unknown' as const, lastSeenAt: Date.now() } : d);
+      return rebuildGraph({ ...model, fleet: { ...model.fleet, devices, lastEventAt: Date.now() }, missionUi: { ...model.missionUi, activity: appendActivity(model.missionUi.activity, activity('Device disconnected', 'warning', msg.deviceId)) } });
+    }
+    case 'DEVICE_STATUS': {
+      const devices = model.fleet.devices.map(d => d.id === msg.deviceId ? { ...d, status: msg.status, health: msg.status === 'connected' ? 'healthy' as const : 'unknown' as const, lastSeenAt: Date.now() } : d);
+      return rebuildGraph({ ...model, fleet: { ...model.fleet, devices, lastEventAt: Date.now() } });
+    }
+    case 'AGENT_ASSIGNED': {
+      const agents = model.fleet.agents.map(a => a.id === msg.agentId ? { ...a, currentTaskId: msg.taskId, currentExecutionId: msg.executionId, deviceId: msg.deviceId, status: 'running' as const, lastSeenAt: Date.now() } : a);
+      const devices = model.fleet.devices.map(d => d.id === msg.deviceId ? { ...d, agentIds: d.agentIds.includes(msg.agentId) ? d.agentIds : [...d.agentIds, msg.agentId], taskIds: msg.taskId && !d.taskIds.includes(msg.taskId) ? [...d.taskIds, msg.taskId] : d.taskIds } : d);
+      return rebuildGraph({ ...model, fleet: { ...model.fleet, agents, devices, lastEventAt: Date.now() } });
+    }
+
     case 'NOTIFY':
       return { ...model, notification: msg.text };
 
@@ -174,7 +226,8 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const agents = new Map(model.agents);
       for (const a of msg.agents) agents.set(a.id, a);
       const readyCount = msg.agents.filter(a => a.status === 'ready').length;
-      return { ...model, detectionState: 'complete', agents, statusText: String(readyCount) + ' agent' + (readyCount !== 1 ? 's' : '') + ' ready' };
+      const fleetAgents = msg.agents.map(a => ({ id:a.id, name:a.name || a.callsign, status:(a.status === 'busy' ? 'running' : a.status === 'offline' ? 'disconnected' : a.status === 'not_installed' ? 'error' : 'ready') as const, capabilities:[], health:'unknown' as const, lastSeenAt:Date.now() }));
+      return rebuildGraph({ ...model, detectionState: 'complete', agents, fleet:{...model.fleet,agents:fleetAgents,lastEventAt:Date.now()}, statusText: String(readyCount) + ' agent' + (readyCount !== 1 ? 's' : '') + ' ready' });
     }
 
     case 'DETECTION_FAILED':
@@ -197,7 +250,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const summary = msg.summary;
       const summaryMsg = makeMsg({ type: 'run_summary', content: JSON.stringify(summary), timestamp: Date.now(), validated: summary.validated });
       const updatedSessions = model.sessions.map(s => s.status === 'running' ? { ...s, status: 'completed' as const, duration: summary.durationMs, messageCount: model.messages.length } : s);
-      return {
+      return rebuildGraph({
         ...model,
         running: false,
         runSummary: summary,
@@ -218,13 +271,13 @@ export function update(model: AppModel, msg: Msg): AppModel {
           sessions: model.missionData.sessions.map(s => s.id === model.missionData.selectedSessionId ? { ...s, status: summary.validated ? 'completed' as const : 'failed' as const, durationMs: summary.durationMs } : s),
           executions: model.missionData.executions.map(e => e.id === model.missionData.selectedExecutionId ? { ...e, status: summary.validated ? 'completed' as const : 'failed' as const, finishedAt: Date.now() } : e),
         },
-      };
+      });
     }
 
     case 'SESSION_ERROR': {
       const errMsg = makeMsg({ type: 'error', content: msg.error, timestamp: Date.now() });
       const updatedSessions = model.sessions.map(s => s.status === 'running' ? { ...s, status: 'failed' as const } : s);
-      return {
+      return rebuildGraph({
         ...model,
         running: false,
         messages: [...model.messages, errMsg],
@@ -236,7 +289,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
           sessions: model.missionData.sessions.map(s => s.id === model.missionData.selectedSessionId ? { ...s, status: 'failed' as const } : s),
           executions: model.missionData.executions.map(e => e.id === model.missionData.selectedExecutionId ? { ...e, status: 'failed' as const, finishedAt: Date.now() } : e),
         },
-      };
+      });
     }
 
     case 'AGENT_STARTED': {
@@ -257,7 +310,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
         missionData: { ...model.missionData, executions: [...model.missionData.executions, execution], tasks, sessions, selectedExecutionId: executionId },
         missionUi: { ...model.missionUi, currentAction: 'Agent ' + msg.agentId + ' is executing', activity: appendActivity(model.missionUi.activity, activity('Agent started', 'info', msg.agentId, msg.agentId)) },
         messages: [...model.messages, makeMsg({ type: 'agent', agentId: msg.agentId, callsign: findCallsign(model, msg.agentId), content: '', timestamp: Date.now(), streaming: true })],
-      };
+      });
     }
 
     case 'AGENT_OUTPUT': {
