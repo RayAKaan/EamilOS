@@ -13,6 +13,7 @@ import { runSession } from './services/sessionBridge.js';
 import { readGitHubState } from './services/gitHubState.js';
 import { paletteOpen, paletteClose, paletteInput, paletteBackspace, paletteMove } from './palette.js';
 import { commandMatches } from './commands/registry.js';
+import { executeSlashCommand, isSlashCommand, isShellEscape } from './commands/input.js';
 
 const VALID_STRATEGIES = ['single', 'single-fallback', 'fallback', 'swarm', 'manual'];
 
@@ -46,6 +47,10 @@ export class EamilOSTuiApp {
   }
 
   async start(): Promise<void> {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      this.dispatch({ type: 'SET_NOTIFICATION', text: 'Interactive TUI requires a TTY; use the non-interactive CLI/JSON interface instead.' });
+      return;
+    }
     startConsoleCapture();
     enterFullScreen();
     installCrashRecovery();
@@ -132,6 +137,18 @@ export class EamilOSTuiApp {
         if (this.model.running) break;
         const prompt = this.model.input.trim();
         if (!prompt) break;
+        if (isShellEscape(prompt)) {
+          this.dispatch({type:'SET_NOTIFICATION',text:'Shell escape is intentionally disabled in the mission TUI. Use an explicit terminal command outside the mission prompt.'});
+          break;
+        }
+        if (isSlashCommand(prompt)) {
+          const effect=executeSlashCommand(this.model,prompt);
+          if(effect?.type==='page') this.dispatch({type:'SET_PAGE',page:effect.page});
+          else if(effect?.type==='message') this.dispatch({type:'SET_NOTIFICATION',text:effect.text});
+          else if(!effect) this.dispatch({type:'SET_NOTIFICATION',text:'Unknown command. Press Ctrl+P to search available commands.'});
+          this.dispatch({type:'INPUT_CLEAR'});
+          break;
+        }
         this.dispatch({ type: 'INPUT_CLEAR' });
         this.startSession(prompt);
         break;
