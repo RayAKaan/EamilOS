@@ -9,9 +9,8 @@ export function registerMissionCommand(program: Command): void {
     .command('create <goal>')
     .description('Create a persistent mission')
     .option('--dir <path>', 'Working directory', process.cwd())
-    .action((goal: string, options: { dir: string }) => {
-      const engine = new MissionEngine();
-      const value = engine.createMission({ goal, workingDir: options.dir });
+    .action(async (goal: string, options: { dir: string }) => {
+      const value = await new MissionControl().create({ goal, workingDir: options.dir });
       console.log(JSON.stringify(value, null, 2));
     });
 
@@ -31,9 +30,9 @@ export function registerMissionCommand(program: Command): void {
 
   mission
     .command('start <missionId>')
-    .description('Start a created or paused mission')
-    .action((missionId: string) => {
-      console.log(JSON.stringify(new MissionEngine().start(missionId), null, 2));
+    .description('Start a mission through the human control plane')
+    .action(async (missionId: string) => {
+      console.log(JSON.stringify(await new MissionControl().start(missionId), null, 2));
     });
 
 
