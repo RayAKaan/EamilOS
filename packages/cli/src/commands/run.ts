@@ -54,7 +54,17 @@ export async function run(
       },
     });
     const result = await control.start(mission.id);
-    console.log(JSON.stringify({ mission, ...result }, null, 2));
+    if (result.approval) {
+      console.log('APPROVAL REQUIRED');
+      console.log('  ID: ' + result.approval.id);
+      console.log('  ACTION: ' + result.approval.action);
+      console.log('  REASON: ' + result.approval.reason);
+      console.log('Run: eamilos mission approvals ' + mission.id + ' approve ' + result.approval.id);
+    } else {
+      console.log(await control.dashboard(mission.id));
+      console.log('');
+      console.log('Mission result: ' + (result.result?.loop.status ?? 'UNKNOWN'));
+    }
     eamilos?.shutdown();
     return;
   }
