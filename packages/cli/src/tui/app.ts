@@ -82,6 +82,9 @@ export class EamilOSTuiApp {
           g: 'github',
           f: 'fleet',
           r: 'graph',
+          l: 'loop',
+          d: 'decisions',
+          p: 'approvals',
           c: 'chat',
           l: 'logs',
         };
