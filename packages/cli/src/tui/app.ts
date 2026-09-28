@@ -72,6 +72,11 @@ export class EamilOSTuiApp {
   private handleKey(event: KeyEvent): void {
     switch (event.type) {
       case 'char': {
+        if (this.model.page === 'approvals' && this.model.approvals.selectedApprovalId && ['1','2','3','4'].includes(event.char)) {
+          const resolution = event.char === '1' ? 'approve' : event.char === '2' ? 'deny' : event.char === '3' ? 'approve-once' : 'approve-session';
+          this.dispatch({type:'APPROVAL_RESOLVED',approvalId:this.model.approvals.selectedApprovalId,resolution});
+          break;
+        }
         if (this.model.running && !['x','m','f','r','l','d','p'].includes(event.char.toLowerCase())) break;
         const pages: Record<string, AppModel['page']> = {
           m: 'mission',
