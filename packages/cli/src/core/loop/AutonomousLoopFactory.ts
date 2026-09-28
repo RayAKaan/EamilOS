@@ -10,7 +10,7 @@ import { createIntelligenceRuntime } from '../intelligence/IntelligenceFactory.j
 import type { IntelligenceConfig, DecisionTrigger, JevDecision } from '../intelligence/types.js';
 import type { RuntimeExecutionResult, RuntimeValidationResult } from '../runtime/types.js';
 import { AutonomousLoopEngine } from './AutonomousLoopEngine.js';
-import type { AutonomousLoopComponents, AutonomousLoopPolicy, LoopAdaptation, LoopInterpretation, LoopObservation, LoopPlanResult, LoopValidation } from './types.js';
+import type { AutonomousLoopComponents, AutonomousLoopPolicy, LoopAdaptation, LoopInterpretation, LoopObservation, LoopPlanResult, LoopValidation, LoopAuthorization } from './types.js';
 
 export interface AutonomousLoopRuntimeOptions {
   missions?: MissionEngine;
@@ -20,6 +20,7 @@ export interface AutonomousLoopRuntimeOptions {
   intelligence?: ReturnType<typeof createIntelligenceRuntime>;
   config?: IntelligenceConfig;
   policy?: Partial<AutonomousLoopPolicy>;
+  authorize?: (missionId: string, interpretation: LoopInterpretation) => Promise<LoopAuthorization>;
 }
 
 export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOptions = {}): AutonomousLoopEngine {
@@ -126,6 +127,7 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
         reasons: applied.messages,
       };
     },
+    authorize: options.authorize,
     adapt: async (missionId, observation, measurement, validation, interpretation) => {
       const adaptation = await selfModifyingGraph.adapt(observation, measurement, validation, measurement.execution);
       if (adaptation.changed) {

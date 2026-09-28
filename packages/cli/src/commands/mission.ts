@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 import { MissionEngine } from '../core/mission/MissionEngine.js';
+import { MissionControl } from '../core/mission-interface/MissionControl.js';
 
 export function registerMissionCommand(program: Command): void {
   const mission = program.command('mission').description('Manage Phase 1 mission/task runtime');
@@ -8,9 +9,8 @@ export function registerMissionCommand(program: Command): void {
     .command('create <goal>')
     .description('Create a persistent mission')
     .option('--dir <path>', 'Working directory', process.cwd())
-    .action((goal: string, options: { dir: string }) => {
-      const engine = new MissionEngine();
-      const value = engine.createMission({ goal, workingDir: options.dir });
+    .action(async (goal: string, options: { dir: string }) => {
+      const value = await new MissionControl().create({ goal, workingDir: options.dir });
       console.log(JSON.stringify(value, null, 2));
     });
 
@@ -30,9 +30,9 @@ export function registerMissionCommand(program: Command): void {
 
   mission
     .command('start <missionId>')
-    .description('Start a created or paused mission')
-    .action((missionId: string) => {
-      console.log(JSON.stringify(new MissionEngine().start(missionId), null, 2));
+    .description('Start a mission through the human control plane')
+    .action(async (missionId: string) => {
+      console.log(JSON.stringify(await new MissionControl().start(missionId), null, 2));
     });
 
 
@@ -78,5 +78,65 @@ export function registerMissionCommand(program: Command): void {
     .description('Evaluate deterministic mission completion')
     .action((missionId: string) => {
       console.log(JSON.stringify(new MissionEngine().evaluateCompletion(missionId), null, 2));
+    });
+  mission
+    .command('run <goal>')
+    .description('Create and run an autonomous mission through the human control plane')
+    .option('--dir <path>', 'Working directory', process.cwd())
+    .option('--autonomy <level>', 'ASSISTED, PLANNED, or AUTONOMOUS', 'AUTONOMOUS')
+    .option('--approve <actions...>', 'Actions requiring human approval')
+    .action(async (goal: string, options: { dir: string; autonomy: string; approve?: string[] }) => {
+      const control = new MissionControl();
+      const mission = await control.create({
+        goal,
+        workingDir: options.dir,
+        autonomy: options.autonomy.toUpperCase() as 'ASSISTED' | 'PLANNED' | 'AUTONOMOUS',
+        requireApprovalFor: options.approve?.map(item => item.toUpperCase()) as never,
+      });
+      const result = await control.start(mission.id);
+      console.log(JSON.stringify({ mission, ...result }, null, 2));
+    });
+
+  mission
+    .command('status <missionId>')
+    .description('Show mission status, progress, graph health, loop state, and approvals')
+    .action(async (missionId: string) => {
+      console.log(JSON.stringify(await new MissionControl().status(missionId), null, 2));
+    });
+
+  mission.command('pause <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().pause(id), null, 2)));
+  mission.command('resume <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().resume(id), null, 2)));
+  mission.command('cancel <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().cancel(id), null, 2)));
+  mission.command('replan <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().replan(id), null, 2)));
+
+  mission
+    .command('ask <missionId> <request...>')
+    .description('Control a mission using bounded natural-language commands')
+    .action(async (missionId: string, request: string[]) => {
+      console.log(JSON.stringify(await new MissionControl().ask(missionId, request.join(' ')), null, 2));
+    });
+
+  const approvals = mission.command('approvals <missionId>').description('Inspect and resolve approval requests');
+  approvals.command('list').action(async (missionId: string) => console.log(JSON.stringify(await new MissionControl().approvals.list(missionId), null, 2)));
+  approvals.command('approve <approvalId>').action(async (missionId: string, approvalId: string) => console.log(JSON.stringify(await new MissionControl().approve(missionId, approvalId), null, 2)));
+  approvals.command('deny <approvalId>').action(async (missionId: string, approvalId: string) => console.log(JSON.stringify(await new MissionControl().deny(missionId, approvalId), null, 2)));
+
+  mission.command('report <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().report(id), null, 2)));
+  mission
+    .command('policy <missionId>')
+    .description('Show or update the mission human-control policy')
+    .option('--autonomy <level>', 'ASSISTED, PLANNED, or AUTONOMOUS')
+    .option('--approve <actions...>', 'Actions requiring human approval')
+    .action(async (id: string, options: { autonomy?: string; approve?: string[] }) => {
+      const control = new MissionControl();
+      if (options.autonomy || options.approve) {
+        const value = await control.setPolicy(id, {
+          autonomy: options.autonomy?.toUpperCase() as 'ASSISTED' | 'PLANNED' | 'AUTONOMOUS' | undefined,
+          requireApprovalFor: options.approve?.map(item => item.toUpperCase()) as never,
+        });
+        console.log(JSON.stringify(value, null, 2));
+      } else {
+        console.log(JSON.stringify(await control.getPolicy(id), null, 2));
+      }
     });
 }

@@ -110,6 +110,23 @@ export class AutonomousLoopEngine {
           reason: interpretation.reason,
         });
 
+        if (this.components.authorize && !['CONTINUE', 'WAIT'].includes(interpretation.action)) {
+          const authorization = await this.components.authorize(missionId, interpretation);
+          await this.event(state, authorization.allowed ? 'approval.granted' : 'approval.required', {
+            action: interpretation.action,
+            taskId: interpretation.taskIds[0],
+            reason: authorization.reason,
+            approvalId: authorization.approvalId,
+          });
+          if (!authorization.allowed) {
+            state.status = 'PAUSED';
+            state.terminationReason = authorization.reason;
+            state.updatedAt = new Date().toISOString();
+            await this.states.save(state);
+            return this.result(state);
+          }
+        }
+
         if (interpretation.action === 'COMPLETE') {
           return this.terminate(state, 'COMPLETED', interpretation.reason);
         }
@@ -249,6 +266,18 @@ export class AutonomousLoopEngine {
 
   async status(missionId: string): Promise<AutonomousLoopState | undefined> {
     return this.states.load(missionId);
+  }
+
+  async abort(missionId: string, reason = 'Mission aborted by user'): Promise<AutonomousLoopState> {
+    const state = await this.states.load(missionId);
+    if (!state) throw new Error('Loop is not active');
+    if (TERMINAL.has(state.status)) return state;
+    state.status = 'ABORTED';
+    state.terminationReason = reason;
+    state.updatedAt = new Date().toISOString();
+    await this.states.save(state);
+    await this.event(state, 'loop.aborted', { reason });
+    return state;
   }
 
   async events(missionId: string) {

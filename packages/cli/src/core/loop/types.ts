@@ -67,6 +67,12 @@ export interface LoopValidation {
   reasons: string[];
 }
 
+export interface LoopAuthorization {
+  allowed: boolean;
+  reason: string;
+  approvalId?: string;
+}
+
 export interface LoopAdaptation {
   action: LoopAction;
   trigger: DecisionTrigger;
@@ -141,6 +147,7 @@ export interface AutonomousLoopComponents {
   measure(missionId: string, before: LoopObservation, execution?: RuntimeExecutionResult): Promise<LoopMeasurement>;
   validate(missionId: string, taskId: string, execution?: RuntimeExecutionResult): Promise<LoopValidation>;
   adapt(missionId: string, observation: LoopObservation, measurement: LoopMeasurement, validation: LoopValidation, interpretation: LoopInterpretation): Promise<LoopAdaptation>;
+  authorize?(missionId: string, interpretation: LoopInterpretation): Promise<LoopAuthorization>;
 }
 
 export interface LoopEvent {
