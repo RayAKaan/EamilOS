@@ -99,7 +99,8 @@ export class MissionControl {
     if (approval) return { started: false, missionId, approval };
 
     const mission = this.missions.snapshot(missionId).mission;
-    if (mission.status === 'created' || mission.status === 'paused') this.missions.start(missionId);
+    if (mission.status === 'created') this.missions.start(missionId);
+    else if (mission.status === 'paused') this.missions.resume(missionId);
     else if (mission.status !== 'active') throw new Error(`Mission ${missionId} cannot start from ${mission.status}`);
 
     const loop = this.runtimeFor(missionId, policy);
