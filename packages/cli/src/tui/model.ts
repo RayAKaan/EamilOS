@@ -1,8 +1,12 @@
 import type { AgentEvent } from './events/agent-event.js';
 import type { MissionDataState } from './mission-data.js';
 import { initialMissionData } from './mission-data.js';
+import type { FleetState } from './fleet-data.js';
+import { initialFleetState } from './fleet-data.js';
+import type { GraphState } from './graph-data.js';
+import { initialGraphState } from './graph-data.js';
 
-export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'chat' | 'logs' | 'agents' | 'terminals';
+export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'fleet' | 'graph' | 'chat' | 'logs' | 'agents' | 'terminals';
 export type AgentMode = 'communication' | 'execution';
 export type Strategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
 export type DetectionState = 'idle' | 'detecting' | 'complete' | 'failed';
@@ -127,6 +131,8 @@ export interface AppModel {
   activityFollow: boolean;
   activityScroll: number;
   missionData: MissionDataState;
+  fleet: FleetState;
+  graph: GraphState;
 }
 
 export function initialMissionUi(): MissionUiState {
@@ -174,6 +180,8 @@ export function initialModel(width: number, height: number): AppModel {
     activityFollow: true,
     activityScroll: 0,
     missionData: initialMissionData(),
+    fleet: initialFleetState(),
+    graph: initialGraphState(),
   };
 }
 
