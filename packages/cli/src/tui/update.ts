@@ -1,7 +1,6 @@
 import type { AgentEvent } from './events/agent-event.js';
 import type { AppModel, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
 import { nextActivityId, nextMsgId } from './model.js';
-import type { FleetDevice } from './fleet-data.js';
 import { buildMissionGraph } from './graph-builder.js';
 
 export type Msg =
@@ -303,11 +302,12 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const execution = { id: executionId, taskId: taskId ?? 'unassigned', sessionId: sessionId ?? 'unknown', agentId: msg.agentId, status: 'running' as const, startedAt: Date.now(), events: [] as string[] };
       const tasks = model.missionData.tasks.map(t => t.id === taskId ? { ...t, assignedAgentId: msg.agentId, currentExecutionId: executionId, status: 'running' as const, progress: Math.max(t.progress, 10) } : t);
       const sessions = model.missionData.sessions.map(s => s.id === sessionId ? { ...s, executionIds: [...s.executionIds, executionId] } : s);
-      return {
+      return rebuildGraph({
         ...model,
         agents,
         agentEvents: appendAgentEvent(model.agentEvents, event),
         missionData: { ...model.missionData, executions: [...model.missionData.executions, execution], tasks, sessions, selectedExecutionId: executionId },
+        fleet: { ...model.fleet, agents: model.fleet.agents.map(a => a.id === msg.agentId ? { ...a, status:'running' as const, currentTaskId:taskId, currentExecutionId:executionId, lastSeenAt:Date.now() } : a) },
         missionUi: { ...model.missionUi, currentAction: 'Agent ' + msg.agentId + ' is executing', activity: appendActivity(model.missionUi.activity, activity('Agent started', 'info', msg.agentId, msg.agentId)) },
         messages: [...model.messages, makeMsg({ type: 'agent', agentId: msg.agentId, callsign: findCallsign(model, msg.agentId), content: '', timestamp: Date.now(), streaming: true })],
       });
@@ -339,13 +339,14 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const a = agents.get(msg.agentId);
       if (a) agents.set(msg.agentId, { ...a, status: 'ready' });
       const event: AgentEvent = { type: 'COMPLETE', timestamp: Date.now(), agentId: msg.agentId, success: true };
-      return {
+      return rebuildGraph({
         ...model,
         agents,
         agentEvents: appendAgentEvent(model.agentEvents, event),
+        fleet: { ...model.fleet, agents: model.fleet.agents.map(a => a.id === msg.agentId ? { ...a, status:'ready' as const, lastSeenAt:Date.now() } : a) },
         messages: model.messages.map(m => m.agentId === msg.agentId && m.streaming ? { ...m, streaming: false } : m),
         missionUi: { ...model.missionUi, currentAction: 'Agent ' + msg.agentId + ' completed its execution', activity: appendActivity(model.missionUi.activity, activity('Agent completed', 'success', msg.agentId, msg.agentId)) },
-      };
+      });
     }
 
     case 'AGENT_ERROR': {
@@ -353,13 +354,14 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const a = agents.get(msg.agentId);
       if (a) agents.set(msg.agentId, { ...a, status: 'ready' });
       const event: AgentEvent = { type: 'ERROR', timestamp: Date.now(), agentId: msg.agentId, message: msg.error, recoverable: true };
-      return {
+      return rebuildGraph({
         ...model,
         agents,
         agentEvents: appendAgentEvent(model.agentEvents, event),
+        fleet: { ...model.fleet, agents: model.fleet.agents.map(a => a.id === msg.agentId ? { ...a, status:'error' as const, health:'degraded' as const, lastSeenAt:Date.now() } : a) },
         messages: [...model.messages.map(m => m.agentId === msg.agentId && m.streaming ? { ...m, streaming: false } : m), makeMsg({ type: 'error', agentId: msg.agentId, content: msg.error, timestamp: Date.now() })],
         missionUi: { ...model.missionUi, currentAction: 'Agent ' + msg.agentId + ' reported an error', activity: appendActivity(model.missionUi.activity, activity('Agent error', 'error', msg.error, msg.agentId)) },
-      };
+      });
     }
 
     case 'AGENT_FALLBACK': {
