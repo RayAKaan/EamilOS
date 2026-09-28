@@ -25,7 +25,7 @@ export type KeyEvent =
 type KeyHandler = (event: KeyEvent) => void;
 
 function parseMouseSequence(seq:string): KeyEvent|undefined {
-  const m=/^\\x1b\\[<([0-9]+);([0-9]+);([0-9]+)([mM])$/.exec(seq); if(!m)return;
+  const m=/^\x1b\[<([0-9]+);([0-9]+);([0-9]+)([mM])$/.exec(seq); if(!m)return;
   const code=Number(m[1]); const x=Number(m[2])-1; const y=Number(m[3])-1;
   return {type:'mouse',x,y,button:code&3,action:m[4]==='M'?'press':'release'};
 }
