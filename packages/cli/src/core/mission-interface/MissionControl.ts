@@ -115,7 +115,7 @@ export class MissionControl {
   async pause(missionId: string) {
     const mission = this.missions.snapshot(missionId).mission;
     if (mission.status === 'active') this.missions.pause(missionId);
-    else if (!['paused', 'created'].includes(mission.status)) {
+    else if (mission.status !== 'paused') {
       throw new Error('Mission ' + missionId + ' cannot pause from ' + mission.status);
     }
     await createAutonomousLoopRuntime().pause(missionId);
@@ -142,9 +142,12 @@ export class MissionControl {
     const policy = await this.getPolicy(missionId);
     const approval = await this.ensureControlApproval(missionId, policy, 'ABORT', undefined, 'Cancel and abort this mission.');
     if (approval) throw new Error(`Approval required: ${approval.id}`);
-    await createAutonomousLoopRuntime().abort(missionId, 'Mission cancelled by user.');
     const mission = this.missions.snapshot(missionId).mission;
-    if (mission.status !== 'cancelled') this.missions.cancel(missionId);
+    if (['completed', 'failed', 'cancelled'].includes(mission.status)) {
+      throw new Error('Mission ' + missionId + ' cannot be cancelled from ' + mission.status);
+    }
+    await createAutonomousLoopRuntime().abort(missionId, 'Mission cancelled by user.');
+    this.missions.cancel(missionId);
     return this.status(missionId);
   }
 
