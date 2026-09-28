@@ -19,6 +19,9 @@ export async function runSession(
   const { dispatch, getModel, onLog } = callbacks;
 
   dispatch({ type: 'SESSION_STARTED' });
+  dispatch({ type: 'LOOP_STAGE', stage: 'observe', status: 'completed' });
+  dispatch({ type: 'LOOP_STAGE', stage: 'interpret', status: 'completed' });
+  dispatch({ type: 'LOOP_STAGE', stage: 'plan', status: 'active' });
 
   const model = getModel();
   const hasExecution = Array.from(model.agents.values()).some(
@@ -41,6 +44,8 @@ export async function runSession(
   });
 
   session.on('agent.started', (data) => {
+    dispatch({ type: 'LOOP_STAGE', stage: 'plan', status: 'completed' });
+    dispatch({ type: 'LOOP_STAGE', stage: 'execute', status: 'active' });
     dispatch({ type: 'AGENT_STARTED', agentId: data.agentId });
     onLog(`Agent started: ${data.agentId}`);
   });
@@ -60,20 +65,32 @@ export async function runSession(
   });
 
   session.on('agent.fallback', (data) => {
+    const now=Date.now();
+    dispatch({ type: 'DECISION_PROPOSED', decision: { id:'decision-'+String(now), missionId:getModel().missionUi.id, loopId:getModel().loop.id, iterationId:getModel().loop.iterations.at(-1)?.id, provider:'runtime', action:'REASSIGN', reason:data.reason, sourceResources:[{type:'agent',id:data.from},{type:'agent',id:data.to}], evidenceIds:[], status:'proposed', createdAt:now } });
     dispatch({ type: 'AGENT_FALLBACK', from: data.from, to: data.to, reason: data.reason });
+    const id=getModel().decisions.selectedDecisionId; if(id) dispatch({type:'DECISION_RESOLVED',decisionId:id,status:'applied',outcome:data.from+' → '+data.to});
     onLog(`Fallback: ${data.from} → ${data.to}`);
   });
 
   session.on('validation.started', () => {
+    dispatch({ type: 'LOOP_STAGE', stage: 'measure', status: 'active' });
+    dispatch({ type: 'LOOP_STAGE', stage: 'execute', status: 'completed' });
+    dispatch({ type: 'LOOP_STAGE', stage: 'measure', status: 'completed' });
+    dispatch({ type: 'LOOP_STAGE', stage: 'validate', status: 'active' });
     dispatch({ type: 'VALIDATION_STARTED' });
   });
 
   session.on('validation.passed', () => {
     dispatch({ type: 'VALIDATION_PASSED' });
+    dispatch({ type: 'LOOP_STAGE', stage: 'validate', status: 'completed' });
+    dispatch({ type: 'LOOP_STAGE', stage: 'adapt', status: 'completed' });
   });
 
   session.on('validation.failed', (data) => {
     dispatch({ type: 'VALIDATION_FAILED', errors: data.errors });
+    dispatch({ type: 'LOOP_ADAPTATION', required: true });
+    dispatch({ type: 'LOOP_STAGE', stage: 'validate', status: 'blocked' });
+    dispatch({ type: 'LOOP_STAGE', stage: 'adapt', status: 'active' });
     onLog(`Validation failed: ${data.errors.length} errors`);
   });
 
