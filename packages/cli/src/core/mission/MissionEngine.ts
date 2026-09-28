@@ -93,6 +93,30 @@ export class MissionEngine {
     return snapshot.mission;
   }
 
+  pause(missionId: string): Mission {
+    const snapshot = this.load(missionId);
+    if (snapshot.mission.status !== 'active') {
+      throw new Error(`Mission ${missionId} cannot pause from ${snapshot.mission.status}`);
+    }
+    snapshot.mission.status = 'paused';
+    this.touch(snapshot);
+    this.emitIn(snapshot, 'MISSION_PAUSED', {});
+    this.persist(snapshot);
+    return snapshot.mission;
+  }
+
+  resume(missionId: string): Mission {
+    const snapshot = this.load(missionId);
+    if (snapshot.mission.status !== 'paused') {
+      throw new Error(`Mission ${missionId} cannot resume from ${snapshot.mission.status}`);
+    }
+    snapshot.mission.status = 'active';
+    this.touch(snapshot);
+    this.emitIn(snapshot, 'MISSION_RESUMED', {});
+    this.persist(snapshot);
+    return snapshot.mission;
+  }
+
   addTask(missionId: string, input: {
     title: string;
     description: string;
