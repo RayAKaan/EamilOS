@@ -208,6 +208,14 @@ export class MissionControl {
     return { missionId, graph: health, loopIntegrity, loopEvents: loopEvents.length };
   }
 
+  async approve(missionId: string, approvalId: string, resolvedBy = 'user'): Promise<ApprovalRequest> {
+    return this.approvals.resolve(missionId, approvalId, true, resolvedBy);
+  }
+
+  async deny(missionId: string, approvalId: string, resolvedBy = 'user'): Promise<ApprovalRequest> {
+    return this.approvals.resolve(missionId, approvalId, false, resolvedBy);
+  }
+
   async report(missionId: string): Promise<MissionReport> {
     const snapshot = this.missions.snapshot(missionId);
     const decisions = snapshot.events.filter(event =>
