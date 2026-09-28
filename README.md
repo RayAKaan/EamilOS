@@ -80,6 +80,55 @@ Three commands. Working files. Done.
 
 ---
 
+
+## Mission Control Plane
+
+The primary mission interface is now:
+
+```bash
+eamilos run "Build a production-ready REST API"
+```
+
+This creates a persistent mission and routes execution through the EamilOS mission/control plane by default. The legacy project/session runtime remains available with `--legacy`.
+
+### Human control
+
+```bash
+eamilos mission dashboard <missionId>
+eamilos mission status <missionId>
+eamilos mission pause <missionId>
+eamilos mission resume <missionId>
+eamilos mission continue <missionId>
+eamilos mission cancel <missionId>
+eamilos mission replan <missionId>
+eamilos mission approvals <missionId> list
+eamilos mission approvals <missionId> approve <approvalId>
+eamilos mission approvals <missionId> deny <approvalId>
+```
+
+A mission can run autonomously while retaining deterministic human approval boundaries. Approval state is persisted, and pause/cancel requests are persisted so a separate EamilOS process can control a foreground loop at the next safe iteration boundary.
+
+### Explainability
+
+```bash
+eamilos mission why <missionId> <taskId>
+eamilos mission blockers <missionId>
+eamilos mission verify <missionId>
+eamilos mission events <missionId>
+eamilos mission report <missionId>
+eamilos mission ask <missionId> "what is blocking the mission"
+```
+
+The graph remains authoritative for deterministic provenance: dependencies, blockers, graph version, validation state, and mission events can be inspected without asking an AI model to invent an explanation.
+
+### Autonomy levels
+
+- **ASSISTED** — human approval is required for execution/recovery/replanning by default.
+- **PLANNED** — EamilOS can plan autonomously but requires approval before execution/recovery/reassignment.
+- **AUTONOMOUS** — EamilOS executes within the configured policy and budget boundaries.
+
+The human control plane does not bypass EamilOS validation, graph consistency checks, runtime budgets, or execution policy.
+
 ## Who This Is For
 
 - Developers tired of fixing AI output
