@@ -206,11 +206,11 @@ program
         legacy: options.legacy === true,
         strategy: options.swarm ? 'swarm' : options.strategy || 'single-fallback',
       };
-      if (options.mission) {
-        await run(undefined, goal, runOptions);
-      } else {
+      if (options.legacy) {
         const eamilos = await initEamilOS();
         await run(eamilos, goal, runOptions);
+      } else {
+        await run(undefined, goal, runOptions);
       }
     } catch (error) {
       handleFatalError(error, options.debug === true);
