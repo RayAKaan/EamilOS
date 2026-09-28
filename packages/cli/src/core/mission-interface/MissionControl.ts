@@ -9,6 +9,7 @@ import type { IntelligenceConfig } from '../intelligence/types.js';
 import { ApprovalStore } from './ApprovalStore.js';
 import { MissionPolicyStore } from './MissionPolicyStore.js';
 import { buildMissionReport, type MissionReport } from './MissionReport.js';
+import { renderMissionDashboard } from './MissionDashboard.js';
 import {
   MissionPolicySchema,
   type ApprovalRequest,
@@ -114,23 +115,12 @@ export class MissionControl {
   }
 
   async pause(missionId: string) {
-    const stateStore = new LoopStateStore();
-    const state = await stateStore.load(missionId);
-    if (state && !['PAUSED', 'COMPLETED', 'ABORTED', 'FAILED', 'ESCALATED'].includes(state.status)) {
-      state.status = 'PAUSED';
-      state.terminationReason = 'Mission paused by user.';
-      state.updatedAt = new Date().toISOString();
-      await stateStore.save(state);
-      await new LoopEventLog().append({
-        missionId,
-        iteration: state.iteration,
-        phase: state.phase,
-        type: 'loop.paused',
-        payload: { reason: state.terminationReason },
-      });
-    }
     const mission = this.missions.snapshot(missionId).mission;
     if (mission.status === 'active') this.missions.pause(missionId);
+    else if (!['paused', 'created'].includes(mission.status)) {
+      throw new Error('Mission ' + missionId + ' cannot pause from ' + mission.status);
+    }
+    await createAutonomousLoopRuntime().pause(missionId);
     return this.status(missionId);
   }
 
@@ -154,22 +144,9 @@ export class MissionControl {
     const policy = await this.getPolicy(missionId);
     const approval = await this.ensureControlApproval(missionId, policy, 'ABORT', undefined, 'Cancel and abort this mission.');
     if (approval) throw new Error(`Approval required: ${approval.id}`);
-    const stateStore = new LoopStateStore();
-    const loopState = await stateStore.load(missionId);
-    if (loopState && !['COMPLETED', 'ABORTED', 'FAILED', 'ESCALATED'].includes(loopState.status)) {
-      loopState.status = 'ABORTED';
-      loopState.terminationReason = 'Mission cancelled by user.';
-      loopState.updatedAt = new Date().toISOString();
-      await stateStore.save(loopState);
-      await new LoopEventLog().append({
-        missionId,
-        iteration: loopState.iteration,
-        phase: loopState.phase,
-        type: 'loop.aborted',
-        payload: { reason: loopState.terminationReason },
-      });
-    }
-    this.missions.cancel(missionId);
+    await createAutonomousLoopRuntime().abort(missionId, 'Mission cancelled by user.');
+    const mission = this.missions.snapshot(missionId).mission;
+    if (mission.status !== 'cancelled') this.missions.cancel(missionId);
     return this.status(missionId);
   }
 
@@ -224,7 +201,7 @@ export class MissionControl {
     };
   }
 
-  async report(missionId: string): Promise<MissionReport> {
+  async dashboard(missionId: string): Promise<string> {\n    return renderMissionDashboard(await this.status(missionId));\n  }\n\n  async events(missionId: string) {\n    return this.missions.snapshot(missionId).events;\n  }\n\n  async verify(missionId: string): Promise<{ missionId: string; consistent: boolean; graphVersion: number; stateHash: string }> {\n    const graph = new GraphBuilder().build(this.missions.snapshot(missionId));\n    const health = new GraphValidator().validate(graph);\n    return { missionId, consistent: health.consistent, graphVersion: graph.version, stateHash: graph.stateHash };\n  }\n\n  async why(missionId: string, taskId: string) {\n    const graph = new GraphBuilder().build(this.missions.snapshot(missionId));\n    const task = graph.nodes.find(node => node.type === 'TASK' && node.id === taskId);\n    if (!task) throw new Error('Task not found in mission graph: ' + taskId);\n    const query = new GraphQueryEngine(graph);\n    return {\n      taskId,\n      title: String(task.attributes.title ?? taskId),\n      state: task.attributes.state,\n      blockers: query.findBlockers(taskId).map(node => ({ id: node.id, type: node.type, title: node.attributes.title })),\n      dependencies: query.findDependencies(taskId).map(node => ({ id: node.id, title: node.attributes.title })),\n      dependents: query.findDependents(taskId).map(node => ({ id: node.id, title: node.attributes.title })),\n      graphVersion: graph.version,\n    };\n  }\n  async report(missionId: string): Promise<MissionReport> {
     const snapshot = this.missions.snapshot(missionId);
     const decisions = snapshot.events.filter(event =>
       event.type === 'TASK_REASSIGNED' || event.data?.source === 'intelligence',
@@ -275,6 +252,23 @@ export class MissionControl {
     if (input === 'blockers' || input.includes('what is blocking')) {
       const data = await this.blockers(missionId);
       return { intent: 'BLOCKERS', message: data.length ? 'Blocking tasks found.' : 'No graph blockers found.', data };
+    }
+    if (input === 'verify' || input.includes('verify the mission')) {
+      const data = await this.verify(missionId);
+      return { intent: 'VERIFY', message: data.consistent ? 'Mission graph is consistent.' : 'Mission graph is inconsistent.', data };
+    }
+    if (input === 'report' || input.includes('show the report')) {
+      return { intent: 'REPORT', message: 'Mission report generated.', data: await this.report(missionId) };
+    }
+    if (input === 'events' || input.includes('show events')) {
+      return { intent: 'EVENTS', message: 'Mission events retrieved.', data: await this.events(missionId) };
+    }
+    const why = input.match(/^why(?: is)? (?:task )?([a-z0-9_-]+)(?: blocked)?$/i);
+    if (why) {
+      return { intent: 'WHY', message: 'Task provenance retrieved.', data: await this.why(missionId, why[1]) };
+    }
+    if (input === 'dashboard' || input.includes('show dashboard')) {
+      return { intent: 'DASHBOARD', message: await this.dashboard(missionId) };
     }
     if (input === 'help' || input.includes('what can i do')) {
       return { intent: 'HELP', message: this.helpText() };
@@ -384,6 +378,6 @@ export class MissionControl {
   }
 
   private helpText(): string {
-    return 'Available controls: status, pause, resume, replan, blockers, approve <approvalId>, deny <approvalId>, cancel, help.';
+    return 'Available controls: status, dashboard, pause, resume, cancel, replan, blockers, verify, report, events, why <taskId>, approve <approvalId>, deny <approvalId>, help.';
   }
 }
