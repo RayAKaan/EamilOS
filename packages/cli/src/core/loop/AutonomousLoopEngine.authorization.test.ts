@@ -1,13 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { AutonomousLoopEngine } from './AutonomousLoopEngine.js';
-import type { AutonomousLoopComponents, AutonomousLoopPolicy } from './types.js';
+import type { AutonomousLoopComponents, AutonomousLoopPolicy, LoopObservation } from './types.js';
 
 describe('AutonomousLoopEngine human authorization', () => {
   it('pauses before an unauthorized action and persists the approval reason', async () => {
     const components: AutonomousLoopComponents = {
-      observe: async () => {
-        throw new Error('observe should not run in this fixture');
-      },
+      observe: async (): Promise<LoopObservation> => ({
+        missionId: 'mission-auth-test',
+        iteration: 1,
+        observedAt: new Date().toISOString(),
+        graph: { missionId: 'mission-auth-test', version: 1, nodes: [], edges: [], stateHash: 'hash', createdAt: new Date().toISOString() },
+        graphHealth: { consistent: true, nodeCount: 0, edgeCount: 0, orphanNodes: 0, orphanEdges: 0, invalidReferences: 0, version: 1, stateHash: 'hash' },
+        context: {} as LoopObservation['context'],
+        readyTasks: ['task-1'],
+        runningTasks: [],
+        blockedTasks: [],
+        failedTasks: [],
+        completionRatio: 0,
+        progressMetric: 0,
+      }),
       interpret: async () => ({
         action: 'EXECUTE',
         trigger: 'USER_REQUESTED',
@@ -55,6 +66,7 @@ describe('AutonomousLoopEngine human authorization', () => {
 
     const engine = new AutonomousLoopEngine(components, policy);
     const result = await engine.run('mission-auth-test');
-    expect(result.status).toBe('FAILED');
+    expect(result.status).toBe('PAUSED');
+    expect(result.terminationReason).toContain('Human approval required');
   });
 });
