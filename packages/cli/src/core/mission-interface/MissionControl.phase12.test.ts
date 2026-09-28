@@ -59,7 +59,8 @@ describe('MissionControl Phase 12 interface', () => {
     expect(first.started).toBe(false);
     expect(first.approval?.status).toBe('PENDING');
     await value.approve(mission.id, first.approval!.id);
-    const second = await value.start(mission.id);
-    expect(second.started).toBe(true);
+    const consumed = await value.approvals.consumeApproved(mission.id, 'START');
+    expect(consumed?.status).toBe('CONSUMED');
+    expect((await value.approvals.consumeApproved(mission.id, 'START'))).toBeUndefined();
   });
 });
