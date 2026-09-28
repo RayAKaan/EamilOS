@@ -1,4 +1,5 @@
 import { EamilOS } from '../core/index.js';
+import { MissionControl } from '../core/mission-interface/MissionControl.js';
 import { header, success, info, kv, divider, error as printError } from '../ui.js';
 import { createSessionOrchestrator } from '../core/session/SessionOrchestrator.js';
 import type { ExecutionStrategy } from '../core/agents/types.js';
@@ -18,6 +19,7 @@ interface RunOptions {
   output?: string;
   debug?: boolean;
   forceInit?: boolean;
+  mission?: boolean;
 }
 
 function normalizeStrategy(raw?: string): ExecutionStrategy {
@@ -34,6 +36,26 @@ export async function run(
   goal: string,
   options: RunOptions
 ): Promise<void> {
+  if (options.mission) {
+    const control = new MissionControl();
+    const mission = await control.create({
+      goal,
+      workingDir: process.cwd(),
+      metadata: {
+        legacyRunOptions: {
+          strategy: options.strategy,
+          agent: options.agent,
+          provider: options.provider,
+          model: options.model,
+        },
+      },
+    });
+    const result = await control.start(mission.id);
+    console.log(JSON.stringify({ mission, ...result }, null, 2));
+    eamilos.shutdown();
+    return;
+  }
+
   header('Creating Project');
 
   const projectName = goal.length > 50 ? goal.substring(0, 47) + '...' : goal;
