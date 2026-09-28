@@ -21,7 +21,7 @@ export const MissionControlActionSchema = z.enum([
 ]);
 export type MissionControlAction = z.infer<typeof MissionControlActionSchema>;
 
-export const ApprovalStatusSchema = z.enum(['PENDING', 'APPROVED', 'DENIED', 'EXPIRED']);
+export const ApprovalStatusSchema = z.enum(['PENDING', 'APPROVED', 'DENIED', 'EXPIRED', 'CONSUMED']);
 export type ApprovalStatus = z.infer<typeof ApprovalStatusSchema>;
 
 export const MissionPolicySchema = z.object({
@@ -47,6 +47,7 @@ export const ApprovalRequestSchema = z.object({
   requestedAt: z.string().datetime(),
   resolvedAt: z.string().datetime().optional(),
   resolvedBy: z.string().optional(),
+  consumedAt: z.string().datetime().optional(),
 });
 export type ApprovalRequest = z.infer<typeof ApprovalRequestSchema>;
 
@@ -73,6 +74,13 @@ export interface MissionStatusView {
     edges: number;
   };
   approvals: ApprovalRequest[];
+}
+
+export interface MissionStartResult {
+  started: boolean;
+  missionId: string;
+  approval?: ApprovalRequest;
+  result?: MissionRunResult;
 }
 
 export interface MissionRunResult {
