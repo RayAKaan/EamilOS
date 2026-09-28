@@ -167,7 +167,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
       return { ...model, statusText: 'Refreshing GitHub…' };
 
     case 'GITHUB_REFRESHED':
-      return { ...model, missionData: { ...model.missionData, github: msg.state }, statusText: msg.state.error ? 'GitHub unavailable' : 'GitHub refreshed' };
+      return rebuildGraph({ ...model, missionData: { ...model.missionData, github: msg.state }, statusText: msg.state.error ? 'GitHub unavailable' : 'GitHub refreshed' });
 
     case 'SELECT_TASK':
       return { ...model, missionData: { ...model.missionData, selectedTaskId: msg.taskId } };
@@ -390,7 +390,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
         validation: 'unknown' as const,
         updatedAt: Date.now(),
       }));
-      return { ...model, modifiedFiles: msg.files, agentEvents: events.reduce(appendAgentEvent, model.agentEvents), missionUi: { ...model.missionUi, currentAction: 'Reviewing ' + String(msg.files.length) + ' file change' + (msg.files.length === 1 ? '' : 's'), activity: appendActivity(model.missionUi.activity, activity('Files changed', 'info', String(msg.files.length) + ' files')) }, missionData: { ...model.missionData, artifacts: [...model.missionData.artifacts, ...artifacts] } };
+      return rebuildGraph({ ...model, modifiedFiles: msg.files, agentEvents: events.reduce(appendAgentEvent, model.agentEvents), missionUi: { ...model.missionUi, currentAction: 'Reviewing ' + String(msg.files.length) + ' file change' + (msg.files.length === 1 ? '' : 's'), activity: appendActivity(model.missionUi.activity, activity('Files changed', 'info', String(msg.files.length) + ' files')) }, missionData: { ...model.missionData, artifacts: [...model.missionData.artifacts, ...artifacts] } });
     }
 
     case 'VALIDATION_STARTED': {
