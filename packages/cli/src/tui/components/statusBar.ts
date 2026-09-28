@@ -12,6 +12,8 @@ const PAGE_LABELS: Record<string, string> = {
   agents: 'A agents',
   sessions: 'S sessions',
   terminals: 'T terminals',
+  fleet: 'F fleet',
+  graph: 'R graph',
 };
 
 export function renderStatusBar(model: AppModel, layout: Layout): string {
