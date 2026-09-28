@@ -11,6 +11,8 @@ import type { DecisionState } from './decision-data.js';
 import { initialDecisionState } from './decision-data.js';
 import type { ApprovalState } from './approval-data.js';
 import { initialApprovalState } from './approval-data.js';
+import type { CommandPaletteState } from './commands/types.js';
+import { initialCommandPalette } from './commands/types.js';
 
 export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'fleet' | 'graph' | 'loop' | 'decisions' | 'approvals' | 'chat' | 'logs' | 'agents' | 'terminals';
 export type AgentMode = 'communication' | 'execution';
@@ -142,6 +144,7 @@ export interface AppModel {
   loop: LoopState;
   decisions: DecisionState;
   approvals: ApprovalState;
+  commandPalette: CommandPaletteState;
 }
 
 export function initialMissionUi(): MissionUiState {
@@ -194,6 +197,7 @@ export function initialModel(width: number, height: number): AppModel {
     loop: initialLoopState(),
     decisions: initialDecisionState(),
     approvals: initialApprovalState(),
+    commandPalette: initialCommandPalette(),
   };
 }
 
