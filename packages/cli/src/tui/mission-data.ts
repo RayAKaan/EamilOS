@@ -87,7 +87,7 @@ export interface GitHubState {
 }
 
 export interface ResourceRef {
-  type: 'mission' | 'task' | 'execution' | 'session' | 'artifact' | 'file' | 'commit' | 'pull-request';
+  type: 'mission' | 'task' | 'execution' | 'session' | 'artifact' | 'file' | 'commit' | 'pull-request' | 'agent' | 'device';
   id: string;
 }
 
