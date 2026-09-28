@@ -1,9 +1,9 @@
-import type {AppModel} from './model.js';
-import type {Layout} from './layout.js';
-import {fit,truncate} from './terminal/text.js';
-import {BOLD,DIM,FG,styled} from './terminal/ansi.js';
-import {commandMatches} from './commands/registry.js';
-import {onChat} from './theme.js';
+import type {AppModel} from '../model.js';
+import type {Layout} from '../layout.js';
+import {fit,truncate} from '../terminal/text.js';
+import {BOLD,DIM,FG,styled} from '../terminal/ansi.js';
+import {commandMatches} from '../commands/registry.js';
+import {onChat} from '../theme.js';
 
 export function renderCommandPalette(model:AppModel,layout:Layout):string[]{
  const width=Math.max(32,Math.min(layout.mainWidth-4,88)); const left=Math.max(0,Math.floor((layout.mainWidth-width)/2));
