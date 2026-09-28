@@ -165,8 +165,8 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const mission = {
         ...model.missionUi,
         id: 'mission-' + String(now),
-        title: model.input.trim() || 'Interactive mission',
-        objective: model.input.trim() || 'Execute the requested mission.',
+        title: model.lastPrompt || 'Interactive mission',
+        objective: model.lastPrompt || 'Execute the requested mission.',
         status: 'running' as const,
         progress: 0,
         currentAction: 'Initializing mission execution',
