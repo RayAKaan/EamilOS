@@ -104,7 +104,17 @@ export function registerMissionCommand(program: Command): void {
       console.log(JSON.stringify(await new MissionControl().status(missionId), null, 2));
     });
 
+  mission
+    .command('dashboard <missionId>')
+    .description('Show the human mission dashboard')
+    .action(async (id: string) => console.log(await new MissionControl().dashboard(id)));
+
+  mission.command('events <missionId>').description('Show mission event history').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().events(id), null, 2)));
+  mission.command('verify <missionId>').description('Verify mission graph consistency').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().verify(id), null, 2)));
+  mission.command('why <missionId> <taskId>').description('Explain task dependencies and blockers').action(async (id: string, taskId: string) => console.log(JSON.stringify(await new MissionControl().why(id, taskId), null, 2)));
+
   mission.command('pause <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().pause(id), null, 2)));
+  mission.command('continue <missionId>').description('Resume a paused mission').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().resume(id), null, 2)));
   mission.command('resume <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().resume(id), null, 2)));
   mission.command('cancel <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().cancel(id), null, 2)));
   mission.command('replan <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().replan(id), null, 2)));
