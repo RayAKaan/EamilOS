@@ -32,7 +32,7 @@ function normalizeStrategy(raw?: string): ExecutionStrategy {
 }
 
 export async function run(
-  eamilos: EamilOS,
+  eamilos: EamilOS | undefined,
   goal: string,
   options: RunOptions
 ): Promise<void> {
@@ -52,7 +52,7 @@ export async function run(
     });
     const result = await control.start(mission.id);
     console.log(JSON.stringify({ mission, ...result }, null, 2));
-    eamilos.shutdown();
+    eamilos?.shutdown();
     return;
   }
 
