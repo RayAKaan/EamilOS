@@ -11,6 +11,7 @@ import { renderLogsPage, renderAgentsPage, renderSessionsPage, renderTerminalsPa
 import { renderMissionHome, renderLiveExecution } from './screens/missionHome.js';
 import { renderTasks, renderArtifacts, renderSessions, renderGitHub } from './screens/explorers.js';
 import { renderFleet, renderGraph } from './screens/fleetGraph.js';
+import { renderLoop, renderDecisions, renderApprovals } from './screens/loopDecisionApproval.js';
 
 export function buildFrame(model: AppModel): string {
   const layout = layoutFor(model);
@@ -27,6 +28,9 @@ export function buildFrame(model: AppModel): string {
     case 'github': bodyLines = renderGitHub(model, layout); break;
     case 'fleet': bodyLines = renderFleet(model, layout); break;
     case 'graph': bodyLines = renderGraph(model, layout); break;
+    case 'loop': bodyLines = renderLoop(model, layout); break;
+    case 'decisions': bodyLines = renderDecisions(model, layout); break;
+    case 'approvals': bodyLines = renderApprovals(model, layout); break;
     case 'chat': bodyLines = renderChatView(model, layout); break;
     case 'logs': bodyLines = renderLogsPage(model, layout); break;
     case 'agents': bodyLines = renderAgentsPage(model, layout); break;

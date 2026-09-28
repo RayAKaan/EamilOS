@@ -5,8 +5,14 @@ import type { FleetState } from './fleet-data.js';
 import { initialFleetState } from './fleet-data.js';
 import type { GraphState } from './graph-data.js';
 import { initialGraphState } from './graph-data.js';
+import type { LoopState } from './loop-data.js';
+import { initialLoopState } from './loop-data.js';
+import type { DecisionState } from './decision-data.js';
+import { initialDecisionState } from './decision-data.js';
+import type { ApprovalState } from './approval-data.js';
+import { initialApprovalState } from './approval-data.js';
 
-export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'fleet' | 'graph' | 'chat' | 'logs' | 'agents' | 'terminals';
+export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'fleet' | 'graph' | 'loop' | 'decisions' | 'approvals' | 'chat' | 'logs' | 'agents' | 'terminals';
 export type AgentMode = 'communication' | 'execution';
 export type Strategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
 export type DetectionState = 'idle' | 'detecting' | 'complete' | 'failed';
@@ -133,6 +139,9 @@ export interface AppModel {
   missionData: MissionDataState;
   fleet: FleetState;
   graph: GraphState;
+  loop: LoopState;
+  decisions: DecisionState;
+  approvals: ApprovalState;
 }
 
 export function initialMissionUi(): MissionUiState {
@@ -182,6 +191,9 @@ export function initialModel(width: number, height: number): AppModel {
     missionData: initialMissionData(),
     fleet: initialFleetState(),
     graph: initialGraphState(),
+    loop: initialLoopState(),
+    decisions: initialDecisionState(),
+    approvals: initialApprovalState(),
   };
 }
 
