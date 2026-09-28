@@ -32,7 +32,8 @@ describe('Phase 13.2 Mission UI', () => {
   it('bounds live history and supports manual scrolling', () => {
     let model = initialModel(100, 30);
     model = update(model, { type: 'SESSION_STARTED' });
-    for (let i = 0; i < 260; i++) model = update(model, { type: 'AGENT_OUTPUT', agentId: 'a1', content: 'event-' + String(i) });
+    model = update(model, { type: 'SET_PAGE', page: 'execution' });
+    for (let i = 0; i < 260; i ++) model = update(model, { type: 'AGENT_OUTPUT', agentId: 'a1', content: 'event-' + String(i) });
     expect(model.agentEvents.length).toBeLessThanOrEqual(200);
     model = update(model, { type: 'TOGGLE_ACTIVITY_FOLLOW' });
     model = update(model, { type: 'SCROLL_UP', lines: 3 });
