@@ -150,10 +150,8 @@ export function update(model: AppModel, msg: Msg): AppModel {
     case 'TICK':
       return { ...model, spinFrame: (model.spinFrame + 1) % 10 };
 
-    case 'REFRESH_GITHUB': {
-      void readGitHubState().then(state => update(model, { type: 'GITHUB_REFRESHED', state }));
+    case 'REFRESH_GITHUB':
       return { ...model, statusText: 'Refreshing GitHub…' };
-    }
 
     case 'GITHUB_REFRESHED':
       return { ...model, missionData: { ...model.missionData, github: msg.state }, statusText: msg.state.error ? 'GitHub unavailable' : 'GitHub refreshed' };
@@ -185,21 +183,15 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'SESSION_STARTED': {
       const now = Date.now();
+      const missionId = 'mission-' + String(now);
+      const sessionId = 'session-' + String(now);
+      const taskId = 'task-' + String(now);
+      const objective = model.lastPrompt || 'Execute the requested mission.';
       const sysMsg = makeMsg({ type: 'system', content: 'Strategy: ' + model.strategy + ' · mode: ' + model.mode, timestamp: now });
-      const mission = {
-        ...model.missionUi,
-        id: 'mission-' + String(now),
-        title: model.lastPrompt || 'Interactive mission',
-        objective: model.lastPrompt || 'Execute the requested mission.',
-        status: 'running' as const,
-        progress: 0,
-        currentAction: 'Initializing mission execution',
-        validation: 'idle' as const,
-        pendingApprovals: 0,
-        startedAt: now,
-        activity: [activity('Mission started', 'info')],
-      };
-      return { ...model, running: true, scroll: 0, agentEvents: [], activityFollow: true, activityScroll: 0, missionUi: mission, messages: [...model.messages, sysMsg], statusText: 'Running…' };
+      const mission = { ...model.missionUi, id: missionId, title: objective, objective, status: 'running' as const, progress: 0, currentAction: 'Initializing mission execution', validation: 'idle' as const, pendingApprovals: 0, startedAt: now, activity: [activity('Mission started', 'info')] };
+      const session = { id: sessionId, missionId, goal: objective, strategy: model.strategy, startedAt: now, status: 'running' as const, executionIds: [] as string[] };
+      const task = { id: taskId, missionId, title: objective, status: 'running' as const, progress: 0, dependsOn: [] as string[], validation: 'idle' as const, createdAt: now, startedAt: now };
+      return { ...model, running: true, scroll: 0, agentEvents: [], activityFollow: true, activityScroll: 0, missionUi: mission, messages: [...model.messages, sysMsg], statusText: 'Running…', missionData: { ...model.missionData, tasks: [...model.missionData.tasks, task], sessions: [...model.missionData.sessions, session], selectedTaskId: taskId, selectedSessionId: sessionId, selectedExecutionId: undefined } };
     }
 
     case 'SESSION_COMPLETED': {
@@ -330,7 +322,21 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'CHANGES_COLLECTED': {
       const events = msg.files.map(file => ({ type: 'FILE_CHANGE', timestamp: Date.now(), agentId: file.agent, path: file.path, action: file.action } as AgentEvent));
-      return { ...model, modifiedFiles: msg.files, agentEvents: events.reduce(appendAgentEvent, model.agentEvents), missionUi: { ...model.missionUi, currentAction: 'Reviewing ' + String(msg.files.length) + ' file change' + (msg.files.length === 1 ? '' : 's'), activity: appendActivity(model.missionUi.activity, activity('Files changed', 'info', String(msg.files.length) + ' files')) } };
+      const taskId = model.missionData.selectedTaskId;
+      const executionId = model.missionData.selectedExecutionId;
+      const artifacts = msg.files.map((file, index) => ({
+        id: 'artifact-' + String(Date.now()) + '-' + String(index),
+        missionId: model.missionUi.id,
+        taskId,
+        executionId,
+        path: file.path,
+        kind: 'source' as const,
+        action: file.action,
+        agentId: file.agent,
+        validation: 'unknown' as const,
+        updatedAt: Date.now(),
+      }));
+      return { ...model, modifiedFiles: msg.files, agentEvents: events.reduce(appendAgentEvent, model.agentEvents), missionUi: { ...model.missionUi, currentAction: 'Reviewing ' + String(msg.files.length) + ' file change' + (msg.files.length === 1 ? '' : 's'), activity: appendActivity(model.missionUi.activity, activity('Files changed', 'info', String(msg.files.length) + ' files')) }, missionData: { ...model.missionData, artifacts: [...model.missionData.artifacts, ...artifacts] } };
     }
 
     case 'VALIDATION_STARTED': {
