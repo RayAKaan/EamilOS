@@ -2,141 +2,256 @@ import type { Command } from 'commander';
 import { MissionEngine } from '../core/mission/MissionEngine.js';
 import { MissionControl } from '../core/mission-interface/MissionControl.js';
 
+function output(value: unknown, json?: boolean): void {
+  if (json) {
+    console.log(JSON.stringify(value, null, 2));
+    return;
+  }
+  if (typeof value === 'string') {
+    console.log(value);
+    return;
+  }
+  console.log(JSON.stringify(value, null, 2));
+}
+
+function printStatus(value: Awaited<ReturnType<MissionControl['status']>>): void {
+  const pct = Math.round(value.progress.completionRatio * 100);
+  console.log(`Mission: ${value.missionId}`);
+  console.log(`Goal: ${value.goal}`);
+  console.log(`Status: ${value.status.toUpperCase()} | Autonomy: ${value.autonomy}`);
+  console.log(`Progress: ${value.progress.completedTasks}/${value.progress.totalTasks} tasks (${pct}%)`);
+  console.log(`  Running: ${value.progress.runningTasks} | Ready: ${value.progress.readyTasks} | Blocked: ${value.progress.blockedTasks} | Failed: ${value.progress.failedTasks}`);
+  console.log(`Graph: v${value.graph.version} | nodes ${value.graph.nodes} | edges ${value.graph.edges} | consistent: ${value.graph.consistent}`);
+  if (value.loop) {
+    console.log(`Loop: ${value.loop.status} | phase ${value.loop.phase} | iteration ${value.loop.iteration}`);
+  }
+  const pending = value.approvals.filter(item => item.status === 'PENDING');
+  if (pending.length) {
+    console.log(`Approvals pending: ${pending.length}`);
+    for (const approval of pending) console.log(`  - ${approval.id}: ${approval.action}${approval.taskId ? ` [${approval.taskId}]` : ''} — ${approval.reason}`);
+  }
+}
+
+function printReport(value: Awaited<ReturnType<MissionControl['report']>>): void {
+  console.log(`Mission: ${value.missionId}`);
+  console.log(`Status: ${value.status.toUpperCase()}`);
+  console.log(value.summary);
+  console.log(`Progress: ${value.progress.completedTasks}/${value.progress.totalTasks} (${Math.round(value.progress.completionRatio * 100)}%)`);
+  console.log(`Tasks: completed ${value.tasks.completed.length}, running ${value.tasks.running.length}, ready ${value.tasks.ready.length}, blocked ${value.tasks.blocked.length}, failed ${value.tasks.failed.length}`);
+  console.log(`Artifacts: ${value.artifacts.length} | Evidence: ${value.evidence.length} | Checkpoints: ${value.checkpoints.length}`);
+  console.log(`Decisions: ${value.decisions} | Mission events: ${value.events}`);
+}
+
 export function registerMissionCommand(program: Command): void {
-  const mission = program.command('mission').description('Manage Phase 1 mission/task runtime');
+  const mission = program.command('mission').description('Create, run, inspect, and control autonomous missions');
 
-  mission
-    .command('create <goal>')
+  mission.command('create <goal>')
     .description('Create a persistent mission')
-    .option('--dir <path>', 'Working directory', process.cwd())
-    .action(async (goal: string, options: { dir: string }) => {
-      const value = await new MissionControl().create({ goal, workingDir: options.dir });
-      console.log(JSON.stringify(value, null, 2));
-    });
-
-  mission
-    .command('list')
-    .description('List persistent missions')
-    .action(() => {
-      console.log(JSON.stringify(new MissionEngine().store.list(), null, 2));
-    });
-
-  mission
-    .command('show <missionId>')
-    .description('Show mission state, tasks, checkpoints and evidence')
-    .action((missionId: string) => {
-      console.log(JSON.stringify(new MissionEngine().snapshot(missionId), null, 2));
-    });
-
-  mission
-    .command('start <missionId>')
-    .description('Start a mission through the human control plane')
-    .action(async (missionId: string) => {
-      console.log(JSON.stringify(await new MissionControl().start(missionId), null, 2));
-    });
-
-
-  mission
-    .command('add-task <missionId> <title>')
-    .description('Add a task to a mission')
-    .option('--description <text>', 'Task description')
-    .option('--depends-on <ids...>', 'Task IDs that must complete first')
-    .option('--priority <priority>', 'CRITICAL, HIGH, MEDIUM, LOW', 'MEDIUM')
-    .action((missionId: string, title: string, options: { description?: string; dependsOn?: string[]; priority: string }) => {
-      const task = new MissionEngine().addTask(missionId, {
-        title,
-        description: options.description ?? title,
-        dependencies: options.dependsOn,
-        priority: options.priority.toUpperCase() as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
-      });
-      console.log(JSON.stringify(task, null, 2));
-    });
-
-  mission
-    .command('schedule <missionId>')
-    .description('Show deterministic ready-task schedule')
-    .action(async (missionId: string) => {
-      const { MissionRuntime } = await import('../core/mission/MissionRuntime.js');
-      console.log(JSON.stringify(new MissionRuntime(new MissionEngine()).schedule(missionId), null, 2));
-    });
-
-  mission
-    .command('claim <missionId> <owner>')
-    .description('Claim the highest-priority ready task with a lease')
-    .option('--ttl <ms>', 'Lease duration in milliseconds', '120000')
-    .action(async (missionId: string, owner: string, options: { ttl: string }) => {
-      const { MissionRuntime } = await import('../core/mission/MissionRuntime.js');
-      console.log(JSON.stringify(
-        new MissionRuntime(new MissionEngine()).claimNext(missionId, owner, Number(options.ttl)),
-        null,
-        2,
-      ));
-    });
-
-  mission
-    .command('check <missionId>')
-    .description('Evaluate deterministic mission completion')
-    .action((missionId: string) => {
-      console.log(JSON.stringify(new MissionEngine().evaluateCompletion(missionId), null, 2));
-    });
-  mission
-    .command('run <goal>')
-    .description('Create and run an autonomous mission through the human control plane')
     .option('--dir <path>', 'Working directory', process.cwd())
     .option('--autonomy <level>', 'ASSISTED, PLANNED, or AUTONOMOUS', 'AUTONOMOUS')
     .option('--approve <actions...>', 'Actions requiring human approval')
-    .action(async (goal: string, options: { dir: string; autonomy: string; approve?: string[] }) => {
+    .option('--json', 'Output JSON')
+    .action(async (goal: string, options: { dir: string; autonomy: string; approve?: string[]; json?: boolean }) => {
+      const value = await new MissionControl().create({
+        goal, workingDir: options.dir,
+        autonomy: options.autonomy.toUpperCase() as 'ASSISTED' | 'PLANNED' | 'AUTONOMOUS',
+        requireApprovalFor: options.approve?.map(item => item.toUpperCase()) as never,
+      });
+      output(value, options.json);
+    });
+
+  mission.command('list')
+    .description('List persistent missions')
+    .option('--json', 'Output JSON')
+    .action((options: { json?: boolean }) => {
+      const values = new MissionEngine().store.list();
+      if (options.json) return output(values, true);
+      if (!values.length) return console.log('No missions found.');
+      for (const item of values) console.log(`${item.id} | ${item.status.toUpperCase()} | ${item.goal}`);
+    });
+
+  mission.command('show <missionId>')
+    .description('Show mission state')
+    .option('--json', 'Output JSON')
+    .action((missionId: string, options: { json?: boolean }) => {
+      const value = new MissionEngine().snapshot(missionId);
+      output(value, options.json);
+    });
+
+  mission.command('run <goal>')
+    .description('Create and run an autonomous mission')
+    .option('--dir <path>', 'Working directory', process.cwd())
+    .option('--autonomy <level>', 'ASSISTED, PLANNED, or AUTONOMOUS', 'AUTONOMOUS')
+    .option('--approve <actions...>', 'Actions requiring human approval')
+    .option('--json', 'Output JSON')
+    .action(async (goal: string, options: { dir: string; autonomy: string; approve?: string[]; json?: boolean }) => {
       const control = new MissionControl();
       const mission = await control.create({
-        goal,
-        workingDir: options.dir,
+        goal, workingDir: options.dir,
         autonomy: options.autonomy.toUpperCase() as 'ASSISTED' | 'PLANNED' | 'AUTONOMOUS',
         requireApprovalFor: options.approve?.map(item => item.toUpperCase()) as never,
       });
       const result = await control.start(mission.id);
-      console.log(JSON.stringify({ mission, ...result }, null, 2));
+      if (options.json) return output({ mission, ...result }, true);
+      console.log(`Mission created: ${mission.id}`);
+      if (!result.started) {
+        console.log(`Approval required: ${result.approval?.id} (${result.approval?.action})`);
+        console.log(`Run: eamilos mission approve ${mission.id} ${result.approval?.id}`);
+        return;
+      }
+      console.log(`Mission finished with status: ${result.result?.status}`);
+      if (result.result) console.log(`Loop: ${result.result.loop.iterations} iterations, ${result.result.loop.executions} executions`);
     });
 
-  mission
-    .command('status <missionId>')
+  mission.command('start <missionId>')
+    .description('Start or resume a mission')
+    .option('--json', 'Output JSON')
+    .action(async (missionId: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().start(missionId);
+      if (!options.json && !value.started) {
+        console.log(`Approval required: ${value.approval?.id} (${value.approval?.action})`);
+        console.log(`Run: eamilos mission approve ${missionId} ${value.approval?.id}`);
+        return;
+      }
+      output(value, options.json);
+    });
+
+  mission.command('status <missionId>')
     .description('Show mission status, progress, graph health, loop state, and approvals')
-    .action(async (missionId: string) => {
-      console.log(JSON.stringify(await new MissionControl().status(missionId), null, 2));
+    .option('--json', 'Output JSON')
+    .action(async (missionId: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().status(missionId);
+      if (options.json) return output(value, true);
+      printStatus(value);
     });
 
-  mission.command('pause <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().pause(id), null, 2)));
-  mission.command('resume <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().resume(id), null, 2)));
-  mission.command('cancel <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().cancel(id), null, 2)));
-  mission.command('replan <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().replan(id), null, 2)));
-
-  mission
-    .command('ask <missionId> <request...>')
-    .description('Control a mission using bounded natural-language commands')
-    .action(async (missionId: string, request: string[]) => {
-      console.log(JSON.stringify(await new MissionControl().ask(missionId, request.join(' ')), null, 2));
+  mission.command('pause <missionId>')
+    .description('Pause a mission')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().pause(id);
+      output(value, options.json);
     });
 
-  const approvals = mission.command('approvals <missionId>').description('Inspect and resolve approval requests');
-  approvals.command('list').action(async (missionId: string) => console.log(JSON.stringify(await new MissionControl().approvals.list(missionId), null, 2)));
-  approvals.command('approve <approvalId>').action(async (missionId: string, approvalId: string) => console.log(JSON.stringify(await new MissionControl().approve(missionId, approvalId), null, 2)));
-  approvals.command('deny <approvalId>').action(async (missionId: string, approvalId: string) => console.log(JSON.stringify(await new MissionControl().deny(missionId, approvalId), null, 2)));
+  mission.command('resume <missionId>')
+    .description('Resume a paused mission')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().resume(id);
+      if (!options.json && !value.started) {
+        console.log(`Approval required: ${value.approval?.id} (${value.approval?.action})`);
+        console.log(`Run: eamilos mission approve ${id} ${value.approval?.id}`);
+        return;
+      }
+      output(value, options.json);
+    });
 
-  mission.command('report <missionId>').action(async (id: string) => console.log(JSON.stringify(await new MissionControl().report(id), null, 2)));
-  mission
-    .command('policy <missionId>')
+  mission.command('cancel <missionId>')
+    .description('Cancel a mission')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { json?: boolean }) => output(await new MissionControl().cancel(id), options.json));
+
+  mission.command('replan <missionId>')
+    .description('Ask the autonomous runtime to replan')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().replan(id);
+      if (!options.json && !value.started) {
+        console.log(`Approval required: ${value.approval?.id} (${value.approval?.action})`);
+        console.log(`Run: eamilos mission approve ${id} ${value.approval?.id}`);
+        return;
+      }
+      output(value, options.json);
+    });
+
+  mission.command('policy <missionId>')
     .description('Show or update the mission human-control policy')
     .option('--autonomy <level>', 'ASSISTED, PLANNED, or AUTONOMOUS')
-    .option('--approve <actions...>', 'Actions requiring human approval')
-    .action(async (id: string, options: { autonomy?: string; approve?: string[] }) => {
+    .option('--approve <actions...>', 'Actions requiring approval')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { autonomy?: string; approve?: string[]; json?: boolean }) => {
       const control = new MissionControl();
-      if (options.autonomy || options.approve) {
-        const value = await control.setPolicy(id, {
-          autonomy: options.autonomy?.toUpperCase() as 'ASSISTED' | 'PLANNED' | 'AUTONOMOUS' | undefined,
-          requireApprovalFor: options.approve?.map(item => item.toUpperCase()) as never,
-        });
-        console.log(JSON.stringify(value, null, 2));
-      } else {
-        console.log(JSON.stringify(await control.getPolicy(id), null, 2));
+      const value = await control.setPolicy(id, {
+        autonomy: options.autonomy?.toUpperCase() as 'ASSISTED' | 'PLANNED' | 'AUTONOMOUS' | undefined,
+        requireApprovalFor: options.approve?.map(item => item.toUpperCase()) as never,
+      });
+      output(value, options.json);
+    });
+
+  mission.command('approvals <missionId>')
+    .description('List approval requests')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().approvals.list(id);
+      output(value, options.json);
+    });
+
+  mission.command('approve <missionId> <approvalId>')
+    .description('Approve a pending mission action')
+    .option('--json', 'Output JSON')
+    .action(async (missionId: string, approvalId: string, options: { json?: boolean }) => {
+      output(await new MissionControl().approve(missionId, approvalId), options.json);
+    });
+
+  mission.command('deny <missionId> <approvalId>')
+    .description('Deny a pending mission action')
+    .option('--json', 'Output JSON')
+    .action(async (missionId: string, approvalId: string, options: { json?: boolean }) => {
+      output(await new MissionControl().deny(missionId, approvalId), options.json);
+    });
+
+  mission.command('report <missionId>')
+    .description('Show the final/ current mission report')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().report(id);
+      if (options.json) return output(value, true);
+      printReport(value);
+    });
+
+  mission.command('history <missionId>')
+    .description('Show mission and autonomous-loop event history')
+    .option('--json', 'Output JSON')
+    .option('--limit <n>', 'Maximum entries', '50')
+    .action(async (id: string, options: { json?: boolean; limit: string }) => {
+      const value = await new MissionControl().history(id);
+      const limited = value.slice(-Math.max(1, Number(options.limit)));
+      if (options.json) return output(limited, true);
+      for (const event of limited) {
+        const detail = event.taskId ? ` task=${event.taskId}` : '';
+        console.log(`${event.timestamp} [${event.source}] ${event.type}${detail}`);
       }
+    });
+
+  mission.command('why <missionId> <taskId>')
+    .description('Explain why a task is blocked/running/failed')
+    .option('--json', 'Output JSON')
+    .action(async (missionId: string, taskId: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().why(missionId, taskId);
+      if (options.json) return output(value, true);
+      console.log(`Task: ${taskId}`);
+      console.log(`Dependencies: ${value.dependencies.map((item: any) => item.id).join(', ') || 'none'}`);
+      console.log(`Blockers: ${value.blockers.map((item: any) => item.id).join(', ') || 'none'}`);
+      console.log(`Failures: ${value.failures.map((item: any) => item.id).join(', ') || 'none'}`);
+      console.log(`Executions: ${value.executions.map((item: any) => item.id).join(', ') || 'none'}`);
+      console.log(`Decisions: ${value.decisions.map((item: any) => item.id).join(', ') || 'none'}`);
+    });
+
+  mission.command('verify <missionId>')
+    .description('Verify graph and loop integrity')
+    .option('--json', 'Output JSON')
+    .action(async (id: string, options: { json?: boolean }) => {
+      const value = await new MissionControl().verify(id);
+      if (options.json) return output(value, true);
+      console.log(`Graph: ${value.graph.consistent ? 'PASS' : 'FAIL'} | Loop event chain: ${value.loopIntegrity ? 'PASS' : 'FAIL'}`);
+      if (!value.graph.consistent || !value.loopIntegrity) process.exitCode = 1;
+    });
+
+  mission.command('ask <missionId> <request...>')
+    .description('Use bounded natural-language mission control')
+    .action(async (missionId: string, request: string[]) => {
+      const value = await new MissionControl().ask(missionId, request.join(' '));
+      console.log(value.message);
+      console.log(JSON.stringify(value.data ?? {}, null, 2));
     });
 }
