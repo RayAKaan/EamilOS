@@ -20,6 +20,7 @@ interface RunOptions {
   debug?: boolean;
   forceInit?: boolean;
   mission?: boolean;
+  legacy?: boolean;
 }
 
 function normalizeStrategy(raw?: string): ExecutionStrategy {
@@ -36,7 +37,9 @@ export async function run(
   goal: string,
   options: RunOptions
 ): Promise<void> {
-  if (options.mission) {
+  const useMissionRuntime = options.legacy !== true;
+
+  if (useMissionRuntime) {
     const control = new MissionControl();
     const mission = await control.create({
       goal,
@@ -56,7 +59,7 @@ export async function run(
     return;
   }
 
-  if (!eamilos) throw new Error('Legacy run runtime was not initialized. Use --mission for the Phase 12 mission runtime.');
+  if (!eamilos) throw new Error('Legacy run runtime was not initialized.');
 
   header('Creating Project');
 
