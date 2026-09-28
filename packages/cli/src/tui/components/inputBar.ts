@@ -28,6 +28,6 @@ export function renderInputBar(model: AppModel, layout: Layout): [string, string
   const sep = styled('  │  ', DIM, FG.BRIGHT_BLACK);
   const leftStr = '  ' + styled('v2.0', DIM, FG.WHITE) + sep + styled(String(readyCount) + ' agents', readyCount > 0 ? FG.GREEN : FG.YELLOW) + (model.statusText ? sep + styled(model.statusText.slice(0, 50), FG.CYAN) : '');
   const kb = (key: string, label: string) => styled(key, BOLD, FG.WHITE) + styled(' ' + label, DIM, FG.BRIGHT_BLACK);
-  const hints = kb('M', 'mission') + '  ' + kb('X', 'live') + '  ' + kb('C', 'chat') + '  ' + kb('Ctrl+S', 'sidebar') + '  ' + kb('Esc', 'exit') + '  ';
+  const hints = kb('M', 'mission') + '  ' + kb('X', 'live') + '  ' + kb('F', 'fleet') + '  ' + kb('R', 'graph') + '  ' + kb('T', 'tasks') + '  ' + kb('A', 'artifacts') + '  ' + kb('S', 'sessions') + '  ' + kb('G', 'github') + '  ' + kb('C', 'chat') + '  ' + kb('Ctrl+S', 'sidebar') + '  ' + kb('Esc', 'exit') + '  ';
   return [onChrome(fit(splitLine('  ' + arrow + ' ' + inputContent, '', width), width)), onChrome(fit(splitLine(leftStr, hints, width), width))];
 }

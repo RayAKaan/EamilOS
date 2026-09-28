@@ -80,6 +80,8 @@ export class EamilOSTuiApp {
           a: 'artifacts',
           s: 'sessions',
           g: 'github',
+          f: 'fleet',
+          r: 'graph',
           c: 'chat',
           l: 'logs',
         };
@@ -98,6 +100,11 @@ export class EamilOSTuiApp {
       }
 
       case 'enter': {
+        if (this.model.page === 'graph') {
+          const node = this.model.graph.nodes.find(n => n.id === this.model.graph.focus.nodeId) ?? this.model.graph.nodes[0];
+          if (node) this.dispatch({ type: 'GRAPH_FOCUS', nodeId: node.id });
+          break;
+        }
         if (this.model.running) break;
         const prompt = this.model.input.trim();
         if (!prompt) break;
@@ -125,10 +132,30 @@ export class EamilOSTuiApp {
         break;
       }
 
+      case 'right': {
+        if (this.model.page === 'graph') { const node=this.model.graph.focus.nodeId; if(node) this.dispatch({type:'GRAPH_TOGGLE_EXPAND',nodeId:node}); }
+        break;
+      }
+      case 'left': {
+        if (this.model.page === 'graph') { const node=this.model.graph.focus.nodeId; if(node) this.dispatch({type:'GRAPH_TOGGLE_EXPAND',nodeId:node}); }
+        break;
+      }
       case 'pageup': this.dispatch({ type: 'SCROLL_UP', lines: 10 }); break;
       case 'pagedown': this.dispatch({ type: 'SCROLL_DOWN', lines: 10 }); break;
-      case 'up': this.dispatch({ type: 'SCROLL_UP', lines: 1 }); break;
-      case 'down': this.dispatch({ type: 'SCROLL_DOWN', lines: 1 }); break;
+      case 'up': {
+        if (this.model.page === 'graph') {
+          const nodes=this.model.graph.nodes; if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));const next=nodes[Math.max(0,i-1)]!;this.dispatch({type:'GRAPH_FOCUS',nodeId:next.id});}
+        } else if (this.model.page === 'fleet') {
+          const agents=this.model.fleet.agents; if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.max(0,i-1)]!.id});}
+        } else this.dispatch({ type: 'SCROLL_UP', lines: 1 }); break;
+      }
+      case 'down': {
+        if (this.model.page === 'graph') {
+          const nodes=this.model.graph.nodes; if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));const next=nodes[Math.min(nodes.length-1,i+1)]!;this.dispatch({type:'GRAPH_FOCUS',nodeId:next.id});}
+        } else if (this.model.page === 'fleet') {
+          const agents=this.model.fleet.agents; if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.min(agents.length-1,i+1)]!.id});}
+        } else this.dispatch({ type: 'SCROLL_DOWN', lines: 1 }); break;
+      }
     }
   }
 
