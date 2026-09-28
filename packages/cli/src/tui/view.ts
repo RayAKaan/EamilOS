@@ -12,6 +12,7 @@ import { renderMissionHome, renderLiveExecution } from './screens/missionHome.js
 import { renderTasks, renderArtifacts, renderSessions, renderGitHub } from './screens/explorers.js';
 import { renderFleet, renderGraph } from './screens/fleetGraph.js';
 import { renderLoop, renderDecisions, renderApprovals } from './screens/loopDecisionApproval.js';
+import { renderCommandPalette } from './screens/commandPalette.js';
 
 export function buildFrame(model: AppModel): string {
   const layout = layoutFor(model);
@@ -51,6 +52,11 @@ export function buildFrame(model: AppModel): string {
     for (const line of bodyLines) frame.push(line);
   }
 
+  if(model.commandPalette.open){
+    const palette=renderCommandPalette(model,layout);
+    const start=layout.bodyTop;
+    for(let i=0;i<palette.length&&start+i<layout.botSepRow;i++) frame.setLine(start+i,palette[i]!);
+  }
   const [promptRow, statusRow] = renderInputBar(model, layout);
   frame.push(promptRow);
   frame.push(statusRow);
