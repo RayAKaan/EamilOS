@@ -86,7 +86,7 @@ export class EamilOSTuiApp {
           d: 'decisions',
           p: 'approvals',
           c: 'chat',
-          l: 'logs',
+          z: 'logs',
         };
         const page = pages[event.char.toLowerCase()];
         if (page) {
@@ -135,7 +135,7 @@ export class EamilOSTuiApp {
         break;
       }
 
-      case 'char': {
+      case 'right': {
         if (this.model.page === 'graph') { const node=this.model.graph.focus.nodeId; if(node) this.dispatch({type:'GRAPH_TOGGLE_EXPAND',nodeId:node}); }
         break;
       }
