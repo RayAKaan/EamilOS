@@ -1,7 +1,6 @@
 import type { AgentEvent } from './events/agent-event.js';
 import type { AppModel, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
 import { nextActivityId, nextMsgId } from './model.js';
-import { readGitHubState } from './services/gitHubState.js';
 
 export type Msg =
   | { type: 'RESIZE'; width: number; height: number }
