@@ -95,7 +95,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
       return model.cursor >= model.input.length ? model : { ...model, input: model.input.slice(0, model.cursor) + model.input.slice(model.cursor + 1) };
 
     case 'INPUT_CLEAR':
-      return { ...model, input: '', cursor: 0 };
+      return { ...model, lastPrompt: model.input, input: '', cursor: 0 };
 
     case 'INPUT_RECALL':
       return { ...model, input: model.lastPrompt, cursor: model.lastPrompt.length };
