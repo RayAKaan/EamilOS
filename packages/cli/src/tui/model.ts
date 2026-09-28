@@ -14,7 +14,7 @@ import { initialApprovalState } from './approval-data.js';
 import type { CommandPaletteState } from './commands/types.js';
 import { initialCommandPalette } from './commands/types.js';
 
-export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'fleet' | 'graph' | 'loop' | 'decisions' | 'approvals' | 'chat' | 'logs' | 'agents' | 'terminals';
+export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'fleet' | 'graph' | 'loop' | 'decisions' | 'approvals' | 'chat' | 'logs' | 'agents';
 export type AgentMode = 'communication' | 'execution';
 export type Strategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
 export type DetectionState = 'idle' | 'detecting' | 'complete' | 'failed';

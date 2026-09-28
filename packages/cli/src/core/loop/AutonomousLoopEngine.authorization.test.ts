@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { AutonomousLoopEngine } from './AutonomousLoopEngine.js';
+import { LoopStateStore } from './LoopStateStore.js';
 import type { AutonomousLoopComponents, AutonomousLoopPolicy, LoopObservation } from './types.js';
 
 describe('AutonomousLoopEngine human authorization', () => {
@@ -64,9 +68,16 @@ describe('AutonomousLoopEngine human authorization', () => {
       allowAutonomousExecution: true,
     };
 
-    const engine = new AutonomousLoopEngine(components, policy);
-    const result = await engine.run('mission-auth-test');
-    expect(result.status).toBe('PAUSED');
-    expect(result.terminationReason).toContain('Human approval required');
+    // Persist to a scratch dir: the engine resumes from any previously saved
+    // terminal state, so the shared project .eamilos/loops would leak in.
+    const dir = mkdtempSync(join(tmpdir(), 'eamilos-loop-'));
+    try {
+      const engine = new AutonomousLoopEngine(components, policy, new LoopStateStore(dir));
+      const result = await engine.run('mission-auth-test');
+      expect(result.status).toBe('PAUSED');
+      expect(result.terminationReason).toContain('Human approval required');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

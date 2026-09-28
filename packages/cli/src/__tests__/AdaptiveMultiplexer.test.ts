@@ -7,6 +7,12 @@ describe('AdaptiveMultiplexer', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     multiplexer = new AdaptiveMultiplexer();
+    // detectEnvironment() reads the real process env, so the host terminal
+    // (e.g. a real WT_SESSION on Windows) would otherwise leak into each case.
+    vi.stubEnv('WT_SESSION', '');
+    vi.stubEnv('TMUX', '');
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('CI', '');
   });
 
   afterEach(() => {
@@ -37,10 +43,6 @@ describe('AdaptiveMultiplexer', () => {
   });
 
   it('defaults to single when no env matches', () => {
-    vi.stubEnv('CI', '');
-    vi.stubEnv('WT_SESSION', '');
-    vi.stubEnv('TMUX', '');
-    vi.stubEnv('TERM_PROGRAM', '');
     expect(AdaptiveMultiplexer.detectEnvironment()).toBe('single');
   });
 

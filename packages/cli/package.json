@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/cli",
-  "version": "1.8.0",
-  "description": "EamilOS v1.8.0 — Full-screen TUI replaces Ink/React renderer",
+  "version": "2.0.0",
+  "description": "EamilOS v2.0.0 — Mission-first full-screen TUI",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {
@@ -36,13 +36,15 @@
     }
   },
   "files": [
-    "dist/**/*",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "bin/eamilos",
     "README.md"
   ],
   "scripts": {
-    "build": "npm run typecheck && node src/tui/bundle.js",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.ui.json --noEmit",
+    "prepack": "npm run clean && npm run build",
+    "build": "tsc -p tsconfig.build.json && node src/tui/bundle.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.ui.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "dev": "tsc --watch",

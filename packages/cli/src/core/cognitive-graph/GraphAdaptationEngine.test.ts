@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { MissionEngine } from '../mission/MissionEngine.js';
+import { MissionStore } from '../mission/MissionStore.js';
 import { GraphBuilder } from './GraphBuilder.js';
 import { GraphValidator } from './GraphValidator.js';
 import { GraphAdaptationEngine } from './GraphAdaptationEngine.js';
@@ -46,28 +50,35 @@ function observation(missions: MissionEngine): LoopObservation {
 
 describe('GraphAdaptationEngine', () => {
   it('creates one idempotent recovery task and makes it a prerequisite of the failed task', () => {
-    const missions = new MissionEngine();
-    const mission = missions.createMission({ id: 'mission_test', goal: 'test', workingDir: process.cwd() });
-    missions.addTask(mission.id, {
-      id: 'task_a', title: 'Implement', description: 'Implement feature',
-      requiredCapabilities: ['node'], idempotencyKey: 'task_a',
-    });
-    const obs = observation(missions);
-    obs.context.taskGraph.failedTasks = ['task_a'];
-    obs.failedTasks = ['task_a'];
-    const measurement: LoopMeasurement = {
-      measuredAt: new Date().toISOString(), progressMetric: 0, progressDelta: 0,
-      taskStateChanges: 1, graphVersion: 1,
-    };
-    const validation: LoopValidation = { passed: false, reasons: ['test failure'] };
-    const result = new GraphAdaptationEngine(missions, {
-      allowTaskCreation: true, allowDependencyChanges: true, allowTaskInputChanges: true,
-      maxMutationsPerIteration: 2, requireGraphConsistency: true,
-    }).apply(obs, measurement, validation);
-    expect(result.changed).toBe(true);
-    const tasks = missions.snapshot(mission.id).tasks;
-    const original = tasks.find(t => t.id === 'task_a')!;
-    expect(tasks.some(t => t.id !== 'task_a')).toBe(true);
-    expect(original.dependencies.length).toBe(1);
+    // Scratch store: createMission rejects an id that already exists, so a
+    // leftover mission_test.json under the project .eamilos/ would fail this.
+    const dir = mkdtempSync(join(tmpdir(), 'eamilos-graph-'));
+    try {
+      const missions = new MissionEngine(new MissionStore(dir));
+      const mission = missions.createMission({ id: 'mission_test', goal: 'test', workingDir: process.cwd() });
+      missions.addTask(mission.id, {
+        id: 'task_a', title: 'Implement', description: 'Implement feature',
+        requiredCapabilities: ['node'], idempotencyKey: 'task_a',
+      });
+      const obs = observation(missions);
+      obs.context.taskGraph.failedTasks = ['task_a'];
+      obs.failedTasks = ['task_a'];
+      const measurement: LoopMeasurement = {
+        measuredAt: new Date().toISOString(), progressMetric: 0, progressDelta: 0,
+        taskStateChanges: 1, graphVersion: 1,
+      };
+      const validation: LoopValidation = { passed: false, reasons: ['test failure'] };
+      const result = new GraphAdaptationEngine(missions, {
+        allowTaskCreation: true, allowDependencyChanges: true, allowTaskInputChanges: true,
+        maxMutationsPerIteration: 2, requireGraphConsistency: true,
+      }).apply(obs, measurement, validation);
+      expect(result.changed).toBe(true);
+      const tasks = missions.snapshot(mission.id).tasks;
+      const original = tasks.find(t => t.id === 'task_a')!;
+      expect(tasks.some(t => t.id !== 'task_a')).toBe(true);
+      expect(original.dependencies.length).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

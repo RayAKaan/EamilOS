@@ -7,7 +7,7 @@ import { renderStatusBar } from './components/statusBar.js';
 import { renderInputBar } from './components/inputBar.js';
 import { renderChatView } from './components/chatView.js';
 import { renderSidebar, sidebarDividerLines } from './components/sidebar.js';
-import { renderLogsPage, renderAgentsPage, renderSessionsPage, renderTerminalsPage } from './components/pages.js';
+import { renderLogsPage, renderAgentsPage } from './components/pages.js';
 import { renderMissionHome, renderLiveExecution } from './screens/missionHome.js';
 import { renderTasks, renderArtifacts, renderSessions, renderGitHub } from './screens/explorers.js';
 import { renderFleet, renderGraph } from './screens/fleetGraph.js';
@@ -35,8 +35,6 @@ export function buildFrame(model: AppModel): string {
     case 'chat': bodyLines = renderChatView(model, layout); break;
     case 'logs': bodyLines = renderLogsPage(model, layout); break;
     case 'agents': bodyLines = renderAgentsPage(model, layout); break;
-    case 'sessions': bodyLines = renderSessionsPage(model, layout); break;
-    case 'terminals': bodyLines = renderTerminalsPage(model, layout); break;
   }
 
   if (layout.showSidebar) {
@@ -44,7 +42,7 @@ export function buildFrame(model: AppModel): string {
     const dividerLines = sidebarDividerLines(layout.sidebarHeight);
     for (let i = 0; i < layout.bodyHeight; i++) {
       const bodyLine = bodyLines[i] ?? fit('', layout.mainWidth);
-      const divLine = dividerLines[i] ?? styled(' ', FG.BRIGHT_BLACK);
+      const divLine = dividerLines[i] ?? ' ';
       const sideLine = sidebarLines[i] ?? fit('', layout.sidebarWidth);
       frame.push(fit(bodyLine + divLine + sideLine, layout.width));
     }
