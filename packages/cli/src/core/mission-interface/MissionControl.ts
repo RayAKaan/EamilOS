@@ -300,13 +300,16 @@ export class MissionControl {
         if (!action) return { allowed: true, reason: 'No human approval is required for this action.' };
         const currentPolicy = await this.getPolicy(id);
         if (['EXECUTE', 'RETRY', 'REASSIGN'].includes(action) && !currentPolicy.allowExecution) {
-          const request = await this.approvals.request({
-            missionId: id,
-            action,
-            taskId: interpretation.taskIds[0],
-            reason: 'Mission policy does not allow autonomous execution without human approval.',
-          });
-          if (request.status === 'PENDING') return { allowed: false, reason: `Human approval required for ${action}.`, approvalId: request.id };
+          const approved = await this.approvals.consumeApproved(id, action, interpretation.taskIds[0]);
+          if (!approved) {
+            const request = await this.approvals.request({
+              missionId: id,
+              action,
+              taskId: interpretation.taskIds[0],
+              reason: 'Mission policy does not allow autonomous execution without human approval.',
+            });
+            return { allowed: false, reason: `Human approval required for ${action}.`, approvalId: request.id };
+          }
         }
         if (currentPolicy.requireApprovalFor.includes(action)) {
           const approved = await this.approvals.consumeApproved(id, action, interpretation.taskIds[0]);
