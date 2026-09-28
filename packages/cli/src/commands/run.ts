@@ -56,6 +56,8 @@ export async function run(
     return;
   }
 
+  if (!eamilos) throw new Error('Legacy run runtime was not initialized. Use --mission for the Phase 12 mission runtime.');
+
   header('Creating Project');
 
   const projectName = goal.length > 50 ? goal.substring(0, 47) + '...' : goal;
