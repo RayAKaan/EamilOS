@@ -1,6 +1,6 @@
 import type { ResourceRef } from './mission-data.js';
 
-export type GraphNodeType='mission'|'task'|'execution'|'agent'|'device'|'artifact'|'session'|'file'|'commit'|'pull-request';
+export type GraphNodeType='mission'|'task'|'execution'|'agent'|'device'|'artifact'|'session'|'file'|'commit'|'pull-request'|'loop'|'iteration'|'decision'|'plan'|'approval'|'evidence';
 export type GraphEdgeType='contains'|'depends-on'|'executed-by'|'runs-on'|'produced'|'belongs-to'|'modified'|'committed-in'|'included-in'|'assigned-to'|'reassigned-to'|'validated-by';
 
 export interface GraphNode {id:string; type:GraphNodeType; label:string; status?:string; resource:ResourceRef;}
