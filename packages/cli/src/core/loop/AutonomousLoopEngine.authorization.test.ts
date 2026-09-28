@@ -11,7 +11,7 @@ describe('AutonomousLoopEngine human authorization', () => {
         observedAt: new Date().toISOString(),
         graph: { missionId: 'mission-auth-test', version: 1, nodes: [], edges: [], stateHash: 'hash', createdAt: new Date().toISOString() },
         graphHealth: { consistent: true, nodeCount: 0, edgeCount: 0, orphanNodes: 0, orphanEdges: 0, invalidReferences: 0, version: 1, stateHash: 'hash' },
-        context: {} as LoopObservation['context'],
+        context: { mission: { status: 'active' } } as LoopObservation['context'],
         readyTasks: ['task-1'],
         runningTasks: [],
         blockedTasks: [],
