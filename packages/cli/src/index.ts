@@ -197,6 +197,7 @@ program
   .option('--output <dir>', 'Output directory')
   .option('--debug', 'Show detailed output')
   .option('--ephemeral', 'Run without writing config to disk')
+  .option('--mission', 'Run through the Phase 12 mission/control-plane runtime')
   .action(async (goal: string, options) => {
     try {
       const eamilos = await initEamilOS();
