@@ -99,6 +99,10 @@ export type MissionAskIntent =
   | 'APPROVE'
   | 'DENY'
   | 'BLOCKERS'
+  | 'DASHBOARD'
+  | 'REPORT'
+  | 'WHY'
+  | 'EVENTS'
   | 'HELP'
   | 'UNKNOWN';
 
