@@ -1,64 +1,46 @@
 import type { AppModel } from './model.js';
-import { layoutFor, Layout } from './layout.js';
+import { layoutFor } from './layout.js';
 import { Frame } from './terminal/frame.js';
-import { fit, splitLine } from './terminal/text.js';
-import { styled, BOLD, DIM, FG } from './terminal/ansi.js';
+import { fit } from './terminal/text.js';
+import { styled, FG } from './terminal/ansi.js';
 import { renderStatusBar } from './components/statusBar.js';
 import { renderInputBar } from './components/inputBar.js';
 import { renderChatView } from './components/chatView.js';
 import { renderSidebar, sidebarDividerLines } from './components/sidebar.js';
 import { renderLogsPage, renderAgentsPage, renderSessionsPage, renderTerminalsPage } from './components/pages.js';
+import { renderMissionHome, renderLiveExecution } from './screens/missionHome.js';
 
 export function buildFrame(model: AppModel): string {
   const layout = layoutFor(model);
-
   const frame = new Frame({ width: layout.width, height: layout.height });
-
   frame.push(renderStatusBar(model, layout));
 
-  let bodyLines: string[] = [];
-
+  let bodyLines: string[];
   switch (model.page) {
-    case 'chat':
-      bodyLines = renderChatView(model, layout);
-      break;
-    case 'logs':
-      bodyLines = renderLogsPage(model, layout);
-      break;
-    case 'agents':
-      bodyLines = renderAgentsPage(model, layout);
-      break;
-    case 'sessions':
-      bodyLines = renderSessionsPage(model, layout);
-      break;
-    case 'terminals':
-      bodyLines = renderTerminalsPage(model, layout);
-      break;
+    case 'mission': bodyLines = renderMissionHome(model, layout); break;
+    case 'execution': bodyLines = renderLiveExecution(model, layout); break;
+    case 'chat': bodyLines = renderChatView(model, layout); break;
+    case 'logs': bodyLines = renderLogsPage(model, layout); break;
+    case 'agents': bodyLines = renderAgentsPage(model, layout); break;
+    case 'sessions': bodyLines = renderSessionsPage(model, layout); break;
+    case 'terminals': bodyLines = renderTerminalsPage(model, layout); break;
   }
 
   if (layout.showSidebar) {
     const sidebarLines = renderSidebar(model, layout);
     const dividerLines = sidebarDividerLines(layout.sidebarHeight);
-
     for (let i = 0; i < layout.bodyHeight; i++) {
       const bodyLine = bodyLines[i] ?? fit('', layout.mainWidth);
       const divLine = dividerLines[i] ?? styled(' ', FG.BRIGHT_BLACK);
       const sideLine = sidebarLines[i] ?? fit('', layout.sidebarWidth);
-      const combined = fit(
-        bodyLine + divLine + sideLine,
-        layout.width
-      );
-      frame.push(combined);
+      frame.push(fit(bodyLine + divLine + sideLine, layout.width));
     }
   } else {
-    for (const line of bodyLines) {
-      frame.push(line);
-    }
+    for (const line of bodyLines) frame.push(line);
   }
 
   const [promptRow, statusRow] = renderInputBar(model, layout);
   frame.push(promptRow);
   frame.push(statusRow);
-
   return frame.finalize();
 }
