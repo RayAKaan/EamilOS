@@ -10,7 +10,7 @@ function makeModel(): AppModel {
 describe('AppModel', () => {
   it('creates initial model with default values', () => {
     const m = makeModel();
-    expect(m.page).toBe('chat');
+    expect(m.page).toBe('mission');
     expect(m.mode).toBe('communication');
     expect(m.strategy).toBe('single-fallback');
     expect(m.running).toBe(false);
