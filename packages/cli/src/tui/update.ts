@@ -225,7 +225,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const agents = new Map(model.agents);
       for (const a of msg.agents) agents.set(a.id, a);
       const readyCount = msg.agents.filter(a => a.status === 'ready').length;
-      const fleetAgents = msg.agents.map(a => ({ id:a.id, name:a.name || a.callsign, status:(a.status === 'busy' ? 'running' : a.status === 'offline' ? 'disconnected' : a.status === 'not_installed' ? 'error' : 'ready') as const, capabilities:[], health:'unknown' as const, lastSeenAt:Date.now() }));
+      const fleetAgents = msg.agents.map(a => { const status = a.status === 'busy' ? 'running' : a.status === 'offline' ? 'disconnected' : a.status === 'not_installed' ? 'error' : 'ready'; return { id:a.id, name:a.name || a.callsign, status, capabilities:[], health:'unknown' as const, lastSeenAt:Date.now() }; });
       return rebuildGraph({ ...model, detectionState: 'complete', agents, fleet:{...model.fleet,agents:fleetAgents,lastEventAt:Date.now()}, statusText: String(readyCount) + ' agent' + (readyCount !== 1 ? 's' : '') + ' ready' });
     }
 
