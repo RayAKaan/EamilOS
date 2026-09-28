@@ -116,3 +116,10 @@ export function onChrome(text: string): string {
 export function onChat(text: string): string {
   return `${BG.BLACK}${text}${RESET}`;
 }
+
+
+export type MotionMode='full'|'reduced';
+export type GlyphMode='unicode'|'ascii';
+export function motionMode():MotionMode{return process.env.EAMILOS_REDUCED_MOTION==='1'?'reduced':'full';}
+export function glyphMode():GlyphMode{return process.env.EAMILOS_ASCII==='1'?'ascii':'unicode';}
+export const GLYPH={ok:()=>glyphMode()==='ascii'?'[OK]':'✓',active:()=>glyphMode()==='ascii'?'[*]':'●',pending:()=>glyphMode()==='ascii'?'[ ]':'○',arrow:()=>glyphMode()==='ascii'?'>':'→',error:()=>glyphMode()==='ascii'?'[!]':'!'};
