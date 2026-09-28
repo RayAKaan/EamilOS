@@ -3,6 +3,7 @@ import { MissionEngine } from '../mission/MissionEngine.js';
 import { createAutonomousLoopRuntime } from '../loop/AutonomousLoopFactory.js';
 import type { AutonomousLoopEngine, LoopInterpretation } from '../loop/index.js';
 import { LoopStateStore } from '../loop/LoopStateStore.js';
+import { LoopEventLog } from '../loop/LoopEventLog.js';
 import { defaultIntelligenceConfig } from '../intelligence/IntelligenceEngine.js';
 import type { IntelligenceConfig } from '../intelligence/types.js';
 import { ApprovalStore } from './ApprovalStore.js';
@@ -112,10 +113,20 @@ export class MissionControl {
   }
 
   async pause(missionId: string) {
-    const loop = this.runtimeFor(missionId, await this.getPolicy(missionId));
-    const state = await loop.status(missionId);
-    if (state && state.status !== 'PAUSED' && !['COMPLETED', 'ABORTED', 'FAILED', 'ESCALATED'].includes(state.status)) {
-      await loop.pause(missionId);
+    const stateStore = new LoopStateStore();
+    const state = await stateStore.load(missionId);
+    if (state && !['PAUSED', 'COMPLETED', 'ABORTED', 'FAILED', 'ESCALATED'].includes(state.status)) {
+      state.status = 'PAUSED';
+      state.terminationReason = 'Mission paused by user.';
+      state.updatedAt = new Date().toISOString();
+      await stateStore.save(state);
+      await new LoopEventLog().append({
+        missionId,
+        iteration: state.iteration,
+        phase: state.phase,
+        type: 'loop.paused',
+        payload: { reason: state.terminationReason },
+      });
     }
     const mission = this.missions.snapshot(missionId).mission;
     if (mission.status === 'active') this.missions.pause(missionId);
@@ -142,10 +153,20 @@ export class MissionControl {
     const policy = await this.getPolicy(missionId);
     const approval = await this.ensureControlApproval(missionId, policy, 'ABORT', undefined, 'Cancel and abort this mission.');
     if (approval) throw new Error(`Approval required: ${approval.id}`);
-    const loop = this.runtimeFor(missionId, policy);
-    const loopState = await loop.status(missionId);
+    const stateStore = new LoopStateStore();
+    const loopState = await stateStore.load(missionId);
     if (loopState && !['COMPLETED', 'ABORTED', 'FAILED', 'ESCALATED'].includes(loopState.status)) {
-      await loop.abort(missionId, 'Mission cancelled by user.');
+      loopState.status = 'ABORTED';
+      loopState.terminationReason = 'Mission cancelled by user.';
+      loopState.updatedAt = new Date().toISOString();
+      await stateStore.save(loopState);
+      await new LoopEventLog().append({
+        missionId,
+        iteration: loopState.iteration,
+        phase: loopState.phase,
+        type: 'loop.aborted',
+        payload: { reason: loopState.terminationReason },
+      });
     }
     this.missions.cancel(missionId);
     return this.status(missionId);
