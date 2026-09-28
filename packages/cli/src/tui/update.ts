@@ -197,7 +197,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'LOOP_STARTED': {
       const now=Date.now(); const id=msg.loopId ?? 'loop-'+String(now);
-      return { ...model, loop:{...model.loop,id,missionId:model.missionUi.id,status:'running',iteration:1,currentStage:'observe',objective:model.missionUi.objective,startedAt:now,updatedAt:now,progress:0,adaptationRequired:false,stages:LOOP_STAGES.map((stage,i)=>({stage,status:i===0?'active':'pending'})),iterations:[{id:id+'-1',number:1,objective:model.missionUi.objective,status:'running',currentStage:'observe',startedAt:now,decisionIds:[],executionIds:[]}],decisionIds:[],executionIds:[]} };
+      return { ...model, loop:{...model.loop,id,missionId:model.missionUi.id,status:'running',iteration:1,currentStage:'observe',objective:model.missionUi.objective,startedAt:now,updatedAt:now,progress:0,adaptationRequired:false,stages:LOOP_STAGES.map((stage,i)=>({stage,status:(i===0?'active':'pending') as const})),iterations:[{id:id+'-1',number:1,objective:model.missionUi.objective,status:'running',currentStage:'observe',startedAt:now,decisionIds:[],executionIds:[]}],decisionIds:[],executionIds:[]} };
     }
     case 'LOOP_STAGE': {
       const now=Date.now(); const stages=model.loop.stages.map(s=>s.stage===msg.stage?{...s,status:msg.status,startedAt:s.startedAt??now,completedAt:(msg.status==='completed'||msg.status==='skipped')?now:s.completedAt,decisionId:msg.decisionId}:s);
@@ -207,7 +207,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
     }
     case 'LOOP_ITERATION': {
       const now=Date.now(); const existing=model.loop.iterations.find(i=>i.number===msg.iteration);
-      const iterations=existing?model.loop.iterations.map(i=>i.number===msg.iteration?{...i,status:msg.status??i.status}:i):[...model.loop.iterations,{id:(model.loop.id??'loop')+'-'+msg.iteration,number:msg.iteration,objective:model.loop.objective,status:msg.status??'running',currentStage:'observe',startedAt:now,decisionIds:[],executionIds:[]}];
+      const iterations=existing?model.loop.iterations.map(i=>i.number===msg.iteration?{...i,status:msg.status??i.status}:i):[...model.loop.iterations,{id:(model.loop.id??'loop')+'-'+msg.iteration,number:msg.iteration,objective:model.loop.objective,status:msg.status??'running',currentStage:'observe' as const,startedAt:now,decisionIds:[],executionIds:[]}];
       return {...model,loop:{...model.loop,iteration:msg.iteration,iterations,status:msg.status==='failed'?'failed':msg.status==='blocked'?'blocked':msg.status==='completed'?'completed':'running',updatedAt:now}};
     }
     case 'LOOP_ADAPTATION':
@@ -225,7 +225,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
     case 'APPROVAL_REQUESTED':
       return {...model,approvals:{...model.approvals,requests:[...model.approvals.requests,msg.approval],selectedApprovalId:msg.approval.id},missionUi:{...model.missionUi,pendingApprovals:model.approvals.requests.filter(a=>a.status==='pending').length+1,activity:appendActivity(model.missionUi.activity,activity('Approval required','warning',msg.approval.action,msg.approval.id))}};
     case 'APPROVAL_RESOLVED': {
-      const requests=model.approvals.requests.map(a=>a.id===msg.approvalId?{...a,status:msg.resolution==='deny'?'denied':'approved',resolvedAt:Date.now(),resolution:msg.resolution}:a);
+      const requests=model.approvals.requests.map(a=>a.id===msg.approvalId?{...a,status:(msg.resolution==='deny'?'denied':'approved') as const,resolvedAt:Date.now(),resolution:msg.resolution}:a);
       const pending=requests.filter(a=>a.status==='pending').length;
       return {...model,approvals:{...model.approvals,requests},missionUi:{...model.missionUi,pendingApprovals:pending,activity:appendActivity(model.missionUi.activity,activity('Approval '+(msg.resolution==='deny'?'denied':'approved'),'info',msg.resolution,msg.approvalId))}};
     }
