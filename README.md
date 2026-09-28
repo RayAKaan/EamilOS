@@ -544,3 +544,51 @@ eamilos intelligence history <missionId>
 ```
 
 The strategic loop is bounded by decision/replan budgets and a stagnation threshold. Invalid, stale, conflicting, or policy-disallowed decisions are never executed.
+
+## Phase 12 — Mission Interface & Human Control Plane
+
+The Phase 9–11 runtime is exposed through a mission-first control plane. Users give EamilOS an objective; EamilOS owns mission state, graph state, planning, execution, validation, recovery, and evidence. Human approval is required for actions configured by mission policy.
+
+### Primary mission workflow
+
+```bash
+# Create and run a mission
+eamilos mission run "Build authentication for this application"
+
+# Or use the existing top-level run command with the mission runtime
+eamilos run --mission "Build authentication for this application"
+
+# Inspect the mission
+eamilos mission status <missionId>
+
+# Inspect the cognitive graph
+eamilos graph show <missionId>
+eamilos graph why <missionId> <taskId>
+
+# Control execution
+eamilos mission pause <missionId>
+eamilos mission resume <missionId>
+eamilos mission replan <missionId>
+eamilos mission cancel <missionId>
+
+# Human approvals
+eamilos mission approvals <missionId> list
+eamilos mission approvals <missionId> approve <approvalId>
+eamilos mission approvals <missionId> deny <approvalId>
+
+# Bounded natural-language control
+eamilos mission ask <missionId> "what is blocking the mission"
+eamilos mission ask <missionId> "pause the mission"
+
+# Final outcome
+eamilos mission report <missionId>
+```
+
+### Autonomy modes
+
+- **ASSISTED** — high-impact execution/replanning actions require approval.
+- **PLANNED** — planning can proceed, while execution/recovery actions require approval.
+- **AUTONOMOUS** — actions proceed without human approval unless explicitly configured.
+
+Approvals are persistent and consumed once. MissionEngine remains authoritative for mission/task state; the Cognitive Execution Graph remains the traceable representation of the mission; Jev and Laya cannot bypass the control plane.
+
