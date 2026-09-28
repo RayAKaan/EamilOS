@@ -1,6 +1,6 @@
 import type { AppModel } from '../model.js';
 import type { Layout } from '../layout.js';
-import { fit, splitLine } from '../terminal/text.js';
+import { fit, splitLine, truncate } from '../terminal/text.js';
 import { styled, BOLD, DIM, FG } from '../terminal/ansi.js';
 import { spinAt, onChrome } from '../theme.js';
 
@@ -12,7 +12,7 @@ const PAGE_LABELS: Record<string, string> = {
   sessions: 'S sessions',
   github: 'G github',
   chat: 'C chat',
-  logs: 'L logs',
+  logs: 'Z logs',
   agents: 'A agents',
   terminals: 'T terminals',
   fleet: 'F fleet',
@@ -42,6 +42,8 @@ export function renderStatusBar(model: AppModel, layout: Layout): string {
   const runStr = model.running ? '  ' + styled(spinAt(model.spinFrame), FG.YELLOW) + ' ' + styled('running', BOLD, FG.YELLOW) : '';
   const sep = styled('  │  ', DIM, FG.BRIGHT_BLACK);
   const left = '  ' + modeStr + sep + stratStr + sep + agentStr + sep + styled(PAGE_LABELS[model.page] ?? model.page, FG.BRIGHT_WHITE) + runStr;
-  const right = styled('EamilOS', BOLD, FG.CYAN) + ' ' + styled('v2.0', DIM, FG.WHITE) + '  ';
+  const right = model.notification
+    ? styled(truncate(model.notification, Math.max(12, Math.floor(layout.width * 0.45))), FG.YELLOW) + '  '
+    : styled('EamilOS', BOLD, FG.CYAN) + ' ' + styled('v2.0', DIM, FG.WHITE) + '  ';
   return onChrome(fit(splitLine(left, right, layout.width), layout.width));
 }
