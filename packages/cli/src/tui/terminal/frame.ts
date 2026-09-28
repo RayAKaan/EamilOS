@@ -55,6 +55,12 @@ export class Frame {
     this.push(prefix + styledLbl + suffix);
   }
 
+  setLine(index: number, line: string): void {
+    if (index < 0 || index >= this.h) return;
+    while (this.lines.length <= index) this.lines.push(' '.repeat(this.w));
+    this.lines[index] = fit(line, this.w);
+  }
+
   // Number of lines added so far.
   get lineCount(): number  { return this.lines.length; }
 

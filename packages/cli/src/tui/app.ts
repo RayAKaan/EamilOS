@@ -11,6 +11,9 @@ import { startConsoleCapture, stopConsoleCapture, drainCapturedLogs } from './se
 import { runAgentDetection, assignCallsigns } from './services/agentDetection.js';
 import { runSession } from './services/sessionBridge.js';
 import { readGitHubState } from './services/gitHubState.js';
+import { paletteOpen, paletteClose, paletteInput, paletteBackspace, paletteMove } from './palette.js';
+import { commandMatches } from './commands/registry.js';
+import { executeSlashCommand, isSlashCommand, isShellEscape } from './commands/input.js';
 
 const VALID_STRATEGIES = ['single', 'single-fallback', 'fallback', 'swarm', 'manual'];
 
@@ -44,6 +47,10 @@ export class EamilOSTuiApp {
   }
 
   async start(): Promise<void> {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      this.dispatch({ type: 'SET_NOTIFICATION', text: 'Interactive TUI requires a TTY; use the non-interactive CLI/JSON interface instead.' });
+      return;
+    }
     startConsoleCapture();
     enterFullScreen();
     installCrashRecovery();
@@ -72,6 +79,14 @@ export class EamilOSTuiApp {
   private handleKey(event: KeyEvent): void {
     switch (event.type) {
       case 'char': {
+        if (this.model.commandPalette.open) {
+          this.dispatch({ type: 'COMMAND_PALETTE_INPUT', char: event.char });
+          break;
+        }
+        if (event.char === '?' && !this.model.running) {
+          this.dispatch({ type: 'SET_NOTIFICATION', text: 'Ctrl+P command palette · / commands · ↑↓ navigate · Enter select · Esc back' });
+          break;
+        }
         if (this.model.running && !['x','m','f','r','l','d','p'].includes(event.char.toLowerCase())) break;
         const pages: Record<string, AppModel['page']> = {
           m: 'mission',
@@ -103,6 +118,7 @@ export class EamilOSTuiApp {
       }
 
       case 'enter': {
+        if (this.model.commandPalette.open) { this.dispatch({ type: 'COMMAND_PALETTE_EXECUTE' }); break; }
         if (this.model.page === 'decisions') {
           const id=this.model.decisions.selectedDecisionId;
           if(id) this.dispatch({type:'SELECT_DECISION',decisionId:id});
@@ -121,15 +137,28 @@ export class EamilOSTuiApp {
         if (this.model.running) break;
         const prompt = this.model.input.trim();
         if (!prompt) break;
+        if (isShellEscape(prompt)) {
+          this.dispatch({type:'SET_NOTIFICATION',text:'Shell escape is intentionally disabled in the mission TUI. Use an explicit terminal command outside the mission prompt.'});
+          break;
+        }
+        if (isSlashCommand(prompt)) {
+          const effect=executeSlashCommand(this.model,prompt);
+          if(effect?.type==='page') this.dispatch({type:'SET_PAGE',page:effect.page});
+          else if(effect?.type==='message') this.dispatch({type:'SET_NOTIFICATION',text:effect.text});
+          else if(!effect) this.dispatch({type:'SET_NOTIFICATION',text:'Unknown command. Press Ctrl+P to search available commands.'});
+          this.dispatch({type:'INPUT_CLEAR'});
+          break;
+        }
         this.dispatch({ type: 'INPUT_CLEAR' });
         this.startSession(prompt);
         break;
       }
 
-      case 'backspace': this.dispatch({ type: 'INPUT_BACKSPACE' }); break;
-      case 'escape': this.stop(); break;
+      case 'backspace': if(this.model.commandPalette.open)this.dispatch({type:'COMMAND_PALETTE_BACKSPACE'}); else this.dispatch({ type: 'INPUT_BACKSPACE' }); break;
+      case 'escape': if(this.model.commandPalette.open){this.dispatch({type:'COMMAND_PALETTE_CLOSE'});break;} this.stop(); break;
 
       case 'ctrl':
+        if (event.key === 'p') { this.dispatch({ type: 'COMMAND_PALETTE_OPEN' }); break; }
         if (event.key === 'c') {
           if (this.model.running) this.cancelSession();
           else this.stop();
@@ -156,6 +185,7 @@ export class EamilOSTuiApp {
       case 'pageup': this.dispatch({ type: 'SCROLL_UP', lines: 10 }); break;
       case 'pagedown': this.dispatch({ type: 'SCROLL_DOWN', lines: 10 }); break;
       case 'up': {
+        if (this.model.commandPalette.open) { this.dispatch({type:'COMMAND_PALETTE_MOVE',delta:-1}); break; }
         if (this.model.page === 'decisions') {
           const rs=this.model.decisions.records;if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.max(0,i-1)]!.id});}
         } else if (this.model.page === 'approvals') {
@@ -168,6 +198,7 @@ export class EamilOSTuiApp {
         break;
       }
       case 'down': {
+        if (this.model.commandPalette.open) { this.dispatch({type:'COMMAND_PALETTE_MOVE',delta:1}); break; }
         if (this.model.page === 'decisions') {
           const rs=this.model.decisions.records;if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.min(rs.length-1,i+1)]!.id});}
         } else if (this.model.page === 'approvals') {

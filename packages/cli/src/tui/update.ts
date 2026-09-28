@@ -7,6 +7,7 @@ import type {LoopStage,LoopStageState,LoopIteration} from './loop-data.js';
 import {LOOP_STAGES} from './loop-data.js';
 import type {DecisionRecord,DecisionAction,DecisionProvider,DecisionStatus,PlanRecord} from './decision-data.js';
 import type {ApprovalRequest,ApprovalResolution,ApprovalRisk} from './approval-data.js';
+import { commandMatches } from './commands/registry.js';
 
 export type Msg =
   | { type: 'RESIZE'; width: number; height: number }
@@ -78,7 +79,14 @@ export type Msg =
   | { type: 'APPROVAL_REQUESTED'; approval: ApprovalRequest }
   | { type: 'APPROVAL_RESOLVED'; approvalId: string; resolution: ApprovalResolution }
   | { type: 'SELECT_DECISION'; decisionId: string }
-  | { type: 'SELECT_APPROVAL'; approvalId: string };
+  | { type: 'SELECT_APPROVAL'; approvalId: string }
+  | { type: 'COMMAND_PALETTE_OPEN' }
+  | { type: 'COMMAND_PALETTE_CLOSE' }
+  | { type: 'COMMAND_PALETTE_INPUT'; char: string }
+  | { type: 'COMMAND_PALETTE_BACKSPACE' }
+  | { type: 'COMMAND_PALETTE_MOVE'; delta: number }
+  | { type: 'COMMAND_PALETTE_EXECUTE' }
+  | { type: 'SET_NOTIFICATION'; text: string };
 
 function findCallsign(model: AppModel, agentId: string): string | undefined {
   return model.agents.get(agentId)?.callsign;
@@ -233,6 +241,29 @@ export function update(model: AppModel, msg: Msg): AppModel {
       return {...model,decisions:{...model.decisions,selectedDecisionId:msg.decisionId}};
     case 'SELECT_APPROVAL':
       return {...model,approvals:{...model.approvals,selectedApprovalId:msg.approvalId}};
+    case 'COMMAND_PALETTE_OPEN':
+      return {...model,commandPalette:{...model.commandPalette,open:true,query:'',selected:0}};
+    case 'COMMAND_PALETTE_CLOSE':
+      return {...model,commandPalette:{...model.commandPalette,open:false,query:'',selected:0}};
+    case 'COMMAND_PALETTE_INPUT':
+      return {...model,commandPalette:{...model.commandPalette,open:true,query:model.commandPalette.query+msg.char,selected:0}};
+    case 'COMMAND_PALETTE_BACKSPACE':
+      return {...model,commandPalette:{...model.commandPalette,query:model.commandPalette.query.slice(0,-1),selected:0}};
+    case 'COMMAND_PALETTE_MOVE': {
+      const count=commandMatches(model.commandPalette.query,model).length;
+      return {...model,commandPalette:{...model.commandPalette,selected:Math.max(0,Math.min(Math.max(0,count-1),model.commandPalette.selected+msg.delta))}};
+    }
+    case 'SET_NOTIFICATION':
+      return {...model,notification:msg.text};
+    case 'COMMAND_PALETTE_EXECUTE': {
+      const matches=commandMatches(model.commandPalette.query,model);
+      const selected=matches[model.commandPalette.selected];
+      if(!selected)return {...model,commandPalette:{...model.commandPalette,open:true}};
+      const effect=selected.command.execute({model,query:model.commandPalette.query});
+      if(effect.type==='page')return {...model,page:effect.page,commandPalette:{...model.commandPalette,open:false,query:'',selected:0}};
+      if(effect.type==='message')return {...model,notification:effect.text,commandPalette:{...model.commandPalette,open:false,query:'',selected:0}};
+      return {...model,commandPalette:{...model.commandPalette,open:false,query:'',selected:0}};
+    }
 
     case 'FLEET_SELECT_AGENT':
       return { ...model, fleet: { ...model.fleet, selectedAgentId: msg.agentId, selectedDeviceId: undefined } };
