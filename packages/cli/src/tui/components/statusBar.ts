@@ -14,7 +14,6 @@ const PAGE_LABELS: Record<string, string> = {
   chat: 'C chat',
   logs: 'L logs',
   agents: 'A agents',
-  sessions: 'S sessions',
   terminals: 'T terminals',
   fleet: 'F fleet',
   graph: 'R graph',
