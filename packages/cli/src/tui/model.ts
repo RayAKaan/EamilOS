@@ -1,6 +1,8 @@
 import type { AgentEvent } from './events/agent-event.js';
+import type { MissionDataState } from './mission-data.js';
+import { initialMissionData } from './mission-data.js';
 
-export type Page = 'mission' | 'execution' | 'chat' | 'logs' | 'agents' | 'sessions' | 'terminals';
+export type Page = 'mission' | 'execution' | 'tasks' | 'artifacts' | 'sessions' | 'github' | 'chat' | 'logs' | 'agents' | 'terminals';
 export type AgentMode = 'communication' | 'execution';
 export type Strategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'manual';
 export type DetectionState = 'idle' | 'detecting' | 'complete' | 'failed';
@@ -124,6 +126,7 @@ export interface AppModel {
   agentEvents: AgentEvent[];
   activityFollow: boolean;
   activityScroll: number;
+  missionData: MissionDataState;
 }
 
 export function initialMissionUi(): MissionUiState {
@@ -170,6 +173,7 @@ export function initialModel(width: number, height: number): AppModel {
     agentEvents: [],
     activityFollow: true,
     activityScroll: 0,
+    missionData: initialMissionData(),
   };
 }
 

@@ -9,6 +9,7 @@ import { renderChatView } from './components/chatView.js';
 import { renderSidebar, sidebarDividerLines } from './components/sidebar.js';
 import { renderLogsPage, renderAgentsPage, renderSessionsPage, renderTerminalsPage } from './components/pages.js';
 import { renderMissionHome, renderLiveExecution } from './screens/missionHome.js';
+import { renderTasks, renderArtifacts, renderSessions, renderGitHub } from './screens/explorers.js';
 
 export function buildFrame(model: AppModel): string {
   const layout = layoutFor(model);
@@ -19,6 +20,10 @@ export function buildFrame(model: AppModel): string {
   switch (model.page) {
     case 'mission': bodyLines = renderMissionHome(model, layout); break;
     case 'execution': bodyLines = renderLiveExecution(model, layout); break;
+    case 'tasks': bodyLines = renderTasks(model, layout); break;
+    case 'artifacts': bodyLines = renderArtifacts(model, layout); break;
+    case 'sessions': bodyLines = renderSessions(model, layout); break;
+    case 'github': bodyLines = renderGitHub(model, layout); break;
     case 'chat': bodyLines = renderChatView(model, layout); break;
     case 'logs': bodyLines = renderLogsPage(model, layout); break;
     case 'agents': bodyLines = renderAgentsPage(model, layout); break;

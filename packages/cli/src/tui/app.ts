@@ -10,6 +10,7 @@ import { tickSpin } from './theme.js';
 import { startConsoleCapture, stopConsoleCapture, drainCapturedLogs } from './services/consoleCapture.js';
 import { runAgentDetection, assignCallsigns } from './services/agentDetection.js';
 import { runSession } from './services/sessionBridge.js';
+import { readGitHubState } from './services/gitHubState.js';
 
 const VALID_STRATEGIES = ['single', 'single-fallback', 'fallback', 'swarm', 'manual'];
 
@@ -75,15 +76,20 @@ export class EamilOSTuiApp {
         const pages: Record<string, AppModel['page']> = {
           m: 'mission',
           x: 'execution',
+          t: 'tasks',
+          a: 'artifacts',
+          s: 'sessions',
+          g: 'github',
           c: 'chat',
           l: 'logs',
-          a: 'agents',
-          s: 'sessions',
-          t: 'terminals',
         };
         const page = pages[event.char.toLowerCase()];
         if (page) {
           if (page === 'execution') this.dispatch({ type: 'TOGGLE_ACTIVITY_FOLLOW' });
+          if (page === 'github') {
+            this.dispatch({ type: 'REFRESH_GITHUB' });
+            void readGitHubState().then(state => this.dispatch({ type: 'GITHUB_REFRESHED', state }));
+          }
           this.dispatch({ type: 'SET_PAGE', page });
         } else if (!this.model.running) {
           this.dispatch({ type: 'INPUT_CHAR', char: event.char });

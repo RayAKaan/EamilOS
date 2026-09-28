@@ -45,7 +45,13 @@ export type Msg =
   | { type: 'TERMINAL_SPAWNED'; entry: TerminalEntry }
   | { type: 'TERMINAL_UPDATED'; agentId: string; lastLine: string; status: TerminalEntry['status'] }
   | { type: 'LOG'; text: string }
-  | { type: 'STATUS_TEXT'; text: string };
+  | { type: 'STATUS_TEXT'; text: string }
+  | { type: 'REFRESH_GITHUB' }
+  | { type: 'GITHUB_REFRESHED'; state: import('./mission-data.js').GitHubState }
+  | { type: 'SELECT_TASK'; taskId: string }
+  | { type: 'SELECT_ARTIFACT'; artifactId: string }
+  | { type: 'SELECT_SESSION'; sessionId: string }
+  | { type: 'SELECT_EXECUTION'; executionId: string };
 
 function findCallsign(model: AppModel, agentId: string): string | undefined {
   return model.agents.get(agentId)?.callsign;
@@ -143,6 +149,21 @@ export function update(model: AppModel, msg: Msg): AppModel {
     case 'TICK':
       return { ...model, spinFrame: (model.spinFrame + 1) % 10 };
 
+    case 'REFRESH_GITHUB':
+      return { ...model, statusText: 'Refreshing GitHub…' };
+
+    case 'GITHUB_REFRESHED':
+      return { ...model, missionData: { ...model.missionData, github: msg.state }, statusText: msg.state.error ? 'GitHub unavailable' : 'GitHub refreshed' };
+
+    case 'SELECT_TASK':
+      return { ...model, missionData: { ...model.missionData, selectedTaskId: msg.taskId } };
+    case 'SELECT_ARTIFACT':
+      return { ...model, missionData: { ...model.missionData, selectedArtifactId: msg.artifactId } };
+    case 'SELECT_SESSION':
+      return { ...model, missionData: { ...model.missionData, selectedSessionId: msg.sessionId } };
+    case 'SELECT_EXECUTION':
+      return { ...model, missionData: { ...model.missionData, selectedExecutionId: msg.executionId } };
+
     case 'NOTIFY':
       return { ...model, notification: msg.text };
 
@@ -161,21 +182,15 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'SESSION_STARTED': {
       const now = Date.now();
+      const missionId = 'mission-' + String(now);
+      const sessionId = 'session-' + String(now);
+      const taskId = 'task-' + String(now);
+      const objective = model.lastPrompt || 'Execute the requested mission.';
       const sysMsg = makeMsg({ type: 'system', content: 'Strategy: ' + model.strategy + ' · mode: ' + model.mode, timestamp: now });
-      const mission = {
-        ...model.missionUi,
-        id: 'mission-' + String(now),
-        title: model.lastPrompt || 'Interactive mission',
-        objective: model.lastPrompt || 'Execute the requested mission.',
-        status: 'running' as const,
-        progress: 0,
-        currentAction: 'Initializing mission execution',
-        validation: 'idle' as const,
-        pendingApprovals: 0,
-        startedAt: now,
-        activity: [activity('Mission started', 'info')],
-      };
-      return { ...model, running: true, scroll: 0, agentEvents: [], activityFollow: true, activityScroll: 0, missionUi: mission, messages: [...model.messages, sysMsg], statusText: 'Running…' };
+      const mission = { ...model.missionUi, id: missionId, title: objective, objective, status: 'running' as const, progress: 0, currentAction: 'Initializing mission execution', validation: 'idle' as const, pendingApprovals: 0, startedAt: now, activity: [activity('Mission started', 'info')] };
+      const session = { id: sessionId, missionId, goal: objective, strategy: model.strategy, startedAt: now, status: 'running' as const, executionIds: [] as string[] };
+      const task = { id: taskId, missionId, title: objective, status: 'running' as const, progress: 0, dependsOn: [] as string[], validation: 'idle' as const, createdAt: now, startedAt: now };
+      return { ...model, running: true, scroll: 0, agentEvents: [], activityFollow: true, activityScroll: 0, missionUi: mission, messages: [...model.messages, sysMsg], statusText: 'Running…', sessions: [...model.sessions, { id: sessionId, goal: objective, strategy: model.strategy, startedAt: now, status: 'running' as const, messageCount: 0 }], missionData: { ...model.missionData, tasks: [...model.missionData.tasks, task], sessions: [...model.missionData.sessions, session], selectedTaskId: taskId, selectedSessionId: sessionId, selectedExecutionId: undefined } };
     }
 
     case 'SESSION_COMPLETED': {
@@ -197,6 +212,12 @@ export function update(model: AppModel, msg: Msg): AppModel {
           activity: appendActivity(model.missionUi.activity, activity(summary.validated ? 'Mission completed' : 'Mission finished with errors', summary.validated ? 'success' : 'error')),
         },
         statusText: summary.validated ? '✓ Completed' : '✗ Failed',
+        missionData: {
+          ...model.missionData,
+          tasks: model.missionData.tasks.map(t => t.id === model.missionData.selectedTaskId ? { ...t, status: summary.validated ? 'completed' as const : 'failed' as const, progress: summary.validated ? 100 : t.progress, validation: summary.validated ? 'passed' as const : 'failed' as const, completedAt: Date.now() } : t),
+          sessions: model.missionData.sessions.map(s => s.id === model.missionData.selectedSessionId ? { ...s, status: summary.validated ? 'completed' as const : 'failed' as const, durationMs: summary.durationMs } : s),
+          executions: model.missionData.executions.map(e => e.id === model.missionData.selectedExecutionId ? { ...e, status: summary.validated ? 'completed' as const : 'failed' as const, finishedAt: Date.now() } : e),
+        },
       };
     }
 
@@ -209,6 +230,12 @@ export function update(model: AppModel, msg: Msg): AppModel {
         messages: [...model.messages, errMsg],
         missionUi: { ...model.missionUi, status: 'failed', currentAction: msg.error, activity: appendActivity(model.missionUi.activity, activity('Mission failed', 'error', msg.error)) },
         statusText: 'Error: ' + msg.error.slice(0, 60),
+        missionData: {
+          ...model.missionData,
+          tasks: model.missionData.tasks.map(t => t.id === model.missionData.selectedTaskId ? { ...t, status: 'failed' as const, validation: 'failed' as const } : t),
+          sessions: model.missionData.sessions.map(s => s.id === model.missionData.selectedSessionId ? { ...s, status: 'failed' as const } : s),
+          executions: model.missionData.executions.map(e => e.id === model.missionData.selectedExecutionId ? { ...e, status: 'failed' as const, finishedAt: Date.now() } : e),
+        },
       };
     }
 
@@ -217,10 +244,17 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const a = agents.get(msg.agentId);
       if (a) agents.set(msg.agentId, { ...a, status: 'busy' });
       const event: AgentEvent = { type: 'THINKING', timestamp: Date.now(), agentId: msg.agentId, label: 'Starting execution' };
+      const executionId = 'exec-' + String(Date.now());
+      const taskId = model.missionData.selectedTaskId;
+      const sessionId = model.missionData.selectedSessionId;
+      const execution = { id: executionId, taskId: taskId ?? 'unassigned', sessionId: sessionId ?? 'unknown', agentId: msg.agentId, status: 'running' as const, startedAt: Date.now(), events: [] as string[] };
+      const tasks = model.missionData.tasks.map(t => t.id === taskId ? { ...t, assignedAgentId: msg.agentId, currentExecutionId: executionId, status: 'running' as const, progress: Math.max(t.progress, 10) } : t);
+      const sessions = model.missionData.sessions.map(s => s.id === sessionId ? { ...s, executionIds: [...s.executionIds, executionId] } : s);
       return {
         ...model,
         agents,
         agentEvents: appendAgentEvent(model.agentEvents, event),
+        missionData: { ...model.missionData, executions: [...model.missionData.executions, execution], tasks, sessions, selectedExecutionId: executionId },
         missionUi: { ...model.missionUi, currentAction: 'Agent ' + msg.agentId + ' is executing', activity: appendActivity(model.missionUi.activity, activity('Agent started', 'info', msg.agentId, msg.agentId)) },
         messages: [...model.messages, makeMsg({ type: 'agent', agentId: msg.agentId, callsign: findCallsign(model, msg.agentId), content: '', timestamp: Date.now(), streaming: true })],
       };
@@ -287,7 +321,21 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'CHANGES_COLLECTED': {
       const events = msg.files.map(file => ({ type: 'FILE_CHANGE', timestamp: Date.now(), agentId: file.agent, path: file.path, action: file.action } as AgentEvent));
-      return { ...model, modifiedFiles: msg.files, agentEvents: events.reduce(appendAgentEvent, model.agentEvents), missionUi: { ...model.missionUi, currentAction: 'Reviewing ' + String(msg.files.length) + ' file change' + (msg.files.length === 1 ? '' : 's'), activity: appendActivity(model.missionUi.activity, activity('Files changed', 'info', String(msg.files.length) + ' files')) } };
+      const taskId = model.missionData.selectedTaskId;
+      const executionId = model.missionData.selectedExecutionId;
+      const artifacts = msg.files.map((file, index) => ({
+        id: 'artifact-' + String(Date.now()) + '-' + String(index),
+        missionId: model.missionUi.id,
+        taskId,
+        executionId,
+        path: file.path,
+        kind: 'source' as const,
+        action: file.action,
+        agentId: file.agent,
+        validation: 'unknown' as const,
+        updatedAt: Date.now(),
+      }));
+      return { ...model, modifiedFiles: msg.files, agentEvents: events.reduce(appendAgentEvent, model.agentEvents), missionUi: { ...model.missionUi, currentAction: 'Reviewing ' + String(msg.files.length) + ' file change' + (msg.files.length === 1 ? '' : 's'), activity: appendActivity(model.missionUi.activity, activity('Files changed', 'info', String(msg.files.length) + ' files')) }, missionData: { ...model.missionData, artifacts: [...model.missionData.artifacts, ...artifacts] } };
     }
 
     case 'VALIDATION_STARTED': {
@@ -297,12 +345,12 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'VALIDATION_PASSED': {
       const event: AgentEvent = { type: 'TEST', timestamp: Date.now(), agentId: 'validation', name: 'validation', status: 'passed' };
-      return { ...model, agentEvents: appendAgentEvent(model.agentEvents, event), missionUi: { ...model.missionUi, validation: 'passed', currentAction: 'Validation passed', activity: appendActivity(model.missionUi.activity, activity('Validation passed', 'success')) }, messages: [...model.messages, makeMsg({ type: 'system', content: '✓ Validation passed', timestamp: Date.now() })] };
+      return { ...model, agentEvents: appendAgentEvent(model.agentEvents, event), missionUi: { ...model.missionUi, validation: 'passed', currentAction: 'Validation passed', activity: appendActivity(model.missionUi.activity, activity('Validation passed', 'success')) }, missionData: { ...model.missionData, tasks: model.missionData.tasks.map(t => t.id === model.missionData.selectedTaskId ? { ...t, validation: 'passed' as const } : t), artifacts: model.missionData.artifacts.map(a => a.taskId === model.missionData.selectedTaskId ? { ...a, validation: 'passed' as const } : a) }, messages: [...model.messages, makeMsg({ type: 'system', content: '✓ Validation passed', timestamp: Date.now() })] };
     }
 
     case 'VALIDATION_FAILED': {
       const event: AgentEvent = { type: 'TEST', timestamp: Date.now(), agentId: 'validation', name: 'validation', status: 'failed' };
-      return { ...model, agentEvents: appendAgentEvent(model.agentEvents, event), missionUi: { ...model.missionUi, validation: 'failed', currentAction: 'Validation failed', activity: appendActivity(model.missionUi.activity, activity('Validation failed', 'error', msg.errors.join('; '))) }, messages: [...model.messages, makeMsg({ type: 'error', content: 'Validation failed: ' + msg.errors.join('; '), timestamp: Date.now() })] };
+      return { ...model, agentEvents: appendAgentEvent(model.agentEvents, event), missionUi: { ...model.missionUi, validation: 'failed', currentAction: 'Validation failed', activity: appendActivity(model.missionUi.activity, activity('Validation failed', 'error', msg.errors.join('; '))) }, missionData: { ...model.missionData, tasks: model.missionData.tasks.map(t => t.id === model.missionData.selectedTaskId ? { ...t, validation: 'failed' as const } : t), artifacts: model.missionData.artifacts.map(a => a.taskId === model.missionData.selectedTaskId ? { ...a, validation: 'failed' as const } : a) }, messages: [...model.messages, makeMsg({ type: 'error', content: 'Validation failed: ' + msg.errors.join('; '), timestamp: Date.now() })] };
     }
 
     case 'CONFLICT_RESOLVED':
