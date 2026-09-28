@@ -21,6 +21,11 @@ import { registerDecisionsCommand } from './commands/decisions.js';
 import { registerHistoryCommand } from './commands/history.js';
 import { connectCommand } from './commands/connect.js';
 import { workerStartCommand } from './commands/worker.js';
+import { registerMissionCommand } from './commands/mission.js';
+import { registerCoordinationCommand } from './commands/coordination.js';
+import { registerIntelligenceCommand } from './commands/intelligence.js';
+import { graphShow, graphVerify, graphWhy } from './commands/graph.js';
+import { registerLoopCommand } from './commands/loop.js';
 import { createMultiAgentCommands } from './multi-agent/index.js';
 import { detectAllProviders, selectBestProvider } from './detection/detectProviders.js';
 import { readFile } from 'fs/promises';
@@ -192,14 +197,19 @@ program
   .option('--output <dir>', 'Output directory')
   .option('--debug', 'Show detailed output')
   .option('--ephemeral', 'Run without writing config to disk')
+  .option('--mission', 'Run through the Phase 12 mission/control-plane runtime')
   .action(async (goal: string, options) => {
     try {
-      const eamilos = await initEamilOS();
       const runOptions = {
         ...options,
         strategy: options.swarm ? 'swarm' : options.strategy || 'single-fallback',
       };
-      await run(eamilos, goal, runOptions);
+      if (options.mission) {
+        await run(undefined, goal, runOptions);
+      } else {
+        const eamilos = await initEamilOS();
+        await run(eamilos, goal, runOptions);
+      }
     } catch (error) {
       handleFatalError(error, options.debug === true);
     }
@@ -413,6 +423,21 @@ program.addCommand(createMultiAgentCommands());
   registerCostCommand(program);
   registerDecisionsCommand(program);
   registerHistoryCommand(program);
+  registerMissionCommand(program);
+  registerCoordinationCommand(program);
+  registerIntelligenceCommand(program);
+  registerLoopCommand(program);
+
+  const graphCommand = program.command('graph').description('Inspect the Cognitive Execution Graph');
+  graphCommand.command('show <missionId>').option('--json', 'Output JSON').action(async (missionId: string, options: { json?: boolean }) => {
+    try { await graphShow(missionId, options); } catch (error) { handleFatalError(error); }
+  });
+  graphCommand.command('verify <missionId>').option('--json', 'Output JSON').action(async (missionId: string, options: { json?: boolean }) => {
+    try { await graphVerify(missionId, options); } catch (error) { handleFatalError(error); }
+  });
+  graphCommand.command('why <missionId> <taskId>').option('--json', 'Output JSON').action(async (missionId: string, taskId: string, options: { json?: boolean }) => {
+    try { await graphWhy(missionId, taskId, options); } catch (error) { handleFatalError(error); }
+  });
 
   program
     .command('connect [address]')

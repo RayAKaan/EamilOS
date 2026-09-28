@@ -1,25 +1,73 @@
-// theme.ts — All colours, glyphs, and background shades.
-// Background hierarchy: BG0 (darkest) → BG1 → BG2 → BG3 (lightest surface)
+// theme.ts — Semantic colour tokens, glyphs, and surface painting.
+//
+// Surfaces use truecolor when the terminal advertises it, 256-colour when it
+// advertises 256, and plain 16-colour ANSI otherwise. On terminals that render
+// background fills as visible grey blocks (or when NO_COLOR is set) we drop
+// background shading entirely and rely on foreground weight plus rules.
 
-import { FG, BG, BOLD, DIM, RESET, styled } from './terminal/ansi.js';
+import { FG, BG, BOLD, DIM, RESET, styled, CSI } from './terminal/ansi.js';
+
+// ── Colour capability detection ───────────────────────────────────────────────
+export type ColorDepth = 'truecolor' | 'ansi256' | 'ansi16' | 'none';
+
+function detectColorDepth(): ColorDepth {
+  if (process.env.NO_COLOR !== undefined) return 'none';
+  if (process.env.EAMILOS_ASCII === '1') return 'ansi16';
+  const colorterm = process.env.COLORTERM ?? '';
+  if (/truecolor|24bit/i.test(colorterm)) return 'truecolor';
+  if (process.env.WT_SESSION) return 'truecolor'; // Windows Terminal
+  if (/-256(color)?$/i.test(process.env.TERM ?? '')) return 'ansi256';
+  if (process.env.TERM === 'dumb') return 'none';
+  return 'ansi16';
+}
+
+let _depth: ColorDepth | null = null;
+
+/** Cached capability. Tests can call resetColorDepth() after changing env. */
+export function colorDepth(): ColorDepth {
+  if (_depth === null) _depth = detectColorDepth();
+  return _depth;
+}
+
+export function resetColorDepth(): void {
+  _depth = null;
+}
+
+function truecolor(isForeground: boolean, r: number, g: number, b: number): string {
+  return `${CSI}${isForeground ? 38 : 48};2;${r};${g};${b}m`;
+}
+
+function bg256(n: number): string {
+  return `${CSI}48;5;${n}m`;
+}
+
+/**
+ * Surface fills are opt-out. A neutral dark-grey fill (#111418) on a truecolor
+ * terminal keeps the panel hierarchy, while 16-colour terminals get no fill so
+ * BG.BRIGHT_BLACK can never render as a light grey slab.
+ */
+function surfaceFill(r: number, g: number, b: number, ansi256Index: number): string {
+  switch (colorDepth()) {
+    case 'truecolor': return truecolor(false, r, g, b);
+    case 'ansi256':   return bg256(ansi256Index);
+    default:          return '';
+  }
+}
+
+const SURFACE_CHROME_RGB  = [17, 20, 24] as const;  // #111418
+const SURFACE_PANEL_RGB   = [13, 16, 20] as const;  // #0d1014
+const SURFACE_CHAT_RGB    = [0, 0, 0] as const;       // #000000
+const CHROME_256 = 234;
+const PANEL_256  = 233;
+const CHAT_256   = 232;
 
 // ── Background shade hierarchy ────────────────────────────────────────────────
-// We only have 16 ANSI colours, so we use the available darks carefully.
-// BG.BLACK        = true black     — main chat area (recedes)
-// BG.BRIGHT_BLACK = dark grey      — status bar, input bar, sidebar
-// (inline bright on top of dark grey for "lifted" elements)
-
 export const SURFACE = {
-  // The main chat viewport — darkest, content reads on it
-  chat:      BG.BLACK,
-  // Status bar and input bar — one step lighter, clearly chrome
-  chrome:    BG.BRIGHT_BLACK,
-  // Sidebar — same as chrome, unified panel feel
-  sidebar:   BG.BRIGHT_BLACK,
-  // Separator rows (top rule, bottom rule) — slightly distinct
-  sep:       BG.BLACK,
-  // Inline highlight: selected/active item in sidebar
-  active:    BG.BLACK,
+  get chat()    { return surfaceFill(...SURFACE_CHAT_RGB,   CHAT_256);   },
+  get chrome()  { return surfaceFill(...SURFACE_CHROME_RGB, CHROME_256); },
+  get sidebar() { return surfaceFill(...SURFACE_PANEL_RGB,  PANEL_256);  },
+  get sep()     { return surfaceFill(...SURFACE_CHAT_RGB,   CHAT_256);   },
+  get active()  { return surfaceFill(...SURFACE_PANEL_RGB,  PANEL_256);  },
 } as const;
 
 // ── Foreground palette ────────────────────────────────────────────────────────
@@ -106,13 +154,24 @@ export const style = {
   kbdHint:  (s: string) => styled(s, DIM, FG.BRIGHT_BLACK),
 } as const;
 
-// ── Surface painter ───────────────────────────────────────────────────────────
-// Paints a full-width line with a background shade.
-// All chrome components call this instead of writing raw BG codes.
+// ── Surface painters ──────────────────────────────────────────────────────────
 export function onChrome(text: string): string {
-  return `${BG.BRIGHT_BLACK}${text}${RESET}`;
+  const fill = SURFACE.chrome;
+  return fill ? `${fill}${text}${RESET}` : text;
+}
+
+export function onPanel(text: string): string {
+  const fill = SURFACE.sidebar;
+  return fill ? `${fill}${text}${RESET}` : text;
 }
 
 export function onChat(text: string): string {
-  return `${BG.BLACK}${text}${RESET}`;
+  const fill = SURFACE.chat;
+  return fill ? `${fill}${text}${RESET}` : text;
 }
+
+export type MotionMode='full'|'reduced';
+export type GlyphMode='unicode'|'ascii';
+export function motionMode():MotionMode{return process.env.EAMILOS_REDUCED_MOTION==='1'?'reduced':'full';}
+export function glyphMode():GlyphMode{return process.env.EAMILOS_ASCII==='1'?'ascii':'unicode';}
+export const GLYPH={ok:()=>glyphMode()==='ascii'?'[OK]':'✓',active:()=>glyphMode()==='ascii'?'[*]':'●',pending:()=>glyphMode()==='ascii'?'[ ]':'○',arrow:()=>glyphMode()==='ascii'?'>':'→',error:()=>glyphMode()==='ascii'?'[!]':'!'};

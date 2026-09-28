@@ -11,6 +11,7 @@ export interface Layout {
   // Feature flags
   showSidebar:    boolean;
   compact:        boolean;
+  activityPane:   boolean;
 
   // Row positions
   statusBarRow:   number;   // row 0
@@ -47,7 +48,8 @@ const        TOP_SEP_HEIGHT         = 1;
 const        BOT_SEP_HEIGHT         = 1;
 const        INPUT_BAR_HEIGHT       = 2;   // prompt + hint row
 const        MIN_HEIGHT             = 16;
-const        MIN_WIDTH_FOR_SIDEBAR  = 96;
+const        MIN_WIDTH_FOR_SIDEBAR  = 120;
+const        MIN_WIDTH_FOR_ACTIVITY = 160;
 
 export function layoutFor(model: AppModel): Layout {
   const { width, height } = model;
@@ -56,6 +58,7 @@ export function layoutFor(model: AppModel): Layout {
   const showSidebar = model.sidebarVisible
     && width >= MIN_WIDTH_FOR_SIDEBAR
     && !compact;
+  const activityPane = width >= MIN_WIDTH_FOR_ACTIVITY && !compact;
 
   // ── Row positions ──────────────────────────────────────────────────────────
   const statusBarRow   = 0;
@@ -85,6 +88,7 @@ export function layoutFor(model: AppModel): Layout {
     height,
     showSidebar,
     compact,
+    activityPane,
     statusBarRow,
     topSepRow,
     bodyTop,

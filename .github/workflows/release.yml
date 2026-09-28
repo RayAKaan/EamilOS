@@ -10,8 +10,9 @@ permissions:
 
 jobs:
   publish:
-    name: Publish to npm
+    name: Publish to npm (trusted publishing / OIDC)
     runs-on: ubuntu-latest
+    environment: npm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,6 +23,13 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
+
+      # npm Trusted Publishing (OIDC) requires npm >= 11.5.1. The npm bundled
+      # with the runner's Node 20 can be older, so upgrade explicitly. No
+      # NODE_AUTH_TOKEN / NPM_TOKEN is used — authentication is exchanged
+      # automatically from this workflow's OIDC identity.
+      - name: Ensure npm supports Trusted Publishing (>= 11.5.1)
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -39,17 +47,19 @@ jobs:
         run: npm run build
         working-directory: packages/cli
 
-      - name: Verify package contents
-        run: npm pack --dry-run
+      - name: Verify package contents (no test/source artifacts)
+        run: |
+          npm pack --dry-run
+          if npm pack --dry-run --json 2>/dev/null | grep -q '"path": "dist/.*\.\(test\|spec\)\.'; then
+            echo "ERROR: compiled test files present in package"; exit 1
+          fi
         working-directory: packages/cli
 
-      - name: Publish to npm
+      - name: Publish to npm (OIDC)
         run: npm publish --provenance --access public
         working-directory: packages/cli
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Verify publication
         run: |
-          sleep 10
-          npm view @eamilos/cli@${{ github.event.release.tag_name }} version
+          VERSION=$(node -p "require('./packages/cli/package.json').version")
+          npm view @eamilos/cli@"$VERSION" version

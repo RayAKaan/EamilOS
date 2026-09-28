@@ -32,6 +32,8 @@ export function enterFullScreen(): void {
   process.stdin.resume();
   process.stdin.setEncoding('utf8');
 
+  if (!process.stdout.isTTY) return;
+
   process.stdout.write(
     ENTER_ALT_SCREEN + HIDE_CURSOR + CLEAR_SCREEN + CURSOR_HOME,
   );
@@ -48,11 +50,12 @@ export function exitFullScreen(): void {
   try {
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
   } catch { /* ignore */ }
-  process.stdout.write(SHOW_CURSOR + EXIT_ALT_SCREEN);
+  if (process.stdout.isTTY) process.stdout.write(SHOW_CURSOR + EXIT_ALT_SCREEN);
 }
 
 // Write a complete pre-built frame in one syscall.
 export function writeFrame(frame: string): void {
+  if (!process.stdout.isTTY) return;
   process.stdout.write(CURSOR_HOME + frame);
 }
 

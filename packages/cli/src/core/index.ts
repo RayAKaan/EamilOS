@@ -338,3 +338,77 @@ export {
   type TerminalEnvironment,
   type AgentTerminalDef,
 } from '../terminal/index.js';
+
+export {
+  MissionEngine,
+  MissionStore,
+  TaskGraph,
+  GraphScheduler,
+  LeaseManager,
+  CompletionEngine,
+  MissionRuntime,
+} from './mission/index.js';
+export type {
+  Mission,
+  MissionStatus,
+  MissionEvidence,
+  TaskCheckpoint,
+  TaskNode,
+  TaskState,
+  MissionRequirements,
+  MissionConstraints,
+  CompletionCriterion,
+  MissionEvent,
+  MissionEventType,
+  TaskLease,
+  MissionSnapshot,
+} from './mission/index.js';
+export {
+  MissionStatusSchema,
+  TaskStateSchema,
+  EvidenceSchema,
+  CheckpointSchema,
+  TaskNodeSchema,
+  CompletionCriterionSchema,
+  MissionRequirementsSchema,
+  MissionConstraintsSchema,
+  MissionSchema,
+} from './mission/index.js';
+
+export {
+  CoordinationEngine,
+  CoordinationStore,
+  ProposalReconciler,
+  LocalPlanBuilder,
+} from './coordination/index.js';
+export type {
+  ResourceKind,
+  ResourceRef,
+  ConflictType,
+  ReconciliationAction,
+  TaskProposal,
+  LocalTodo,
+  LocalPlan,
+  PlanRevision,
+  CoordinationConflict,
+  ResourceLease,
+  TaskReservation,
+  PlanVersion,
+  CoordinationSnapshot,
+  ReconciliationResult,
+} from './coordination/index.js';
+
+export * from './intelligence/index.js';
+
+
+export * from './runtime/index.js';
+export * from './fabric/index.js';
+
+export * from './distributed-mission/index.js';
+export * from './cognitive-graph/index.js';
+
+export { GitHubWorkspaceManager } from './git/GitHubWorkspaceManager.js';
+
+export * from './loop/index.js';
+
+export * from './mission-interface/index.js';
