@@ -48,7 +48,7 @@ export class GraphAdaptationEngine {
   constructor(
     private readonly missions: MissionEngine,
     private readonly policy: GraphAdaptationPolicy,
-    private readonly events = new GraphEventLog(),
+    private readonly eventLog = new GraphEventLog(),
   ) {}
 
   propose(
@@ -196,7 +196,7 @@ export class GraphAdaptationEngine {
     const next = this.withMonotonicVersion(rebuilt, current.version + 1);
     if (this.policy.requireGraphConsistency) validator.assertValid(next);
 
-    this.events.append({
+    this.eventLog.append({
       missionId: observation.missionId,
       version: next.version,
       type: 'graph.adaptation.applied',
@@ -224,7 +224,7 @@ export class GraphAdaptationEngine {
   }
 
   events(missionId: string) {
-    return this.events.all(missionId);
+    return this.eventLog.all(missionId);
   }
 
   private withMonotonicVersion(snapshot: GraphSnapshot, version: number): GraphSnapshot {
