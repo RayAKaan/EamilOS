@@ -6,10 +6,10 @@ describe('AdaptiveMultiplexer', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    multiplexer = new AdaptiveMultiplexer();
-    // detectEnvironment() reads the real process env, so the host terminal
-    // (e.g. a real WT_SESSION on Windows) would otherwise leak into each case.
-    vi.stubEnv('WT_SESSION', '');
+      multiplexer = new AdaptiveMultiplexer();
+      // detectEnvironment() reads the real process env, so the host terminal
+      // (e.g. a real WT_SESSION on Windows) would otherwise leak into each case.
+      vi.stubEnv('WT_SESSION', '');
     vi.stubEnv('TMUX', '');
     vi.stubEnv('TERM_PROGRAM', '');
     vi.stubEnv('CI', '');
@@ -33,12 +33,14 @@ describe('AdaptiveMultiplexer', () => {
   it('detects tmux', () => {
     vi.stubEnv('TMUX', '/tmp/tmux-1234/default');
     vi.stubEnv('CI', '');
+    vi.stubEnv('WT_SESSION', ''); // Ensure WT_SESSION doesn't interfere
     expect(AdaptiveMultiplexer.detectEnvironment()).toBe('tmux');
   });
 
   it('falls back to single in vscode (no reliable split API)', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CI', '');
+    vi.stubEnv('WT_SESSION', ''); // Ensure WT_SESSION doesn't interfere
     expect(AdaptiveMultiplexer.detectEnvironment()).toBe('single');
   });
 
@@ -54,6 +56,7 @@ describe('AdaptiveMultiplexer', () => {
   it('isMultiplexingSupported returns true in tmux', () => {
     vi.stubEnv('TMUX', '/tmp/tmux-1234/default');
     vi.stubEnv('CI', '');
+    vi.stubEnv('WT_SESSION', '');
     expect(AdaptiveMultiplexer.isMultiplexingSupported()).toBe(true);
   });
 

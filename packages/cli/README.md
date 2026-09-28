@@ -380,6 +380,29 @@ Every behavior is tunable. Every default is battle-tested.
 
 ---
 
+## Migration from v1.x (Consolidated Architecture)
+
+**EamilOS v1.7.0 consolidates all public packages into `@eamilos/cli`.**
+
+| Old Package | Status | Migration |
+|-------------|--------|-----------|
+| `@eamilos/core` | **Deprecated** | Use `@eamilos/cli/core` |
+| `@eamilos/cli-ui` | **Deprecated** | Use `@eamilos/cli/ui` |
+| `@eamilos/cli` | **Active** | Continue using `@eamilos/cli` |
+
+The old packages remain installable but will show deprecation warnings. All functionality is now available through the single `@eamilos/cli` package with subpath exports:
+
+```bash
+# Core runtime (mission, tasks, graph, validation, etc.)
+import { initEamilOS } from '@eamilos/cli/core'
+
+# Multi-agent orchestration (Claude Code, Codex, OpenCode, Gemini, Aider, Goose)
+import { createMultiAgentCommands } from '@eamilos/cli/multi-agent'
+
+# Terminal UI (Mission TUI)
+import { launchTUI } from '@eamilos/cli/ui'
+```
+
 ## The Principle
 
 TCP makes unreliable networks deliver reliable data.

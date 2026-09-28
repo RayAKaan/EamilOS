@@ -65,6 +65,7 @@ install_ollama.ps1
 *.md
 !README.md
 !packages/*/README.md
+!DEPRECATION.md
 
 # npm pack output
 *.tgz
