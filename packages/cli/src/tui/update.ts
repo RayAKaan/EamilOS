@@ -3,6 +3,10 @@ import type { FleetAgentStatus } from './fleet-data.js';
 import type { AppModel, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
 import { nextActivityId, nextMsgId } from './model.js';
 import { buildMissionGraph } from './graph-builder.js';
+import type {LoopStage,LoopStageState} from './loop-data.js';
+import {LOOP_STAGES} from './loop-data.js';
+import type {DecisionRecord,DecisionAction,DecisionProvider,DecisionStatus,PlanRecord} from './decision-data.js';
+import type {ApprovalRequest,ApprovalResolution,ApprovalRisk} from './approval-data.js';
 
 export type Msg =
   | { type: 'RESIZE'; width: number; height: number }
@@ -62,7 +66,19 @@ export type Msg =
   | { type: 'FLEET_SELECT_DEVICE'; deviceId: string }
   | { type: 'GRAPH_FOCUS'; nodeId: string }
   | { type: 'GRAPH_TOGGLE_EXPAND'; nodeId: string }
-  | { type: 'GRAPH_TRACE'; nodeId: string };
+  | { type: 'GRAPH_TRACE'; nodeId: string }
+  | { type: 'LOOP_STARTED'; loopId?: string }
+  | { type: 'LOOP_STAGE'; stage: LoopStage; status: LoopStageState['status']; decisionId?: string }
+  | { type: 'LOOP_ITERATION'; iteration: number; status?: 'running'|'completed'|'failed'|'blocked' }
+  | { type: 'LOOP_ADAPTATION'; required: boolean }
+  | { type: 'DECISION_PROPOSED'; decision: DecisionRecord }
+  | { type: 'DECISION_RESOLVED'; decisionId: string; status: Extract<DecisionStatus,'approved'|'denied'|'applied'|'rejected'|'superseded'>; outcome?: string }
+  | { type: 'PLAN_CREATED'; plan: PlanRecord }
+  | { type: 'PLAN_STATUS'; planId: string; status: PlanRecord['status'] }
+  | { type: 'APPROVAL_REQUESTED'; approval: ApprovalRequest }
+  | { type: 'APPROVAL_RESOLVED'; approvalId: string; resolution: ApprovalResolution }
+  | { type: 'SELECT_DECISION'; decisionId: string }
+  | { type: 'SELECT_APPROVAL'; approvalId: string };
 
 function findCallsign(model: AppModel, agentId: string): string | undefined {
   return model.agents.get(agentId)?.callsign;
@@ -179,6 +195,45 @@ export function update(model: AppModel, msg: Msg): AppModel {
     case 'SELECT_EXECUTION':
       return { ...model, missionData: { ...model.missionData, selectedExecutionId: msg.executionId } };
 
+    case 'LOOP_STARTED': {
+      const now=Date.now(); const id=msg.loopId ?? 'loop-'+String(now);
+      return { ...model, loop:{...model.loop,id,missionId:model.missionUi.id,status:'running',iteration:1,currentStage:'observe',objective:model.missionUi.objective,startedAt:now,updatedAt:now,progress:0,adaptationRequired:false,stages:LOOP_STAGES.map((stage,i)=>({stage,status:i===0?'active':'pending'})),iterations:[{id:id+'-1',number:1,objective:model.missionUi.objective,status:'running',currentStage:'observe',startedAt:now,decisionIds:[],executionIds:[]}],decisionIds:[],executionIds:[]} };
+    }
+    case 'LOOP_STAGE': {
+      const now=Date.now(); const stages=model.loop.stages.map(s=>s.stage===msg.stage?{...s,status:msg.status,startedAt:s.startedAt??now,completedAt:(msg.status==='completed'||msg.status==='skipped')?now:s.completedAt,decisionId:msg.decisionId}:s);
+      const iteration=model.loop.iterations.map(i=>i.number===model.loop.iteration?{...i,currentStage:msg.stage,status:msg.status==='blocked'?'blocked':i.status,decisionIds:msg.decisionId?[...i.decisionIds,msg.decisionId]:i.decisionIds}:i);
+      const activeIndex=Math.max(0,LOOP_STAGES.indexOf(msg.stage)); const progress=Math.round(activeIndex/(LOOP_STAGES.length-1)*100);
+      return {...model,loop:{...model.loop,currentStage:msg.stage,stages,iterations,progress,updatedAt:now}};
+    }
+    case 'LOOP_ITERATION': {
+      const now=Date.now(); const existing=model.loop.iterations.find(i=>i.number===msg.iteration);
+      const iterations=existing?model.loop.iterations.map(i=>i.number===msg.iteration?{...i,status:msg.status??i.status}:i):[...model.loop.iterations,{id:(model.loop.id??'loop')+'-'+msg.iteration,number:msg.iteration,objective:model.loop.objective,status:msg.status??'running',currentStage:'observe',startedAt:now,decisionIds:[],executionIds:[]}];
+      return {...model,loop:{...model.loop,iteration:msg.iteration,iterations,status:msg.status==='failed'?'failed':msg.status==='blocked'?'blocked':msg.status==='completed'?'completed':'running',updatedAt:now}};
+    }
+    case 'LOOP_ADAPTATION':
+      return {...model,loop:{...model.loop,adaptationRequired:msg.required,updatedAt:Date.now()}};
+    case 'DECISION_PROPOSED':
+      return {...model,decisions:{...model.decisions,records:[...model.decisions.records,msg.decision],selectedDecisionId:msg.decision.id},loop:{...model.loop,decisionIds:model.loop.decisionIds.includes(msg.decision.id)?model.loop.decisionIds:[...model.loop.decisionIds,msg.decision.id]}};
+    case 'DECISION_RESOLVED': {
+      const records=model.decisions.records.map(d=>d.id===msg.decisionId?{...d,status:msg.status,resolvedAt:Date.now(),outcome:msg.outcome??d.outcome}:d);
+      return {...model,decisions:{...model.decisions,records},missionUi:{...model.missionUi,activity:appendActivity(model.missionUi.activity,activity('Decision '+msg.status,'info',msg.outcome,msg.decisionId))}};
+    }
+    case 'PLAN_CREATED':
+      return {...model,decisions:{...model.decisions,plans:[...model.decisions.plans,msg.plan]}};
+    case 'PLAN_STATUS':
+      return {...model,decisions:{...model.decisions,plans:model.decisions.plans.map(p=>p.id===msg.planId?{...p,status:msg.status}:p)}};
+    case 'APPROVAL_REQUESTED':
+      return {...model,approvals:{...model.approvals,requests:[...model.approvals.requests,msg.approval],selectedApprovalId:msg.approval.id},missionUi:{...model.missionUi,pendingApprovals:model.approvals.requests.filter(a=>a.status==='pending').length+1,activity:appendActivity(model.missionUi.activity,activity('Approval required','warning',msg.approval.action,msg.approval.id))}};
+    case 'APPROVAL_RESOLVED': {
+      const requests=model.approvals.requests.map(a=>a.id===msg.approvalId?{...a,status:msg.resolution==='deny'?'denied':'approved',resolvedAt:Date.now(),resolution:msg.resolution}:a);
+      const pending=requests.filter(a=>a.status==='pending').length;
+      return {...model,approvals:{...model.approvals,requests},missionUi:{...model.missionUi,pendingApprovals:pending,activity:appendActivity(model.missionUi.activity,activity('Approval '+(msg.resolution==='deny'?'denied':'approved'),'info',msg.resolution,msg.approvalId))}};
+    }
+    case 'SELECT_DECISION':
+      return {...model,decisions:{...model.decisions,selectedDecisionId:msg.decisionId}};
+    case 'SELECT_APPROVAL':
+      return {...model,approvals:{...model.approvals,selectedApprovalId:msg.approvalId}};
+
     case 'FLEET_SELECT_AGENT':
       return { ...model, fleet: { ...model.fleet, selectedAgentId: msg.agentId, selectedDeviceId: undefined } };
     case 'FLEET_SELECT_DEVICE':
@@ -243,7 +298,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
       const mission = { ...model.missionUi, id: missionId, title: objective, objective, status: 'running' as const, progress: 0, currentAction: 'Initializing mission execution', validation: 'idle' as const, pendingApprovals: 0, startedAt: now, activity: [activity('Mission started', 'info')] };
       const session = { id: sessionId, missionId, goal: objective, strategy: model.strategy, startedAt: now, status: 'running' as const, executionIds: [] as string[] };
       const task = { id: taskId, missionId, title: objective, status: 'running' as const, progress: 0, dependsOn: [] as string[], validation: 'idle' as const, createdAt: now, startedAt: now };
-      return { ...model, running: true, scroll: 0, agentEvents: [], activityFollow: true, activityScroll: 0, missionUi: mission, messages: [...model.messages, sysMsg], statusText: 'Running…', sessions: [...model.sessions, { id: sessionId, goal: objective, strategy: model.strategy, startedAt: now, status: 'running' as const, messageCount: 0 }], missionData: { ...model.missionData, tasks: [...model.missionData.tasks, task], sessions: [...model.missionData.sessions, session], selectedTaskId: taskId, selectedSessionId: sessionId, selectedExecutionId: undefined } };
+      return rebuildGraph({ ...model, running: true, scroll: 0, agentEvents: [], activityFollow: true, activityScroll: 0, missionUi: mission, messages: [...model.messages, sysMsg], statusText: 'Running…', sessions: [...model.sessions, { id: sessionId, goal: objective, strategy: model.strategy, startedAt: now, status: 'running' as const, messageCount: 0 }], missionData: { ...model.missionData, tasks: [...model.missionData.tasks, task], sessions: [...model.missionData.sessions, session], selectedTaskId: taskId, selectedSessionId: sessionId, selectedExecutionId: undefined }, loop:{...model.loop,id:'loop-'+now,missionId, status:'running',iteration:1,currentStage:'observe',objective,startedAt:now,updatedAt:now,progress:0,adaptationRequired:false,stages:LOOP_STAGES.map((stage,i)=>({stage,status:i===0?'active':'pending'})),iterations:[{id:'loop-'+now+'-1',number:1,objective,status:'running',currentStage:'observe',startedAt:now,decisionIds:[],executionIds:[]}],decisionIds:[],executionIds:[]} });
     }
 
     case 'SESSION_COMPLETED': {
