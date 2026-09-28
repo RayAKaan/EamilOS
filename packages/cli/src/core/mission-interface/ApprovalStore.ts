@@ -68,20 +68,22 @@ export class ApprovalStore {
     return resolved;
   }
 
-  async consumeApproved(missionId: string, action: MissionControlAction, taskId?: string): Promise<boolean> {
+  async consumeApproved(missionId: string, action: MissionControlAction, taskId?: string): Promise<ApprovalRequest | undefined> {
     const requests = await this.list(missionId);
     const index = requests.findIndex(item =>
       item.action === action &&
       item.taskId === taskId &&
       item.status === 'APPROVED',
     );
-    if (index < 0) return false;
-    requests[index] = {
+    if (index < 0) return undefined;
+    const consumed = ApprovalRequestSchema.parse({
       ...requests[index],
-      status: 'APPROVED',
-    };
+      status: 'CONSUMED',
+      consumedAt: new Date().toISOString(),
+    });
+    requests[index] = consumed;
     await this.save(missionId, requests);
-    return true;
+    return consumed;
   }
 
   private async save(missionId: string, requests: ApprovalRequest[]): Promise<void> {
