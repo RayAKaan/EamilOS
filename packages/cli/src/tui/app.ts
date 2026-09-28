@@ -72,7 +72,7 @@ export class EamilOSTuiApp {
   private handleKey(event: KeyEvent): void {
     switch (event.type) {
       case 'char': {
-        if (this.model.running && event.char !== 'x' && event.char !== 'm' && event.char !== 'f') break;
+        if (this.model.running && !['x','m','f','r','l','d','p'].includes(event.char.toLowerCase())) break;
         const pages: Record<string, AppModel['page']> = {
           m: 'mission',
           x: 'execution',
@@ -135,7 +135,7 @@ export class EamilOSTuiApp {
         break;
       }
 
-      case 'right': {
+      case 'char': {
         if (this.model.page === 'graph') { const node=this.model.graph.focus.nodeId; if(node) this.dispatch({type:'GRAPH_TOGGLE_EXPAND',nodeId:node}); }
         break;
       }
@@ -146,18 +146,20 @@ export class EamilOSTuiApp {
       case 'pageup': this.dispatch({ type: 'SCROLL_UP', lines: 10 }); break;
       case 'pagedown': this.dispatch({ type: 'SCROLL_DOWN', lines: 10 }); break;
       case 'up': {
-        if (this.model.page === 'graph') {
-          const nodes=this.model.graph.nodes; if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));const next=nodes[Math.max(0,i-1)]!;this.dispatch({type:'GRAPH_FOCUS',nodeId:next.id});}
-        } else if (this.model.page === 'fleet') {
-          const agents=this.model.fleet.agents; if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.max(0,i-1)]!.id});}
-        } else this.dispatch({ type: 'SCROLL_UP', lines: 1 }); break;
+        if (this.model.page === 'decisions') { const rs=this.model.decisions.records; if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.max(0,i-1)]!.id});} }
+        else if (this.model.page === 'approvals') { const rs=this.model.approvals.requests; if(rs.length){const i=Math.max(0,rs.findIndex(a=>a.id===this.model.approvals.selectedApprovalId));this.dispatch({type:'SELECT_APPROVAL',approvalId:rs[Math.max(0,i-1)]!.id});} }
+        else if (this.model.page === 'graph') { const nodes=this.model.graph.nodes; if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));const next=nodes[Math.max(0,i-1)]!;this.dispatch({type:'GRAPH_FOCUS',nodeId:next.id});} }
+        else if (this.model.page === 'fleet') { const agents=this.model.fleet.agents; if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.max(0,i-1)]!.id});} }
+        else this.dispatch({ type: 'SCROLL_UP', lines: 1 }); break;
       }
       case 'down': {
-        if (this.model.page === 'graph') {
-          const nodes=this.model.graph.nodes; if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));const next=nodes[Math.min(nodes.length-1,i+1)]!;this.dispatch({type:'GRAPH_FOCUS',nodeId:next.id});}
-        } else if (this.model.page === 'fleet') {
-          const agents=this.model.fleet.agents; if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.min(agents.length-1,i+1)]!.id});}
-        } else this.dispatch({ type: 'SCROLL_DOWN', lines: 1 }); break;
+        if (this.model.page === 'decisions') { const rs=this.model.decisions.records; if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.min(rs.length-1,i+1)]!.id});} }
+        else if (this.model.page === 'approvals') { const rs=this.model.approvals.requests; if(rs.length){const i=Math.max(0,rs.findIndex(a=>a.id===this.model.approvals.selectedApprovalId));this.dispatch({type:'SELECT_APPROVAL',approvalId:rs[Math.min(rs.length-1,i+1)]!.id});} }
+        else if (this.model.page === 'graph') { const nodes=this.model.graph.nodes; if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));const next=nodes[Math.min(nodes.length-1,i+1)]!;this.dispatch({type:'GRAPH_FOCUS',nodeId:next.id});} }
+        else if (this.model.page === 'fleet') { const agents=this.model.fleet.agents; if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.min(agents.length-1,i+1)]!.id});} }
+        else this.dispatch({ type: 'SCROLL_DOWN', lines: 1 }); break;
+      }
+ else this.dispatch({ type: 'SCROLL_DOWN', lines: 1 }); break;
       }
     }
   }
