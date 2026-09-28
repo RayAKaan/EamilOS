@@ -1,7 +1,7 @@
 {
   "name": "@eamilos/cli",
-  "version": "2.0.0",
-  "description": "EamilOS v2.0.0 — Mission-first full-screen TUI",
+  "version": "1.8.0",
+  "description": "EamilOS v1.8.0 — Full-screen TUI replaces Ink/React renderer",
   "type": "module",
   "main": "dist/index.js",
   "publishConfig": {

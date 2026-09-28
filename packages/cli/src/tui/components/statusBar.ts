@@ -44,6 +44,6 @@ export function renderStatusBar(model: AppModel, layout: Layout): string {
   const left = '  ' + modeStr + sep + stratStr + sep + agentStr + sep + styled(PAGE_LABELS[model.page] ?? model.page, FG.BRIGHT_WHITE) + runStr;
   const right = model.notification
     ? styled(truncate(model.notification, Math.max(12, Math.floor(layout.width * 0.45))), FG.YELLOW) + '  '
-    : styled('EamilOS', BOLD, FG.CYAN) + ' ' + styled('v2.0', DIM, FG.WHITE) + '  ';
+    : styled('EamilOS', BOLD, FG.CYAN) + ' ' + styled('v1.8', DIM, FG.WHITE) + '  ';
   return onChrome(fit(splitLine(left, right, layout.width), layout.width));
 }
