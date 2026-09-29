@@ -28,6 +28,7 @@ export class EamilOSTuiApp {
   private stopInput: (() => void) | null = null;
   private stopResize: (() => void) | null = null;
   private running = false;
+  private renderScheduled = false;
 
   constructor() {
     const size = getTerminalSize();
@@ -36,6 +37,9 @@ export class EamilOSTuiApp {
 
   private dispatch(msg: Msg): void {
     this.model = update(this.model, msg);
+    if (this.model.renderRequested) {
+      this.scheduleRender();
+    }
   }
 
   private getModel(): AppModel {
@@ -46,14 +50,31 @@ export class EamilOSTuiApp {
     this.dispatch({ type: 'LOG', text });
   }
 
+  private scheduleRender(): void {
+    if (this.renderScheduled) return;
+    this.renderScheduled = true;
+    queueMicrotask(() => {
+      this.renderScheduled = false;
+      this.model = update(this.model, { type: 'REQUEST_RENDER' });
+      this.renderFrame();
+    });
+  }
+
+  private requestRender(): void {
+    this.dispatch({ type: 'REQUEST_RENDER' });
+  }
+
   async start(): Promise<void> {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       this.dispatch({ type: 'SET_NOTIFICATION', text: 'Interactive TUI requires a TTY; use the non-interactive CLI/JSON interface instead.' });
+      this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'stopped' });
       return;
     }
     startConsoleCapture();
     enterFullScreen();
     installCrashRecovery();
+
+    this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'ready' });
 
     this.stopResize = onResize((size) => {
       this.dispatch({ type: 'RESIZE', width: size.width, height: size.height });
@@ -61,7 +82,11 @@ export class EamilOSTuiApp {
 
     this.stopInput = startInput((event: KeyEvent) => this.handleKey(event));
 
-    this.frameInterval = setInterval(() => this.renderFrame(), 50);
+    this.frameInterval = setInterval(() => {
+      this.dispatch({ type: 'TICK' });
+      this.scheduleRender();
+    }, 50);
+
     this.logInterval = setInterval(() => {
       for (const log of drainCapturedLogs()) this.dispatch({ type: 'LOG', text: log });
     }, 250);
@@ -73,7 +98,8 @@ export class EamilOSTuiApp {
     } catch (err) {
       this.dispatch({ type: 'DETECTION_FAILED', error: err instanceof Error ? err.message : String(err) });
     }
-    this.renderFrame();
+    this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'ready' });
+    this.scheduleRender();
   }
 
   private handleKey(event: KeyEvent): void {
@@ -155,16 +181,17 @@ export class EamilOSTuiApp {
       }
 
       case 'backspace': if(this.model.commandPalette.open)this.dispatch({type:'COMMAND_PALETTE_BACKSPACE'}); else this.dispatch({ type: 'INPUT_BACKSPACE' }); break;
-      case 'escape': if(this.model.commandPalette.open){this.dispatch({type:'COMMAND_PALETTE_CLOSE'});break;} this.stop(); break;
+      case 'escape': if(this.model.commandPalette.open){this.dispatch({type:'COMMAND_PALETTE_CLOSE'});break;} this.handleEscape(); break;
 
       case 'ctrl':
         if (event.key === 'p') { this.dispatch({ type: 'COMMAND_PALETTE_OPEN' }); break; }
         if (event.key === 'c') {
-          if (this.model.running) this.cancelSession();
-          else this.stop();
+          this.handleCtrlC();
+          break;
         } else if (event.key === 's') this.dispatch({ type: 'TOGGLE_SIDEBAR' });
         else if (event.key === 'l') this.dispatch({ type: 'CLEAR_CHAT' });
         else if (event.key === 'p') this.dispatch({ type: 'INPUT_RECALL' });
+        else if (event.key === 'q') this.requestShutdown();
         break;
 
       case 'tab': {
@@ -213,40 +240,59 @@ export class EamilOSTuiApp {
     }
   }
 
+  private handleEscape(): void {
+    if (this.model.running) {
+      this.cancelSession();
+    } else if (this.model.applicationState === 'idle' || this.model.applicationState === 'ready') {
+      this.dispatch({ type: 'SET_NOTIFICATION', text: 'Press Ctrl+Q to exit or Ctrl+C to cancel' });
+    }
+  }
+
+  private handleCtrlC(): void {
+    this.dispatch({ type: 'CTRL_C_PRESS' });
+    
+    if (this.model.applicationState === 'shutting_down') {
+      this.requestShutdown();
+    }
+  }
+
+  private requestShutdown(): void {
+    this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'shutting_down' });
+    this.shutdown();
+  }
+
   private async startSession(prompt: string): Promise<void> {
-    if (this.running) return;
-    this.running = true;
+    if (this.model.missionState === 'running' || this.model.missionState === 'queued') return;
+    
+    this.dispatch({ type: 'MISSION_QUEUED', objective: prompt });
+    
     const agents = Array.from(this.model.agents.values()).filter(a => a.status === 'ready');
     const mode = agents.some(a => a.id === 'opencode' || a.id === 'claude-code' || a.id === 'aider') ? 'execution' : 'communication';
     this.dispatch({ type: 'STATUS_TEXT', text: 'Starting mission…' });
 
-    try {
-      await runSession(prompt, this.model.strategy, mode, {
-        dispatch: (msg) => this.dispatch(msg),
-        getModel: () => this.getModel(),
-        onLog: (text) => this.onLog(text),
-      });
-    } finally {
-      this.running = false;
-    }
+    runSession(prompt, this.model.strategy, mode, {
+      dispatch: (msg) => this.dispatch(msg),
+      getModel: () => this.getModel(),
+      onLog: (text) => this.onLog(text),
+    }).catch((err) => {
+      this.dispatch({ type: 'SESSION_ERROR', error: err instanceof Error ? err.message : String(err) });
+    });
   }
 
   private cancelSession(): void {
-    this.dispatch({ type: 'SESSION_ERROR', error: 'Cancelled by user' });
+    this.dispatch({ type: 'EXECUTION_CANCELLED', reason: 'Cancelled by user' });
   }
 
   private renderFrame(): void {
-    this.dispatch({ type: 'TICK' });
     writeFrame(buildFrame(this.model));
   }
 
-  stop(): void {
+  private shutdown(): void {
     if (this.frameInterval) { clearInterval(this.frameInterval); this.frameInterval = null; }
     if (this.logInterval) { clearInterval(this.logInterval); this.logInterval = null; }
     if (this.stopInput) { this.stopInput(); this.stopInput = null; }
     if (this.stopResize) { this.stopResize(); this.stopResize = null; }
     stopConsoleCapture();
     exitFullScreen();
-    process.exit(0);
   }
 }

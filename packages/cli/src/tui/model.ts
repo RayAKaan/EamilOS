@@ -21,6 +21,15 @@ export type DetectionState = 'idle' | 'detecting' | 'complete' | 'failed';
 export type MissionStatus = 'draft' | 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 export type MissionValidation = 'idle' | 'running' | 'passed' | 'failed';
 
+export type ApplicationState = 'starting' | 'ready' | 'running' | 'cancelling' | 'idle' | 'error' | 'shutting_down' | 'stopped';
+export type MissionState = 'idle' | 'queued' | 'running' | 'waiting' | 'validating' | 'completed' | 'failed' | 'cancelled';
+
+export interface CtrlCState {
+  lastPress: number;
+  count: number;
+  awaitingConfirmation: boolean;
+}
+
 export interface MissionActivityItem {
   id: string;
   timestamp: number;
@@ -145,6 +154,10 @@ export interface AppModel {
   decisions: DecisionState;
   approvals: ApprovalState;
   commandPalette: CommandPaletteState;
+  applicationState: ApplicationState;
+  missionState: MissionState;
+  ctrlCState: CtrlCState;
+  renderRequested: boolean;
 }
 
 export function initialMissionUi(): MissionUiState {
@@ -198,6 +211,10 @@ export function initialModel(width: number, height: number): AppModel {
     decisions: initialDecisionState(),
     approvals: initialApprovalState(),
     commandPalette: initialCommandPalette(),
+    applicationState: 'starting',
+    missionState: 'idle',
+    ctrlCState: { lastPress: 0, count: 0, awaitingConfirmation: false },
+    renderRequested: true,
   };
 }
 
