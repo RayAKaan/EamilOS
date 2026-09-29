@@ -1,6 +1,6 @@
-import type { AgentEvent } from './events/agent-event.js';
+import type { AppModel, ApplicationState, MissionState, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
 import type { FleetAgentStatus } from './fleet-data.js';
-import type { AppModel, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
+import type { AgentEvent } from './events/agent-event.js';
 import { nextActivityId, nextMsgId } from './model.js';
 import { buildMissionGraph } from './graph-builder.js';
 import type {LoopStage,LoopStageState,LoopIteration} from './loop-data.js';
@@ -45,7 +45,7 @@ export type Msg =
   | { type: 'AGENT_ERROR'; agentId: string; error: string }
   | { type: 'AGENT_FALLBACK'; from: string; to: string; reason: string }
   | { type: 'CHANGES_COLLECTED'; files: ModifiedFile[] }
-  | { type: 'VALIDATION_STARTED' }
+  | { type: 'VALIDATION_STARTED'; stage?: string }
   | { type: 'VALIDATION_PASSED' }
   | { type: 'VALIDATION_FAILED'; errors: string[] }
   | { type: 'CONFLICT_RESOLVED'; path: string; method: string; winner: string }
@@ -86,7 +86,27 @@ export type Msg =
   | { type: 'COMMAND_PALETTE_BACKSPACE' }
   | { type: 'COMMAND_PALETTE_MOVE'; delta: number }
   | { type: 'COMMAND_PALETTE_EXECUTE' }
-  | { type: 'SET_NOTIFICATION'; text: string };
+  | { type: 'SET_NOTIFICATION'; text: string }
+  | { type: 'SET_APPLICATION_STATE'; state: ApplicationState }
+  | { type: 'SET_MISSION_STATE'; state: MissionState }
+  | { type: 'CTRL_C_PRESS' }
+  | { type: 'REQUEST_RENDER' }
+  | { type: 'MISSION_QUEUED'; objective: string }
+  | { type: 'MISSION_ACCEPTED'; missionId: string }
+  | { type: 'TASK_QUEUED'; taskId: string; objective: string }
+  | { type: 'TASK_STARTED'; taskId: string; agentId: string }
+  | { type: 'TASK_COMPLETED'; taskId: string; success: boolean }
+  | { type: 'AGENT_STARTING'; agentId: string; callsign: string }
+  | { type: 'AGENT_READY'; agentId: string }
+  | { type: 'AGENT_THINKING'; agentId: string; elapsed: number }
+  | { type: 'TOOL_STARTED'; agentId: string; tool: string; args: string }
+  | { type: 'TOOL_OUTPUT'; agentId: string; tool: string; result: string }
+  | { type: 'FILE_CHANGED'; path: string; action: 'create' | 'modify' | 'delete'; agent: string }
+  | { type: 'TEST_STARTED'; agentId: string; name: string }
+  | { type: 'TEST_FINISHED'; agentId: string; name: string; passed: boolean }
+  | { type: 'VALIDATION_STARTED'; stage: string }
+  | { type: 'VALIDATION_FINISHED'; passed: boolean; errors: string[] }
+  | { type: 'EXECUTION_CANCELLED'; reason: string };
 
 function findCallsign(model: AppModel, agentId: string): string | undefined {
   return model.agents.get(agentId)?.callsign;
@@ -480,11 +500,6 @@ export function update(model: AppModel, msg: Msg): AppModel {
       return rebuildGraph({ ...model, modifiedFiles: msg.files, agentEvents: events.reduce(appendAgentEvent, model.agentEvents), missionUi: { ...model.missionUi, currentAction: 'Reviewing ' + String(msg.files.length) + ' file change' + (msg.files.length === 1 ? '' : 's'), activity: appendActivity(model.missionUi.activity, activity('Files changed', 'info', String(msg.files.length) + ' files')) }, missionData: { ...model.missionData, artifacts: [...model.missionData.artifacts, ...artifacts] } });
     }
 
-    case 'VALIDATION_STARTED': {
-      const event: AgentEvent = { type: 'TEST', timestamp: Date.now(), agentId: 'validation', name: 'validation', status: 'running' };
-      return { ...model, loop:{...model.loop,currentStage:'validate',stages:model.loop.stages.map(s=>s.stage==='validate'?{...s,status:'active' as const,startedAt:s.startedAt??Date.now()}:s),updatedAt:Date.now()}, agentEvents: appendAgentEvent(model.agentEvents, event), missionUi: { ...model.missionUi, validation: 'running', currentAction: 'Validating mission output', activity: appendActivity(model.missionUi.activity, activity('Validation started', 'info')) }, messages: [...model.messages, makeMsg({ type: 'system', content: 'Validating changes…', timestamp: Date.now() })] };
-    }
-
     case 'VALIDATION_PASSED': {
       const event: AgentEvent = { type: 'TEST', timestamp: Date.now(), agentId: 'validation', name: 'validation', status: 'passed' };
       return rebuildGraph({ ...model, loop:{...model.loop,currentStage:'validate',stages:model.loop.stages.map(s=>s.stage==='validate'?{...s,status:'completed' as const,completedAt:Date.now()}:s),updatedAt:Date.now()}, agentEvents: appendAgentEvent(model.agentEvents, event), missionUi: { ...model.missionUi, validation: 'passed', currentAction: 'Validation passed', activity: appendActivity(model.missionUi.activity, activity('Validation passed', 'success')) }, missionData: { ...model.missionData, tasks: model.missionData.tasks.map(t => t.id === model.missionData.selectedTaskId ? { ...t, validation: 'passed' as const } : t), artifacts: model.missionData.artifacts.map(a => a.taskId === model.missionData.selectedTaskId ? { ...a, validation: 'passed' as const } : a) }, messages: [...model.messages, makeMsg({ type: 'system', content: '✓ Validation passed', timestamp: Date.now() })] });
@@ -509,6 +524,187 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'STATUS_TEXT':
       return { ...model, statusText: msg.text };
+
+    case 'SET_APPLICATION_STATE':
+      return { ...model, applicationState: msg.state };
+
+    case 'SET_MISSION_STATE':
+      return { ...model, missionState: msg.state };
+
+    case 'CTRL_C_PRESS': {
+      const now = Date.now();
+      const ctrlC = model.ctrlCState;
+      const timeSinceLast = now - ctrlC.lastPress;
+      
+      if (ctrlC.awaitingConfirmation && timeSinceLast <= 1500) {
+        return { 
+          ...model, 
+          applicationState: 'shutting_down',
+          ctrlCState: { lastPress: now, count: ctrlC.count + 1, awaitingConfirmation: false }
+        };
+      }
+      
+      if (model.missionState === 'running' || model.missionState === 'queued' || model.missionState === 'waiting' || model.missionState === 'validating') {
+        return { 
+          ...model, 
+          missionState: 'cancelled',
+          ctrlCState: { lastPress: now, count: ctrlC.count + 1, awaitingConfirmation: false }
+        };
+      }
+      
+      return { 
+        ...model, 
+        ctrlCState: { lastPress: now, count: ctrlC.count + 1, awaitingConfirmation: true },
+        notification: 'Press Ctrl+C again to exit EamilOS'
+      };
+    }
+
+    case 'REQUEST_RENDER':
+      return { ...model, renderRequested: true };
+
+    case 'MISSION_QUEUED': {
+      const now = Date.now();
+      const missionId = 'mission-' + String(now);
+      const mission = { 
+        ...model.missionUi, 
+        id: missionId, 
+        title: msg.objective, 
+        objective: msg.objective, 
+        status: 'queued' as const, 
+        progress: 0, 
+        currentAction: 'Mission queued, preparing execution…', 
+        validation: 'idle' as const, 
+        pendingApprovals: 0, 
+        startedAt: now, 
+        activity: [activity('Mission queued', 'info')] 
+      };
+      return { 
+        ...model, 
+        missionState: 'queued',
+        applicationState: 'running',
+        missionUi: mission,
+        statusText: 'Mission queued…',
+        activityFollow: true,
+        activityScroll: 0,
+      };
+    }
+
+    case 'MISSION_ACCEPTED': {
+      return {
+        ...model,
+        missionState: 'running',
+        missionUi: { ...model.missionUi, status: 'running', currentAction: 'Execution started', activity: appendActivity(model.missionUi.activity, activity('Mission accepted', 'info')) },
+        statusText: 'Running…',
+      };
+    }
+
+    case 'TASK_QUEUED': {
+      return {
+        ...model,
+        missionState: 'running',
+        missionUi: { ...model.missionUi, currentAction: 'Task queued: ' + msg.objective, activity: appendActivity(model.missionUi.activity, activity('Task queued', 'info', msg.objective)) },
+      };
+    }
+
+    case 'TASK_STARTED': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Task started on agent ' + msg.agentId, activity: appendActivity(model.missionUi.activity, activity('Task started', 'info', msg.agentId)) },
+      };
+    }
+
+    case 'TASK_COMPLETED': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: msg.success ? 'Task completed successfully' : 'Task failed', activity: appendActivity(model.missionUi.activity, activity(msg.success ? 'Task completed' : 'Task failed', msg.success ? 'success' : 'error', msg.taskId)) },
+      };
+    }
+
+    case 'AGENT_STARTING': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Starting agent ' + msg.agentId, activity: appendActivity(model.missionUi.activity, activity('Agent starting', 'info', msg.callsign)) },
+      };
+    }
+
+    case 'AGENT_READY': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Agent ' + msg.agentId + ' ready', activity: appendActivity(model.missionUi.activity, activity('Agent ready', 'success', msg.agentId)) },
+      };
+    }
+
+    case 'AGENT_THINKING': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Agent ' + msg.agentId + ' thinking (' + Math.round(msg.elapsed / 1000) + 's)' },
+      };
+    }
+
+    case 'TOOL_STARTED': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Tool: ' + msg.tool, activity: appendActivity(model.missionUi.activity, activity('Tool started', 'info', msg.tool)) },
+      };
+    }
+
+    case 'TOOL_OUTPUT': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Tool completed: ' + msg.tool, activity: appendActivity(model.missionUi.activity, activity('Tool output', 'success', msg.tool)) },
+      };
+    }
+
+    case 'FILE_CHANGED': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'File ' + msg.action + ': ' + msg.path, activity: appendActivity(model.missionUi.activity, activity('File changed', 'info', msg.path)) },
+      };
+    }
+
+    case 'TEST_STARTED': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Running test: ' + msg.name, activity: appendActivity(model.missionUi.activity, activity('Test started', 'info', msg.name)) },
+      };
+    }
+
+    case 'TEST_FINISHED': {
+      return {
+        ...model,
+        missionUi: { ...model.missionUi, currentAction: 'Test ' + msg.name + ': ' + (msg.passed ? 'passed' : 'failed'), activity: appendActivity(model.missionUi.activity, activity('Test finished', msg.passed ? 'success' : 'error', msg.name)) },
+      };
+    }
+
+    case 'VALIDATION_STARTED': {
+      return {
+        ...model,
+        missionState: 'validating',
+        missionUi: { ...model.missionUi, validation: 'running', currentAction: 'Validating: ' + msg.stage, activity: appendActivity(model.missionUi.activity, activity('Validation started', 'info', msg.stage)) },
+      };
+    }
+
+    case 'VALIDATION_FINISHED': {
+      return {
+        ...model,
+        missionState: msg.passed ? 'completed' : 'failed',
+        missionUi: { 
+          ...model.missionUi, 
+          validation: msg.passed ? 'passed' : 'failed', 
+          currentAction: msg.passed ? 'Validation passed' : 'Validation failed: ' + msg.errors.join('; '), 
+          activity: appendActivity(model.missionUi.activity, activity(msg.passed ? 'Validation passed' : 'Validation failed', msg.passed ? 'success' : 'error', msg.errors.join('; '))) 
+        },
+      };
+    }
+
+    case 'EXECUTION_CANCELLED': {
+      return {
+        ...model,
+        missionState: 'cancelled',
+        missionUi: { ...model.missionUi, status: 'cancelled', currentAction: 'Execution cancelled: ' + msg.reason, activity: appendActivity(model.missionUi.activity, activity('Execution cancelled', 'warning', msg.reason)) },
+        statusText: 'Cancelled: ' + msg.reason,
+      };
+    }
 
     default:
       return model;
