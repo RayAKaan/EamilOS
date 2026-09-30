@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 import { createConnection } from 'net';
 import type { RegisteredAgent, AgentKind, AgentCapabilities, AgentMode, AgentStatus, ExecutionStrategy } from './types.js';
 
@@ -13,42 +13,127 @@ interface AgentDetectionConfig {
   detect: () => Promise<{ available: boolean; version?: string; error?: string }>;
 }
 
+function runCommand(cmd: string, args: string[], timeoutMs: number = 3000): Promise<{ available: boolean; version?: string; error?: string }> {
+  return new Promise((resolve) => {
+    const isWindows = process.platform === 'win32';
+    const fullCmd = isWindows ? 'cmd.exe' : cmd;
+    const fullArgs = isWindows ? ['/d', '/c', cmd, ...args] : args;
+    
+    const child = spawn(fullCmd, fullArgs, {
+      timeout: timeoutMs,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+
+    let killed = false;
+    const timeout = setTimeout(() => {
+      killed = true;
+      child.kill('SIGKILL');
+      resolve({ available: false, error: `Detection timeout after ${timeoutMs}ms` });
+    }, timeoutMs);
+
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      if (!killed) resolve({ available: false, error: err.message });
+    });
+
+    child.on('exit', (code) => {
+      clearTimeout(timeout);
+      if (!killed) {
+        if (code === 0) {
+          resolve({ available: true, version: 'CLI' });
+        } else {
+          resolve({ available: false, error: `Exit code ${code}` });
+        }
+      }
+    });
+  });
+}
+
+function checkTcpPort(port: number, host: string = 'localhost', timeoutMs: number = 1000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection(port, host, () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on('error', () => resolve(false));
+    socket.setTimeout(timeoutMs, () => { socket.destroy(); resolve(false); });
+  });
+}
+
 export class AgentRegistry {
   private agents: Map<string, RegisteredAgent> = new Map();
   private detectors: AgentDetectionConfig[] = [];
+  private _isDetecting = false;
+  private detectionPromise: Promise<AgentRegistry> | null = null;
 
   registerDetector(detector: AgentDetectionConfig): void {
     this.detectors.push(detector);
   }
 
-  async detect(): Promise<AgentRegistry> {
-    const results = await Promise.allSettled(
-      this.detectors.map(async (d) => {
-        const status = await d.detect();
-        const agent: RegisteredAgent = {
-          id: d.id,
-          name: d.name,
-          kind: d.kind,
-          provider: d.provider,
-          status: status.available ? 'available' : 'not_installed',
-          version: status.version,
-          capabilities: d.capabilities,
-          supportedModes: d.supportedModes,
-          priority: d.priority,
-          error: status.error,
-        };
-        return agent;
-      })
-    );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        const agent = result.value;
-        this.agents.set(agent.id, agent);
-      }
+  async detect(options?: { force?: boolean; timeoutMs?: number }): Promise<AgentRegistry> {
+    if (this._isDetecting && !options?.force) {
+      return this.detectionPromise!;
     }
 
-    return this;
+    this._isDetecting = true;
+    const timeoutMs = options?.timeoutMs ?? 30000;
+    
+    this.detectionPromise = (async () => {
+      try {
+        const results = await Promise.allSettled(
+          this.detectors.map(async (d) => {
+            const status = await d.detect();
+            const agent: RegisteredAgent = {
+              id: d.id,
+              name: d.name,
+              kind: d.kind,
+              provider: d.provider,
+              status: status.available ? 'available' : 'not_installed',
+              version: status.version,
+              capabilities: d.capabilities,
+              supportedModes: d.supportedModes,
+              priority: d.priority,
+              error: status.error,
+            };
+            return agent;
+          })
+        );
+
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            const agent = result.value;
+            this.agents.set(agent.id, agent);
+          }
+        }
+      } finally {
+        this._isDetecting = false;
+      }
+      return this;
+    })();
+
+    const timeoutPromise = new Promise<AgentRegistry>((_, reject) => {
+      setTimeout(() => reject(new Error(`Detection timeout after ${timeoutMs}ms`)), timeoutMs);
+    });
+
+    return Promise.race([this.detectionPromise, timeoutPromise]);
+  }
+
+  getSnapshot(): RegisteredAgent[] {
+    return Array.from(this.agents.values());
+  }
+
+  isDetecting(): boolean {
+    return this._isDetecting;
+  }
+
+  async refresh(): Promise<AgentRegistry> {
+    this.agents.clear();
+    return this.detect({ force: true });
+  }
+
+  async detectWithOptions(options?: { force?: boolean; timeoutMs?: number }): Promise<AgentRegistry> {
+    return this.detect(options);
   }
 
   getAvailableAgents(mode?: AgentMode): RegisteredAgent[] {
@@ -125,12 +210,11 @@ export class AgentRegistry {
       priority: 1,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: true, cloud: true, multimodal: false },
       detect: async () => {
-        try {
-          execSync('npx --no-install opencode-ai --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
-          return { available: true, version: 'CLI' };
-        } catch {
-          return { available: false, error: 'opencode-ai not installed. Run: npm install -g opencode-ai' };
+        const result = await runCommand('npx', ['--no-install', 'opencode-ai', '--version'], 3000);
+        if (!result.available) {
+          result.error = 'opencode-ai not installed. Run: npm install -g opencode-ai';
         }
+        return result;
       },
     });
 
@@ -143,12 +227,11 @@ export class AgentRegistry {
       priority: 2,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: false },
       detect: async () => {
-        try {
-          execSync('npx --no-install @anthropic-ai/claude-code --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
-          return { available: true, version: 'CLI' };
-        } catch {
-          return { available: false, error: '@anthropic-ai/claude-code not installed' };
+        const result = await runCommand('npx', ['--no-install', '@anthropic-ai/claude-code', '--version'], 3000);
+        if (!result.available) {
+          result.error = '@anthropic-ai/claude-code not installed';
         }
+        return result;
       },
     });
 
@@ -161,12 +244,11 @@ export class AgentRegistry {
       priority: 3,
       capabilities: { codeGeneration: false, fileEditing: false, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: true },
       detect: async () => {
-        try {
-          execSync('npx --no-install @google/gemini-cli --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
-          return { available: true, version: 'CLI' };
-        } catch {
-          return { available: false, error: '@google/gemini-cli not installed' };
+        const result = await runCommand('npx', ['--no-install', '@google/gemini-cli', '--version'], 3000);
+        if (!result.available) {
+          result.error = '@google/gemini-cli not installed';
         }
+        return result;
       },
     });
 
@@ -179,12 +261,11 @@ export class AgentRegistry {
       priority: 4,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
-        try {
-          execSync('aider --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
-          return { available: true, version: 'CLI' };
-        } catch {
-          return { available: false, error: 'aider not installed. Run: pip install aider-chat' };
+        const result = await runCommand('aider', ['--version'], 3000);
+        if (!result.available) {
+          result.error = 'aider not installed. Run: pip install aider-chat';
         }
+        return result;
       },
     });
 
@@ -197,17 +278,14 @@ export class AgentRegistry {
       priority: 5,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
-        try {
-          execSync('npx --no-install @block/goose --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
-          return { available: true, version: 'CLI' };
-        } catch {
-          try {
-            execSync('goose --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
-            return { available: true, version: 'CLI' };
-          } catch {
-            return { available: false, error: 'goose not installed' };
-          }
+        let result = await runCommand('npx', ['--no-install', '@block/goose', '--version'], 3000);
+        if (!result.available) {
+          result = await runCommand('goose', ['--version'], 3000);
         }
+        if (!result.available) {
+          result.error = 'goose not installed';
+        }
+        return result;
       },
     });
 
@@ -220,12 +298,11 @@ export class AgentRegistry {
       priority: 3,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
       detect: async () => {
-        try {
-          execSync('codex --version', { timeout: 10000, stdio: 'pipe', windowsHide: true });
-          return { available: true, version: 'CLI' };
-        } catch {
-          return { available: false, error: 'codex not installed. Run: npm install -g @openai/codex' };
+        const result = await runCommand('codex', ['--version'], 3000);
+        if (!result.available) {
+          result.error = 'codex not installed. Run: npm install -g @openai/codex';
         }
+        return result;
       },
     });
 
@@ -239,14 +316,7 @@ export class AgentRegistry {
       capabilities: { codeGeneration: true, fileEditing: false, commandExecution: false, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
       detect: async () => {
         try {
-          const open = await new Promise<boolean>((resolve) => {
-            const socket = createConnection(11434, 'localhost', () => {
-              socket.destroy();
-              resolve(true);
-            });
-            socket.on('error', () => resolve(false));
-            socket.setTimeout(1000, () => { socket.destroy(); resolve(false); });
-          });
+          const open = await checkTcpPort(11434);
           return open ? { available: true, version: 'running' } : { available: false, error: 'Ollama not running on port 11434' };
         } catch {
           return { available: false, error: 'Ollama check failed' };

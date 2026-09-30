@@ -68,7 +68,7 @@ export class SessionOrchestrator extends EventEmitter {
       timeoutMs: 240000,
       ...config,
     };
-    this.registry = AgentRegistry.create();
+    this.registry = config.registry ?? AgentRegistry.create();
     this.constraintEnforcer = getConstraintEnforcer();
     this.stagingWorkspace = getStagingWorkspace();
     this.sessionStore = getSessionStore();
@@ -108,7 +108,11 @@ export class SessionOrchestrator extends EventEmitter {
     let finalResult: SessionResult | null = null;
 
     try {
-      await this.registry.detect();
+      // Only detect if registry is not already populated
+      const hasAgents = this.registry.getAllAgents().length > 0;
+      if (!hasAgents) {
+        await this.registry.detect();
+      }
 
       // Plan: decompose goal into subtasks
       const available = this.registry.getAvailableAgents(this.config.mode);
@@ -516,6 +520,7 @@ export class SessionOrchestrator extends EventEmitter {
       mode: 'communication',
       workingDir,
       timeoutMs: this.config.timeoutMs ?? 240000,
+      signal: this.config.signal,
     };
 
     try {
@@ -587,6 +592,7 @@ export class SessionOrchestrator extends EventEmitter {
       mode: this.config.mode,
       workingDir: workingDir ?? this.config.workingDir,
       timeoutMs: this.config.timeoutMs ?? 240000,
+      signal: this.config.signal,
       onOutput: (chunk: string) => {
         this.emit('agent.output', { agentId: agent.id, content: chunk });
         this.appendAgentLog(agent.id, chunk);
@@ -626,6 +632,7 @@ export class SessionOrchestrator extends EventEmitter {
       mode: 'execution',
       workingDir: stagingDir,
       timeoutMs: this.config.timeoutMs ?? 240000,
+      signal: this.config.signal,
       onOutput: (chunk: string) => {
         this.emit('agent.output', { agentId: agent.id, content: chunk });
         this.appendAgentLog(agent.id, chunk);
