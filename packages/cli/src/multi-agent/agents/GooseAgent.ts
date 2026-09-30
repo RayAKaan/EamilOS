@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
 import { buildAgentEnv } from '../../core/security/AgentEnv.js';
