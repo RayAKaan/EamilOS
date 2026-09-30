@@ -176,6 +176,7 @@ export class EamilOSTuiApp {
 
       case 'ctrl':
         if (event.key === 'p') { this.dispatch({ type: 'COMMAND_PALETTE_OPEN' }); break; }
+        if (event.key === 'o') { this.dispatch({ type: 'TOGGLE_TRANSCRIPT_DENSITY' }); break; }
         if (event.key === 'c') {
           this.handleCtrlC();
           break;
