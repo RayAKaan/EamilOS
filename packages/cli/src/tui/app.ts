@@ -249,7 +249,6 @@ export class EamilOSTuiApp {
 
   private async startSession(prompt: string): Promise<void> {
     this.promptQueue.push(prompt);
-    this.dispatch({ type: 'MISSION_QUEUED', objective: prompt });
     if (this.activePrompt) {
       this.dispatch({ type: 'STATUS_TEXT', text: `${this.promptQueue.length} prompt${this.promptQueue.length === 1 ? '' : 's'} queued` });
       return;
