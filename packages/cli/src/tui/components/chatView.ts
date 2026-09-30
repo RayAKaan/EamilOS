@@ -126,7 +126,7 @@ export function renderChatView(model: AppModel, layout: Layout): string[] {
 
   const allLines: string[] = [];
   for (const msg of model.messages) {
-    allLines.push(...renderMessage(msg, width, model.spinFrame));
+    allLines.push(...renderMessage(msg, width, model.spinFrame, model.transcriptDensity));
   }
 
   const total     = allLines.length;
