@@ -1,4 +1,8 @@
 import { EventEmitter } from 'events';
+import { randomUUID } from 'node:crypto';
+import { EventSourcedSession } from './EventSourcedSession.js';
+import { InvariantRegistry } from '../runtime/InvariantRegistry.js';
+import { AgentScope } from '../agents/AgentScope.js';
 import { mkdirSync, writeFileSync, appendFileSync } from 'fs';
 import { resolve } from 'path';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
@@ -60,6 +64,9 @@ export class SessionOrchestrator extends EventEmitter {
   private policy: ExecutionPolicy;
   private permissionService: ReturnType<typeof getPermissionService>;
   private agentLogFiles: Map<string, string> = new Map();
+  private eventSession: EventSourcedSession;
+  private readonly invariants = new InvariantRegistry();
+  private readonly agentScope = new AgentScope();
 
   constructor(config: SessionConfig) {
     super();
@@ -74,6 +81,7 @@ export class SessionOrchestrator extends EventEmitter {
     this.sessionStore = getSessionStore();
     this.policy = parsePolicy(config.policy);
     this.permissionService = getPermissionService();
+    this.eventSession = new EventSourcedSession('uninitialized', { status: 'created', goal: config.goal });
     this.permissionService.on('permission:requested', (request) => {
       this.emit('permission.requested', {
         agentId: request.agentId,
@@ -92,6 +100,11 @@ export class SessionOrchestrator extends EventEmitter {
     return super.emit(event, data);
   }
 
+  private async commitEvent(type: string, data: Record<string, unknown>): Promise<void> {
+    await this.eventSession.append(type, data);
+    this.emit(type as keyof SessionEventMap, data as never);
+  }
+
   private throwIfAborted(): void {
     if (this.config.signal?.aborted) {
       throw new Error('Mission cancelled');
@@ -100,9 +113,27 @@ export class SessionOrchestrator extends EventEmitter {
 
   async run(): Promise<SessionResult> {
     this.startTime = Date.now();
-    this.sessionId = `session_${this.startTime}`;
+    this.sessionId = `session_${randomUUID()}`;
+    this.eventSession = new EventSourcedSession(this.sessionId, {
+      status: 'created',
+      goal: this.config.goal,
+      mode: this.config.mode,
+      strategy: this.config.strategy,
+    });
+    await this.eventSession.load();
+    this.invariants.register('eamilos.session', (fail) => {
+      const events = this.eventSession.eventsSnapshot();
+      let started = 0;
+      let terminal = 0;
+      for (const event of events) {
+        if (event.type === 'agent.started') started += 1;
+        if (event.type === 'agent.completed' || event.type === 'agent.error' || event.type === 'agent.cancelled') terminal += 1;
+      }
+      if (terminal > started) fail('agent terminal event count exceeded agent.started count');
+    });
     const errors: string[] = [];
 
+    await this.commitEvent('session.started', { goal: this.config.goal, mode: this.config.mode, strategy: this.config.strategy });
     this.emit('session.started', {
       goal: this.config.goal,
       strategy: this.config.strategy,
@@ -160,14 +191,14 @@ export class SessionOrchestrator extends EventEmitter {
 
       finalResult = result;
       result.duration = Date.now() - this.startTime;
-      this.emit('session.completed', { success: result.success, duration: result.duration });
+      await this.commitEvent('session.completed', { success: result.success, duration: result.duration });
       return result;
     } catch (err) {
       const cancelled = this.config.signal?.aborted === true;
       const msg = cancelled ? 'Mission cancelled' : (err instanceof Error ? err.message : String(err));
       errors.push(msg);
-      if (cancelled) this.emit('session.cancelled', { reason: msg });
-      else this.emit('session.error', { error: msg });
+      if (cancelled) await this.commitEvent('session.cancelled', { reason: msg });
+      else await this.commitEvent('session.error', { error: msg });
       return {
         success: false,
         goal: this.config.goal,
@@ -179,6 +210,7 @@ export class SessionOrchestrator extends EventEmitter {
         duration: Date.now() - this.startTime,
       };
     } finally {
+      await this.invariants.verify();
       this.sessionStore.recordResult(
         finalResult?.success ?? (!errors.length),
         finalResult?.agentUsed,
@@ -201,6 +233,7 @@ export class SessionOrchestrator extends EventEmitter {
     }
 
     this.agents.set(agent.id, agent);
+    this.agentScope.create(agent.id, agent.capabilities ? Object.keys(agent.capabilities).filter(k => (agent.capabilities as any)[k]) : []);
 
     if (this.config.mode === 'communication') {
       return this.executeInCommunicationMode(agent);
@@ -250,6 +283,7 @@ export class SessionOrchestrator extends EventEmitter {
       if (!adapter) continue;
 
       this.agents.set(adapter.id, adapter);
+      if (!this.agentScope.get(adapter.id)) this.agentScope.create(adapter.id, Object.keys(adapter.capabilities).filter(k => Boolean((adapter.capabilities as any)[k])));
 
       if (i > 0) {
         this.emit('agent.fallback', {
@@ -526,7 +560,7 @@ export class SessionOrchestrator extends EventEmitter {
   private async executeInCommunicationMode(agent: EamilOSAgent): Promise<SessionResult> {
     this.throwIfAborted();
     const workingDir = this.constraintEnforcer.createIsolatedContext(agent.id, this.config.workingDir);
-    this.emit('agent.started', { agentId: agent.id });
+    await this.commitEvent('agent.started', { agentId: agent.id });
     this.sessionStore.recordAgentSelected(agent.id);
 
     const request: AgentRequest = {
@@ -554,7 +588,7 @@ IMPORTANT: You are in READ-ONLY mode. Do not write, edit, or modify any files. O
 
       if (!response.success || response.error) {
         const error = response.error ?? response.content ?? `${agent.id} failed`;
-        this.emit('agent.error', { agentId: agent.id, error });
+        await this.commitEvent('agent.error', { agentId: agent.id, error });
         return {
           success: false,
           goal: this.config.goal,
@@ -568,7 +602,7 @@ IMPORTANT: You are in READ-ONLY mode. Do not write, edit, or modify any files. O
         };
       }
 
-      this.emit('agent.completed', { agentId: agent.id, result: response });
+      await this.commitEvent('agent.completed', { agentId: agent.id, result: { success: response.success, content: response.content } });
       this.sessionStore.recordTerminalOutput(agent.id, response.content);
 
       return {
@@ -585,7 +619,7 @@ IMPORTANT: You are in READ-ONLY mode. Do not write, edit, or modify any files. O
       };
     } catch (err) {
       if (this.config.signal?.aborted) {
-        this.emit('agent.cancelled', { agentId: agent.id, reason: 'Mission cancelled' });
+        await this.commitEvent('agent.cancelled', { agentId: agent.id, reason: 'Mission cancelled' });
         return {
           success: false,
           goal: this.config.goal,
@@ -599,7 +633,7 @@ IMPORTANT: You are in READ-ONLY mode. Do not write, edit, or modify any files. O
         };
       }
       const msg = err instanceof Error ? err.message : String(err);
-      this.emit('agent.error', { agentId: agent.id, error: msg });
+      await this.commitEvent('agent.error', { agentId: agent.id, error: msg });
       return {
         success: false,
         goal: this.config.goal,
