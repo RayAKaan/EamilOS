@@ -379,8 +379,7 @@ export class SessionOrchestrator extends EventEmitter {
     const canMultiplex = AdaptiveMultiplexer.isMultiplexingSupported();
 
     if (!canMultiplex) {
-      this.emitAgentOutput('eamilos', 'No multiplex-capable terminal detected. Streaming agent output inside EamilOS TUI.
-');
+      this.emitAgentOutput('eamilos', 'No multiplex-capable terminal detected. Streaming agent output inside EamilOS TUI.\n');
       return;
     }
 
@@ -437,9 +436,7 @@ export class SessionOrchestrator extends EventEmitter {
   }
 
   private emitAgentOutput(agentId: string, content: string): void {
-    this.appendAgentLog(agentId, content.endsWith('
-') ? content : `${content}
-`);
+    this.appendAgentLog(agentId, content.endsWith('\n') ? content : `${content}\n`);
     this.emit('agent.output', { agentId, content });
   }
 
