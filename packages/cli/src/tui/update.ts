@@ -34,7 +34,8 @@ export type Msg =
   | { type: 'TICK' }
   | { type: 'NOTIFY'; text: string }
   | { type: 'DETECTION_START' }
-  | { type: 'DETECTION_COMPLETE'; agents: AgentEntry[] }\n  | { type: 'AGENT_DISCOVERED'; agent: AgentEntry }
+  | { type: 'DETECTION_COMPLETE'; agents: AgentEntry[] }
+  | { type: 'AGENT_DISCOVERED'; agent: AgentEntry }
   | { type: 'DETECTION_FAILED'; error: string }
   | { type: 'SESSION_STARTED' }
   | { type: 'SESSION_COMPLETED'; summary: RunSummary }
