@@ -92,6 +92,12 @@ export class SessionOrchestrator extends EventEmitter {
     return super.emit(event, data);
   }
 
+  private throwIfAborted(): void {
+    if (this.config.signal?.aborted) {
+      throw new Error('Mission cancelled');
+    }
+  }
+
   async run(): Promise<SessionResult> {
     this.startTime = Date.now();
     this.sessionId = `session_${this.startTime}`;
@@ -108,11 +114,13 @@ export class SessionOrchestrator extends EventEmitter {
     let finalResult: SessionResult | null = null;
 
     try {
+      this.throwIfAborted();
       // Only detect if registry is not already populated
       const hasAgents = this.registry.getAllAgents().length > 0;
       if (!hasAgents) {
         await this.registry.detect();
       }
+      this.throwIfAborted();
 
       // Plan: decompose goal into subtasks
       const available = this.registry.getAvailableAgents(this.config.mode);
@@ -155,9 +163,11 @@ export class SessionOrchestrator extends EventEmitter {
       this.emit('session.completed', { success: result.success, duration: result.duration });
       return result;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const cancelled = this.config.signal?.aborted === true;
+      const msg = cancelled ? 'Mission cancelled' : (err instanceof Error ? err.message : String(err));
       errors.push(msg);
-      this.emit('session.error', { error: msg });
+      if (cancelled) this.emit('session.cancelled', { reason: msg });
+      else this.emit('session.error', { error: msg });
       return {
         success: false,
         goal: this.config.goal,
@@ -231,6 +241,7 @@ export class SessionOrchestrator extends EventEmitter {
     const allErrors: string[] = [];
 
     for (let i = 0; i < candidateIds.length; i++) {
+      this.throwIfAborted();
       const agentId = candidateIds[i];
       const adapter = AgentFactory.createAdapter(agentId, {
         workingDir: this.config.workingDir,
@@ -510,10 +521,13 @@ export class SessionOrchestrator extends EventEmitter {
   }
 
   private async executeInCommunicationMode(agent: EamilOSAgent): Promise<SessionResult> {
+    this.throwIfAborted();
     const workingDir = this.constraintEnforcer.createIsolatedContext(agent.id, this.config.workingDir);
+    this.emit('agent.started', { agentId: agent.id });
+    this.sessionStore.recordAgentSelected(agent.id);
 
     const request: AgentRequest = {
-      id: `req_${Date.now()}`,
+      id: `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       sessionId: this.sessionId,
       prompt: `[READ-ONLY MODE] Analyze and provide recommendations only. Do not modify any files.\n\nTask: ${this.config.goal}`,
       systemPrompt: `${SYSTEM_PROMPT}\n\nIMPORTANT: You are in READ-ONLY mode. Do not write, edit, or modify any files. Only analyze and propose changes.`,
@@ -521,10 +535,15 @@ export class SessionOrchestrator extends EventEmitter {
       workingDir,
       timeoutMs: this.config.timeoutMs ?? 240000,
       signal: this.config.signal,
+      onOutput: (chunk: string) => {
+        this.emit('agent.output', { agentId: agent.id, content: chunk });
+        this.appendAgentLog(agent.id, chunk);
+      },
     };
 
     try {
       const response = await agent.run(request);
+      this.throwIfAborted();
 
       if (!response.success || response.error) {
         const error = response.error ?? response.content ?? `${agent.id} failed`;
@@ -535,7 +554,6 @@ export class SessionOrchestrator extends EventEmitter {
           strategy: this.config.strategy,
           mode: 'communication',
           agentUsed: agent.id,
-          primaryResult: undefined,
           fileChanges: [],
           appliedChanges: [],
           errors: [error],
@@ -545,10 +563,6 @@ export class SessionOrchestrator extends EventEmitter {
 
       this.emit('agent.completed', { agentId: agent.id, result: response });
       this.sessionStore.recordTerminalOutput(agent.id, response.content);
-
-      if (response.fileChanges.length > 0) {
-        this.emit('validation.failed', { errors: ['File changes blocked in communication mode'] });
-      }
 
       return {
         success: true,
@@ -563,6 +577,20 @@ export class SessionOrchestrator extends EventEmitter {
         duration: Date.now() - this.startTime,
       };
     } catch (err) {
+      if (this.config.signal?.aborted) {
+        this.emit('agent.cancelled', { agentId: agent.id, reason: 'Mission cancelled' });
+        return {
+          success: false,
+          goal: this.config.goal,
+          strategy: this.config.strategy,
+          mode: 'communication',
+          agentUsed: agent.id,
+          fileChanges: [],
+          appliedChanges: [],
+          errors: ['Mission cancelled'],
+          duration: Date.now() - this.startTime,
+        };
+      }
       const msg = err instanceof Error ? err.message : String(err);
       this.emit('agent.error', { agentId: agent.id, error: msg });
       return {
@@ -601,7 +629,12 @@ export class SessionOrchestrator extends EventEmitter {
 
     try {
       const response = await agent.run(request);
-      this.emit('agent.completed', { agentId: agent.id, result: response });
+      if (this.config.signal?.aborted) {
+        this.emit('agent.cancelled', { agentId: agent.id, reason: 'Mission cancelled' });
+        return { agentId: agent.id, success: false, content: '', fileChanges: [], error: 'Mission cancelled', errorType: 'timeout', durationMs: 0 };
+      }
+      if (response.success) this.emit('agent.completed', { agentId: agent.id, result: response });
+      else this.emit('agent.error', { agentId: agent.id, error: response.error ?? 'Agent failed', errorType: response.errorType });
       return response;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -641,8 +674,25 @@ export class SessionOrchestrator extends EventEmitter {
 
     let response: AgentResponse;
     try {
+      this.throwIfAborted();
+      this.emit('agent.started', { agentId: agent.id });
+      this.sessionStore.recordAgentSelected(agent.id);
       this.emitAgentOutput(agent.id, `Starting ${agent.id} in staging workspace...\n`);
       response = await agent.run(request);
+      if (this.config.signal?.aborted) {
+        this.emit('agent.cancelled', { agentId: agent.id, reason: 'Mission cancelled' });
+        return {
+          success: false,
+          goal: this.config.goal,
+          strategy: this.config.strategy,
+          mode: this.config.mode,
+          agentUsed: agent.id,
+          fileChanges: response.fileChanges ?? [],
+          appliedChanges: [],
+          errors: ['Mission cancelled'],
+          duration: Date.now() - this.startTime,
+        };
+      }
       if (response.content) {
         this.appendAgentLog(agent.id, response.content.endsWith('\n') ? response.content : `${response.content}\n`);
       }
