@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import { createConnection } from 'net';
 import type { RegisteredAgent, AgentKind, AgentCapabilities, AgentMode, AgentStatus, ExecutionStrategy } from './types.js';
 
-interface AgentDetectionConfig {
+export interface AgentDetectionConfig {
   id: string;
   name: string;
   kind: AgentKind;
@@ -10,44 +10,57 @@ interface AgentDetectionConfig {
   supportedModes: AgentMode[];
   priority: number;
   capabilities: AgentCapabilities;
-  detect: () => Promise<{ available: boolean; version?: string; error?: string }>;
+  detect: () => Promise<{ available: boolean; version?: string; error?: string }>;\n}
 }
 
 function runCommand(cmd: string, args: string[], timeoutMs: number = 3000): Promise<{ available: boolean; version?: string; error?: string }> {
   return new Promise((resolve) => {
     const isWindows = process.platform === 'win32';
-    const fullCmd = isWindows ? 'cmd.exe' : cmd;
-    const fullArgs = isWindows ? ['/d', '/c', cmd, ...args] : args;
-    
-    const child = spawn(fullCmd, fullArgs, {
-      timeout: timeoutMs,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
+    const child = isWindows
+      ? spawn('cmd.exe', ['/d', '/c', cmd, ...args], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+      : spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
-    let killed = false;
-    const timeout = setTimeout(() => {
-      killed = true;
-      child.kill('SIGKILL');
-      resolve({ available: false, error: `Detection timeout after ${timeoutMs}ms` });
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+
+    const finish = (result: { available: boolean; version?: string; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch {}
+      finish({ available: false, error: `Detection timeout after ${timeoutMs}ms` });
     }, timeoutMs);
 
-    child.on('error', (err) => {
-      clearTimeout(timeout);
-      if (!killed) resolve({ available: false, error: err.message });
-    });
-
-    child.on('exit', (code) => {
-      clearTimeout(timeout);
-      if (!killed) {
-        if (code === 0) {
-          resolve({ available: true, version: 'CLI' });
-        } else {
-          resolve({ available: false, error: `Exit code ${code}` });
-        }
+    child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
+    child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+    child.once('error', (err) => finish({ available: false, error: err.message }));
+    child.once('close', (code) => {
+      if (code === 0) {
+        const version = (stdout || stderr).trim().split(/\r?\n/)[0] || 'CLI';
+        finish({ available: true, version });
+      } else {
+        finish({ available: false, error: stderr.trim() || `Exit code ${code ?? 'unknown'}` });
       }
     });
   });
+}
+
+async function runCommandCandidates(
+  candidates: Array<{ cmd: string; args: string[] }>,
+  timeoutMs = 2500,
+): Promise<{ available: boolean; version?: string; error?: string }> {
+  let lastError = 'not found';
+  for (const candidate of candidates) {
+    const result = await runCommand(candidate.cmd, candidate.args, timeoutMs);
+    if (result.available) return result;
+    lastError = result.error ?? lastError;
+  }
+  return { available: false, error: lastError };
 }
 
 function checkTcpPort(port: number, host: string = 'localhost', timeoutMs: number = 1000): Promise<boolean> {
@@ -71,52 +84,44 @@ export class AgentRegistry {
     this.detectors.push(detector);
   }
 
-  async detect(options?: { force?: boolean; timeoutMs?: number }): Promise<AgentRegistry> {
-    if (this._isDetecting && !options?.force) {
-      return this.detectionPromise!;
-    }
-
+  async detect(options?: { force?: boolean; timeoutMs?: number; onAgent?: (agent: RegisteredAgent) => void }): Promise<AgentRegistry> {
+    if (this._isDetecting && !options?.force) return this.detectionPromise!;
     this._isDetecting = true;
     const timeoutMs = options?.timeoutMs ?? 30000;
-    
+
     this.detectionPromise = (async () => {
       try {
-        const results = await Promise.allSettled(
-          this.detectors.map(async (d) => {
-            const status = await d.detect();
-            const agent: RegisteredAgent = {
-              id: d.id,
-              name: d.name,
-              kind: d.kind,
-              provider: d.provider,
-              status: status.available ? 'available' : 'not_installed',
-              version: status.version,
-              capabilities: d.capabilities,
-              supportedModes: d.supportedModes,
-              priority: d.priority,
-              error: status.error,
-            };
-            return agent;
-          })
-        );
-
-        for (const result of results) {
-          if (result.status === 'fulfilled') {
-            const agent = result.value;
-            this.agents.set(agent.id, agent);
-          }
-        }
+        const work = this.detectors.map(async (d) => {
+          const status = await Promise.race([
+            d.detect(),
+            new Promise<{ available: boolean; error?: string }>(resolve =>
+              setTimeout(() => resolve({ available: false, error: `Detection timeout after ${timeoutMs}ms` }), timeoutMs)
+            ),
+          ]);
+          const agent: RegisteredAgent = {
+            id: d.id,
+            name: d.name,
+            kind: d.kind,
+            provider: d.provider,
+            status: status.available ? 'available' : 'not_installed',
+            version: status.version,
+            capabilities: d.capabilities,
+            supportedModes: d.supportedModes,
+            priority: d.priority,
+            error: status.error,
+          };
+          this.agents.set(agent.id, agent);
+          options?.onAgent?.(agent);
+          return agent;
+        });
+        await Promise.allSettled(work);
       } finally {
         this._isDetecting = false;
       }
       return this;
     })();
 
-    const timeoutPromise = new Promise<AgentRegistry>((_, reject) => {
-      setTimeout(() => reject(new Error(`Detection timeout after ${timeoutMs}ms`)), timeoutMs);
-    });
-
-    return Promise.race([this.detectionPromise, timeoutPromise]);
+    return this.detectionPromise;
   }
 
   getSnapshot(): RegisteredAgent[] {
@@ -210,7 +215,7 @@ export class AgentRegistry {
       priority: 1,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: true, cloud: true, multimodal: false },
       detect: async () => {
-        const result = await runCommand('npx', ['--no-install', 'opencode-ai', '--version'], 3000);
+        const result = await runCommandCandidates([{ cmd: 'opencode', args: ['--version'] }, { cmd: 'npx', args: ['--no-install', 'opencode-ai', '--version'] }]);
         if (!result.available) {
           result.error = 'opencode-ai not installed. Run: npm install -g opencode-ai';
         }
@@ -227,7 +232,7 @@ export class AgentRegistry {
       priority: 2,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: false },
       detect: async () => {
-        const result = await runCommand('npx', ['--no-install', '@anthropic-ai/claude-code', '--version'], 3000);
+        const result = await runCommandCandidates([{ cmd: 'claude', args: ['--version'] }, { cmd: 'npx', args: ['--no-install', '@anthropic-ai/claude-code', '--version'] }]);
         if (!result.available) {
           result.error = '@anthropic-ai/claude-code not installed';
         }
@@ -244,7 +249,7 @@ export class AgentRegistry {
       priority: 3,
       capabilities: { codeGeneration: false, fileEditing: false, commandExecution: true, webResearch: true, longContext: true, local: false, cloud: true, multimodal: true },
       detect: async () => {
-        const result = await runCommand('npx', ['--no-install', '@google/gemini-cli', '--version'], 3000);
+        const result = await runCommandCandidates([{ cmd: 'gemini', args: ['--version'] }, { cmd: 'npx', args: ['--no-install', '@google/gemini-cli', '--version'] }]);
         if (!result.available) {
           result.error = '@google/gemini-cli not installed';
         }
@@ -261,7 +266,7 @@ export class AgentRegistry {
       priority: 4,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
-        const result = await runCommand('aider', ['--version'], 3000);
+        const result = await runCommandCandidates([{ cmd: 'aider', args: ['--version'] }]);
         if (!result.available) {
           result.error = 'aider not installed. Run: pip install aider-chat';
         }
@@ -278,9 +283,9 @@ export class AgentRegistry {
       priority: 5,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
-        let result = await runCommand('npx', ['--no-install', '@block/goose', '--version'], 3000);
+        let result = await runCommandCandidates([{ cmd: 'goose', args: ['--version'] }, { cmd: 'npx', args: ['--no-install', '@block/goose', '--version'] }]);
         if (!result.available) {
-          result = await runCommand('goose', ['--version'], 3000);
+          result = await runCommand('goose', ['--version'], 2500);
         }
         if (!result.available) {
           result.error = 'goose not installed';
@@ -298,7 +303,7 @@ export class AgentRegistry {
       priority: 3,
       capabilities: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
       detect: async () => {
-        const result = await runCommand('codex', ['--version'], 3000);
+        const result = await runCommandCandidates([{ cmd: 'codex', args: ['--version'] }]);
         if (!result.available) {
           result.error = 'codex not installed. Run: npm install -g @openai/codex';
         }
