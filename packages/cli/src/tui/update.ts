@@ -1,4 +1,4 @@
-import type { AppModel, ApplicationState, MissionState, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
+import type { AppModel, ApplicationState, MissionState, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem, TranscriptDensity } from './model.js';
 import type { FleetAgentStatus } from './fleet-data.js';
 import type { AgentEvent } from './events/agent-event.js';
 import { nextActivityId, nextMsgId } from './model.js';
