@@ -1,4 +1,3 @@
-import { execSync } from 'child_process';
 import { BaseAgent, crossSpawn, AgentCapability, AgentConfig, TerminalMessage, ToolCall } from './BaseAgent.js';
 import { getProviderManager } from '../../core/provider-manager.js';
 import { buildAgentEnv } from '../../core/security/AgentEnv.js';
@@ -71,17 +70,8 @@ export class GooseAgent extends BaseAgent {
 
   private sendOneShot(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
     return new Promise((resolve) => {
-      let finalCmd: string;
-      let args: string[];
-
-      try {
-        execSync('goose --version 2>&1', { timeout: 1000, stdio: 'pipe' });
-        finalCmd = 'goose';
-        args = ['run', prompt];
-      } catch {
-        finalCmd = this.command;
-        args = ['--yes', '@block/goose', 'run', prompt];
-      }
+      const finalCmd = 'goose';
+      const args = ['run', '--no-session', '--output-format', 'stream-json', '-t', prompt];
 
       let output = '';
       let stderr = '';
@@ -92,6 +82,7 @@ export class GooseAgent extends BaseAgent {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: buildAgentEnv('goose', { NO_COLOR: 'true', ...this.config.env }),
       });
+      this.trackProcess(proc);
 
       proc.on('error', async () => {
         if (!timedOut) { clearTimeout(timeout); resolve(await this.executeKernelFallback(prompt, id, startTime)); }
