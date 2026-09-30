@@ -155,6 +155,11 @@ export class GooseAgent extends BaseAgent {
         const parsed = JSON.parse(trimmed);
         if (parsed.type === 'text' && parsed.content) {
           output += parsed.content;
+        } else if (parsed.type === 'message' && parsed.message) {
+          const blocks = Array.isArray(parsed.message.content) ? parsed.message.content : [];
+          for (const block of blocks) {
+            if (block?.type === 'text' && typeof block.text === 'string') output += block.text;
+          }
         } else if (parsed.type === 'tool_call' || parsed.type === 'tool_use') {
           tools.push({
             name: parsed.tool || parsed.name || 'unknown',
