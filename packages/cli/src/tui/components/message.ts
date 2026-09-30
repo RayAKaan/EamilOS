@@ -1,7 +1,7 @@
 // message.ts — Message renderer. Chat area runs on BG.BLACK.
 // All message lines painted with onChat() to maintain the dark surface.
 
-import type { Message } from '../model.js';
+import type { Message, TranscriptDensity, ToolCall } from '../model.js';
 import {
   fit, truncate, wrapPlain,
   sanitiseLine, visibleWidth,
@@ -47,34 +47,40 @@ export function renderUserMsg(msg: Message, width: number): string[] {
 }
 
 // ── Agent ─────────────────────────────────────────────────────────────────────
-export function renderAgentMsg(
-  msg: Message,
-  width: number,
-  spinFrame: number,
-): string[] {
-  const agentId = msg.agentId ?? 'agent';
-  const colour  = colourFor(agentId);
-  const label   = msg.callsign ? `${msg.callsign} · ${agentId}` : agentId;
-  const header  = sectionHeader(label, colour, msg.timestamp, width);
-  const lines: string[] = [header];
+function toolStatus(tool: ToolCall, spinFrame: number): { mark: string; colour: string; label: string } {
+  if (tool.status === 'running') return { mark: spinAt(spinFrame), colour: FG.YELLOW, label: 'running' };
+  if (tool.status === 'failed') return { mark: '✖', colour: FG.RED, label: 'failed' };
+  if (tool.status === 'done') return { mark: '✓', colour: FG.GREEN, label: 'done' };
+  return { mark: '○', colour: FG.BRIGHT_BLACK, label: 'pending' };
+}
 
+function renderToolCard(tool: ToolCall, width: number, spinFrame: number, density: TranscriptDensity): string[] {
+  if (density === 'hidden') return [];
+  const state = toolStatus(tool, spinFrame);
+  const header = onChat(fit('  ' + styled(state.mark + '  Tool / ' + tool.name, BOLD, state.colour), width));
+  const raw = tool.result ?? tool.args ?? '';
+  const lines = raw.split(/\r?\n/).map(sanitiseLine).filter(Boolean);
+  const limit = density === 'expanded' ? 16 : 8;
+  const shown = lines.length > limit ? [...lines.slice(0, Math.ceil(limit / 2)), '… ' + String(lines.length - limit) + ' lines omitted …', ...lines.slice(-Math.floor(limit / 2))] : lines;
+  const body = shown.map(line => onChat(fit('    ' + styled(line, DIM, FG.WHITE), width)));
+  const footer = onChat(fit('    ' + styled(state.label + (tool.lines ? ' · ' + tool.lines + ' lines' : ''), DIM, FG.BRIGHT_BLACK), width));
+  return [header, ...body, footer];
+}
+
+export function renderAgentMsg(msg: Message, width: number, spinFrame: number, density: TranscriptDensity = 'normal'): string[] {
+  const agentId = msg.agentId ?? 'agent';
+  const colour = colourFor(agentId);
+  const label = msg.callsign ? msg.callsign + ' · ' + agentId : agentId;
+  const lines: string[] = [sectionHeader(label, colour, msg.timestamp, width)];
   if (msg.content.trim()) {
-    const indent = '  ';
-    const iw     = Math.max(0, width - indent.length);
+    const iw = Math.max(0, width - 2);
     for (const l of wrapPlain(msg.content, iw)) {
       if (/\[.*\]\(http/.test(l)) continue;
-      lines.push(onChat(fit(indent + styled(sanitiseLine(l, iw), FG.WHITE), width)));
+      lines.push(onChat(fit('  ' + styled(sanitiseLine(l, iw), FG.WHITE), width)));
     }
   }
-
-  if (msg.streaming) {
-    lines.push(onChat(fit(
-      '  ' + styled(spinAt(spinFrame), colour)
-      + ' ' + styled('streaming…', DIM, FG.BRIGHT_BLACK),
-      width,
-    )));
-  }
-
+  for (const tool of msg.tools) lines.push(...renderToolCard(tool, width, spinFrame, density));
+  if (msg.streaming) lines.push(onChat(fit('  ' + styled(spinAt(spinFrame), colour) + ' ' + styled('streaming…', DIM, FG.BRIGHT_BLACK), width)));
   lines.push(onChat(fit('', width)));
   return lines;
 }
@@ -167,10 +173,11 @@ export function renderMessage(
   msg: Message,
   width: number,
   spinFrame: number,
+  density: TranscriptDensity = 'normal',
 ): string[] {
   switch (msg.type) {
     case 'user':        return renderUserMsg(msg, width);
-    case 'agent':       return renderAgentMsg(msg, width, spinFrame);
+    case 'agent':       return renderAgentMsg(msg, width, spinFrame, density);
     case 'system':      return renderSystemMsg(msg, width);
     case 'error':       return renderErrorMsg(msg, width);
     case 'arbiter':     return renderArbiterMsg(msg, width);
