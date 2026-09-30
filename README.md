@@ -135,6 +135,31 @@ That distinction is intentional.
 
 ---
 
+# DeepSeek Harness integration
+
+EamilOS now treats **DeepSeek Harness as a harness**, not merely as another model provider.
+
+The integration adds:
+
+- **DeepSeek Harness adapter** — EamilOS can discover and invoke `dsh --profile headless --json`.
+- **Harness-of-harnesses routing** — DeepSeek Harness joins Claude Code, Codex, OpenCode, Gemini CLI, Aider, Goose, and custom execution engines as a first-class execution resource.
+- **Provider-neutral stream boundary** — model/harness output is normalized before it reaches mission state.
+- **Event-sourced runtime sessions** — mission lifecycle facts are appended to JSONL and can be reconstructed instead of relying only on mutable snapshots.
+- **Scoped agent capabilities** — per-agent capability scopes prevent global runtime registrations from becoming accidental cross-agent state.
+- **Composable plugin runtime** — runtime services can be mounted, observed, and disposed independently.
+- **Tool execution pipeline** — pre-execution policy, monotonic guards, execution wrappers, post-processing, cancellation, and timeouts are explicit seams.
+- **Runtime invariants** — important lifecycle relationships can be checked and attributed to their owning subsystem.
+
+These ideas are inspired by the architecture of DeepSeek Harness, whose design makes the session log, agent loop, tools, model adapters, and other capabilities replaceable plugins rather than privileged hard-coded subsystems. citeturn0search3turn2search3
+
+The architectural difference remains important:
+
+> **DeepSeek Harness is one harness. EamilOS is the layer that coordinates multiple harnesses.**
+
+So EamilOS does not become a DeepSeek clone. It adopts the composability and durability practices that make DSH extensible while preserving mission-level orchestration as its primary abstraction.
+
+---
+
 # Models and providers
 
 Agents and models are separate concepts in EamilOS.
