@@ -8,7 +8,8 @@ import { startInput } from './terminal/input.js';
 import type { KeyEvent } from './terminal/input.js';
 import { tickSpin } from './theme.js';
 import { startConsoleCapture, stopConsoleCapture, drainCapturedLogs } from './services/consoleCapture.js';
-import { createAgentRegistry, runAgentDetection, assignCallsigns } from './services/agentDetection.js';\nimport type { AgentRegistry } from '../core/agents/AgentRegistry.js';
+import { createAgentRegistry, runAgentDetection, assignCallsigns } from './services/agentDetection.js';
+import type { AgentRegistry } from '../core/agents/AgentRegistry.js';
 import { runSession } from './services/sessionBridge.js';
 import { readGitHubState } from './services/gitHubState.js';
 import { paletteOpen, paletteClose, paletteInput, paletteBackspace, paletteMove } from './palette.js';
@@ -28,11 +29,15 @@ export class EamilOSTuiApp {
   private stopInput: (() => void) | null = null;
   private stopResize: (() => void) | null = null;
   private running = false;
-  private renderScheduled = false;\n  private registry: AgentRegistry;\n  private promptQueue: string[] = [];\n  private activePrompt = false;
+  private renderScheduled = false;
+  private registry: AgentRegistry;
+  private promptQueue: string[] = [];
+  private activePrompt = false;
 
   constructor() {
     const size = getTerminalSize();
-    this.model = initialModel(size.width, size.height);\n    this.registry = createAgentRegistry();
+    this.model = initialModel(size.width, size.height);
+    this.registry = createAgentRegistry();
   }
 
   private dispatch(msg: Msg): void {
