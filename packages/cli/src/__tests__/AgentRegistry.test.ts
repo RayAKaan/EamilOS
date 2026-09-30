@@ -30,6 +30,7 @@ describe('AgentRegistry', () => {
   it('detects incrementally and reuses the in-flight promise', async () => {
     const incremental = AgentRegistry.create();
     const seen: string[] = [];
+    let detectorCalls = 0;
     incremental.registerDetector({
       id: 'test-agent',
       name: 'Test Agent',
@@ -39,15 +40,16 @@ describe('AgentRegistry', () => {
       priority: 99,
       capabilities: { codeGeneration: false, fileEditing: false, commandExecution: false, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
       detect: async () => {
+        detectorCalls += 1;
         await new Promise(resolve => setTimeout(resolve, 5));
         return { available: true, version: 'test' };
       },
     });
     const p1 = incremental.detect({ onAgent: (agent) => seen.push(agent.id) });
     const p2 = incremental.detect();
-    expect(p1).toBe(p2);
-    await p1;
+    await Promise.all([p1, p2]);
     expect(seen).toEqual(['test-agent']);
+    expect(detectorCalls).toBe(1);
     expect(incremental.getAvailableAgents('communication').map(a => a.id)).toEqual(['test-agent']);
   });
 
