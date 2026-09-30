@@ -55,7 +55,7 @@ export interface HealthStatus {
 }
 
 export abstract class BaseAgent extends EventEmitter {
-  protected process: ChildProcess | null = null;
+  protected process: ChildProcess | null = null;\n  protected activeProcesses = new Set<ChildProcess>();
   protected sessionId: string;
   protected config: AgentConfig;
   protected pendingMessages = new Map<string, (msg: TerminalMessage) => void>();
@@ -103,11 +103,11 @@ export abstract class BaseAgent extends EventEmitter {
     }
   }
 
-  protected async spawnProcess(command: string, args: string[], agentId?: string): Promise<void> {
+  protected trackProcess(proc: ChildProcess): ChildProcess {\n    this.activeProcesses.add(proc);\n    const cleanup = () => {\n      this.activeProcesses.delete(proc);\n      if (this.process === proc) this.process = null;\n    };\n    proc.once('close', cleanup);\n    proc.once('error', cleanup);\n    return proc;\n  }\n\n  protected async spawnProcess(command: string, args: string[], agentId?: string): Promise<void> {
     return new Promise((resolve) => {
       const fullEnv = buildAgentEnv(agentId || this.name, this.config.env);
 
-      this.process = crossSpawn(command, args, {
+      this.process = this.trackProcess(crossSpawn(command, args, {
         cwd: this.config.workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: fullEnv,
@@ -192,13 +192,27 @@ export abstract class BaseAgent extends EventEmitter {
   }
 
   async terminate(): Promise<void> {
-    if (this.process) {
-      this.process.stdin?.write('\x03');
-      setTimeout(() => {
-        this.process?.kill('SIGTERM');
-        this.process = null;
-      }, 3000);
+    const processes = new Set<ChildProcess>(this.activeProcesses);
+    if (this.process) processes.add(this.process);
+    if (processes.size === 0) return;
+
+    for (const proc of processes) {
+      try { proc.stdin?.write('\x03'); } catch {}
+      try {
+        if (process.platform === 'win32' && proc.pid) {
+          const killer = spawn('taskkill.exe', ['/pid', String(proc.pid), '/T', '/F'], {
+            stdio: 'ignore',
+            windowsHide: true,
+          });
+          killer.unref();
+        } else {
+          proc.kill('SIGTERM');
+        }
+      } catch {}
     }
+
+    this.process = null;
+    this.activeProcesses.clear();
   }
 
   getSessionInfo() {
