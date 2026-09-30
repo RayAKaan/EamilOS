@@ -56,7 +56,7 @@ export class PluginRuntime {
       set: <T>(key: string, value: T) => this.services.set(key, value),
       on: (event, listener) => {
         this.emitter.on(event, listener);
-        const dispose = () => this.emitter.off(event, listener);
+        const dispose = () => { this.emitter.off(event, listener); };
         disposers.push(dispose);
         return dispose;
       },
