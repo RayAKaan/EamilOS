@@ -10,7 +10,7 @@ export interface AgentDetectionConfig {
   supportedModes: AgentMode[];
   priority: number;
   capabilities: AgentCapabilities;
-  detect: () => Promise<{ available: boolean; version?: string; error?: string }>;\n}
+  detect: () => Promise<{ available: boolean; version?: string; error?: string }>;
 }
 
 function runCommand(cmd: string, args: string[], timeoutMs: number = 3000): Promise<{ available: boolean; version?: string; error?: string }> {
