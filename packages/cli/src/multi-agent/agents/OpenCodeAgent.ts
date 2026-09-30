@@ -211,6 +211,7 @@ export class OpenCodeAgent extends BaseAgent {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: buildAgentEnv('opencode', { NO_COLOR: 'true', ...this.config.env }),
       });
+      this.trackProcess(proc);
 
       proc.on('error', async (err) => {
         if (!timedOut) {
