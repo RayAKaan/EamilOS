@@ -295,6 +295,33 @@ export class AgentRegistry {
     });
 
     this.registerDetector({
+      id: 'deepseek-harness',
+      name: 'DeepSeek Harness',
+      kind: 'harness',
+      provider: 'deepseek',
+      supportedModes: ['communication', 'execution'],
+      priority: 5,
+      capabilities: {
+        codeGeneration: true,
+        fileEditing: true,
+        commandExecution: true,
+        webResearch: true,
+        longContext: true,
+        local: true,
+        cloud: true,
+        multimodal: false,
+      },
+      detect: async () => {
+        const result = await runCommandCandidates([
+          { cmd: process.platform === 'win32' ? 'dsh.cmd' : 'dsh', args: ['--help'] },
+          { cmd: process.platform === 'win32' ? 'npx.cmd' : 'npx', args: ['--no-install', '@deepseek-ai/dsh', '--help'] },
+        ], 4000);
+        if (!result.available) result.error = 'DeepSeek Harness not installed. Install @deepseek-ai/dsh or put dsh on PATH.';
+        return result;
+      },
+    });
+
+    this.registerDetector({
       id: 'codex-cli',
       name: 'Codex CLI',
       kind: 'cli',
