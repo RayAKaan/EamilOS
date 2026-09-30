@@ -104,6 +104,34 @@ const BASE_CAPABILITIES: Record<string, AgentCapabilities> = {
   'codex-cli': { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
 };
 
+async function runCancellable(
+  inner: { send(prompt: string): Promise<TerminalMessage>; terminate(): Promise<void>; on: Function; off: Function },
+  request: AgentRequest,
+): Promise<TerminalMessage> {
+  if (request.signal?.aborted) {
+    throw new Error('Mission cancelled');
+  }
+  const onChunk = request.onOutput ? (_name: string, chunk: string) => request.onOutput!(chunk) : undefined;
+  if (onChunk) inner.on('chunk', onChunk);
+  let removeAbort: (() => void) | undefined;
+  try {
+    const sendPromise = inner.send(request.prompt);
+    if (!request.signal) return await sendPromise;
+    const abortPromise = new Promise<never>((_, reject) => {
+      const onAbort = () => {
+        void inner.terminate().catch(() => undefined);
+        reject(new Error('Mission cancelled'));
+      };
+      request.signal!.addEventListener('abort', onAbort, { once: true });
+      removeAbort = () => request.signal?.removeEventListener('abort', onAbort);
+    });
+    return await Promise.race([sendPromise, abortPromise]);
+  } finally {
+    removeAbort?.();
+    if (onChunk) inner.off('chunk', onChunk);
+  }
+}
+
 const AGENT_KINDS: Record<string, AgentKind> = {
   opencode: 'cli',
   'claude-code': 'cli',
@@ -180,10 +208,8 @@ class OpenCodeAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
-    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
-    if (onChunk) this.inner.on('chunk', onChunk);
     try {
-      const msg = await this.inner.send(request.prompt);
+      const msg = await runCancellable(this.inner, request);
       const fileChanges = extractFileChanges(msg.content, this.id);
       return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
@@ -228,10 +254,8 @@ class ClaudeCodeAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
-    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
-    if (onChunk) this.inner.on('chunk', onChunk);
     try {
-      const msg = await this.inner.send(request.prompt);
+      const msg = await runCancellable(this.inner, request);
       const fileChanges = extractFileChanges(msg.content, this.id);
       return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
@@ -276,10 +300,8 @@ class GeminiCliAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
-    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
-    if (onChunk) this.inner.on('chunk', onChunk);
     try {
-      const msg = await this.inner.send(request.prompt);
+      const msg = await runCancellable(this.inner, request);
       const fileChanges = extractFileChanges(msg.content, this.id);
       return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
@@ -324,16 +346,12 @@ class AiderAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
-    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
-    if (onChunk) this.inner.on('chunk', onChunk);
     try {
-      const msg = await this.inner.send(request.prompt);
+      const msg = await runCancellable(this.inner, request);
       const fileChanges = extractFileChanges(msg.content, this.id);
       return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
       return errorToAgentResponse(this.id, err, start);
-    } finally {
-      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 
@@ -374,10 +392,8 @@ class CodexCliAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
-    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
-    if (onChunk) this.inner.on('chunk', onChunk);
     try {
-      const msg = await this.inner.send(request.prompt);
+      const msg = await runCancellable(this.inner, request);
       const fileChanges = extractFileChanges(msg.content, this.id);
       return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
@@ -422,16 +438,12 @@ class GooseAgentAdapter implements EamilOSAgent {
 
   async run(request: AgentRequest): Promise<AgentResponse> {
     const start = Date.now();
-    const onChunk = request.onOutput ? (name: string, chunk: string) => request.onOutput!(chunk) : undefined;
-    if (onChunk) this.inner.on('chunk', onChunk);
     try {
-      const msg = await this.inner.send(request.prompt);
+      const msg = await runCancellable(this.inner, request);
       const fileChanges = extractFileChanges(msg.content, this.id);
       return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
     } catch (err) {
       return errorToAgentResponse(this.id, err, start);
-    } finally {
-      if (onChunk) this.inner.off('chunk', onChunk);
     }
   }
 
