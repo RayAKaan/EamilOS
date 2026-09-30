@@ -150,7 +150,7 @@ The integration adds:
 - **Tool execution pipeline** — pre-execution policy, monotonic guards, execution wrappers, post-processing, cancellation, and timeouts are explicit seams.
 - **Runtime invariants** — important lifecycle relationships can be checked and attributed to their owning subsystem.
 
-These ideas are inspired by the architecture of DeepSeek Harness, whose design makes the session log, agent loop, tools, model adapters, and other capabilities replaceable plugins rather than privileged hard-coded subsystems. citeturn0search3turn2search3
+These ideas are inspired by the architecture of DeepSeek Harness, whose design makes the session log, agent loop, tools, model adapters, and other capabilities replaceable plugins rather than privileged hard-coded subsystems.
 
 The architectural difference remains important:
 
