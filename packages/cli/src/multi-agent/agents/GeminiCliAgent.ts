@@ -96,7 +96,7 @@ export class GeminiCliAgent extends BaseAgent {
 
   private sendOneShot(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
     return new Promise((resolve) => {
-      const args = ['run', prompt];
+      const args = ['--prompt', prompt, '--output-format', 'stream-json'];
 
       let output = '';
       let stderr = '';
@@ -107,6 +107,7 @@ export class GeminiCliAgent extends BaseAgent {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: buildAgentEnv('gemini-cli', { NO_COLOR: 'true', ...this.config.env }),
       });
+      this.trackProcess(proc);
 
       proc.on('error', async () => {
         if (!timedOut) { clearTimeout(timeout); resolve(this.createMessage(id, '@google/gemini-cli: spawn failed', '', [], { duration: Date.now() - startTime })); }

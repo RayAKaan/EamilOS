@@ -8,7 +8,8 @@ import { startInput } from './terminal/input.js';
 import type { KeyEvent } from './terminal/input.js';
 import { tickSpin } from './theme.js';
 import { startConsoleCapture, stopConsoleCapture, drainCapturedLogs } from './services/consoleCapture.js';
-import { runAgentDetection, assignCallsigns } from './services/agentDetection.js';
+import { createAgentRegistry, runAgentDetection, assignCallsigns } from './services/agentDetection.js';
+import type { AgentRegistry } from '../core/agents/AgentRegistry.js';
 import { runSession } from './services/sessionBridge.js';
 import { readGitHubState } from './services/gitHubState.js';
 import { paletteOpen, paletteClose, paletteInput, paletteBackspace, paletteMove } from './palette.js';
@@ -29,10 +30,14 @@ export class EamilOSTuiApp {
   private stopResize: (() => void) | null = null;
   private running = false;
   private renderScheduled = false;
+  private registry: AgentRegistry;
+  private promptQueue: string[] = [];
+  private activePrompt = false;
 
   constructor() {
     const size = getTerminalSize();
     this.model = initialModel(size.width, size.height);
+    this.registry = createAgentRegistry();
   }
 
   private dispatch(msg: Msg): void {
@@ -92,14 +97,25 @@ export class EamilOSTuiApp {
     }, 250);
 
     this.dispatch({ type: 'DETECTION_START' });
-    try {
-      const rawAgents = await runAgentDetection();
-      this.dispatch({ type: 'DETECTION_COMPLETE', agents: assignCallsigns(rawAgents) });
-    } catch (err) {
+    this.dispatch({ type: 'STATUS_TEXT', text: 'Discovering agents…' });
+    void runAgentDetection(this.registry, (entry) => {
+      const assigned = assignCallsigns([entry])[0]!;
+      this.dispatch({ type: 'AGENT_DISCOVERED', agent: assigned });
+    }).then(() => {
+      const agents = assignCallsigns(this.registry.getSnapshot().map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        callsign: agent.id.toUpperCase().slice(0, 4),
+        status: agent.status === 'available' ? 'ready' as const : 'not_installed' as const,
+        version: agent.version,
+        error: agent.error,
+      })));
+      this.dispatch({ type: 'DETECTION_COMPLETE', agents });
+      this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'ready' });
+    }).catch((err) => {
       this.dispatch({ type: 'DETECTION_FAILED', error: err instanceof Error ? err.message : String(err) });
-    }
-    this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'ready' });
-    this.scheduleRender();
+      this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'ready' });
+    });
   }
 
   private handleKey(event: KeyEvent): void {
@@ -109,70 +125,45 @@ export class EamilOSTuiApp {
           this.dispatch({ type: 'COMMAND_PALETTE_INPUT', char: event.char });
           break;
         }
-        if (event.char === '?' && !this.model.running) {
-          this.dispatch({ type: 'SET_NOTIFICATION', text: 'Ctrl+P command palette · / commands · ↑↓ navigate · Enter select · Esc back' });
+        if (event.char === '/') {
+          this.dispatch({ type: 'COMMAND_PALETTE_OPEN' });
           break;
         }
-        if (this.model.running && !['x','m','f','r','l','d','p'].includes(event.char.toLowerCase())) break;
-        const pages: Record<string, AppModel['page']> = {
-          m: 'mission',
-          x: 'execution',
-          t: 'tasks',
-          a: 'artifacts',
-          s: 'sessions',
-          g: 'github',
-          f: 'fleet',
-          r: 'graph',
-          l: 'loop',
-          d: 'decisions',
-          p: 'approvals',
-          c: 'chat',
-          z: 'logs',
-        };
-        const page = pages[event.char.toLowerCase()];
-        if (page) {
-          if (page === 'execution') this.dispatch({ type: 'TOGGLE_ACTIVITY_FOLLOW' });
-          if (page === 'github') {
-            this.dispatch({ type: 'REFRESH_GITHUB' });
-            void readGitHubState().then(state => this.dispatch({ type: 'GITHUB_REFRESHED', state }));
-          }
-          this.dispatch({ type: 'SET_PAGE', page });
-        } else if (!this.model.running) {
-          this.dispatch({ type: 'INPUT_CHAR', char: event.char });
+        if (event.char === '?') {
+          this.dispatch({ type: 'SET_NOTIFICATION', text: 'Type / for commands · Enter to send · Esc to close' });
+          break;
         }
+        this.dispatch({ type: 'INPUT_CHAR', char: event.char });
         break;
       }
 
       case 'enter': {
-        if (this.model.commandPalette.open) { this.dispatch({ type: 'COMMAND_PALETTE_EXECUTE' }); break; }
+        if (this.model.commandPalette.open) {
+          this.dispatch({ type: 'COMMAND_PALETTE_EXECUTE' });
+          break;
+        }
         if (this.model.page === 'decisions') {
-          const id=this.model.decisions.selectedDecisionId;
-          if(id) this.dispatch({type:'SELECT_DECISION',decisionId:id});
+          const id = this.model.decisions.selectedDecisionId;
+          if (id) this.dispatch({ type: 'SELECT_DECISION', decisionId: id });
           break;
         }
         if (this.model.page === 'approvals') {
-          const id=this.model.approvals.selectedApprovalId;
-          if(id) this.dispatch({type:'SELECT_APPROVAL',approvalId:id});
+          const id = this.model.approvals.selectedApprovalId;
+          if (id) this.dispatch({ type: 'SELECT_APPROVAL', approvalId: id });
           break;
         }
-        if (this.model.page === 'graph') {
-          const node = this.model.graph.nodes.find(n => n.id === this.model.graph.focus.nodeId) ?? this.model.graph.nodes[0];
-          if (node) this.dispatch({ type: 'GRAPH_FOCUS', nodeId: node.id });
-          break;
-        }
-        if (this.model.running) break;
         const prompt = this.model.input.trim();
         if (!prompt) break;
         if (isShellEscape(prompt)) {
-          this.dispatch({type:'SET_NOTIFICATION',text:'Shell escape is intentionally disabled in the mission TUI. Use an explicit terminal command outside the mission prompt.'});
+          this.dispatch({ type:'SET_NOTIFICATION', text:'Shell escape is intentionally disabled in the mission prompt.' });
           break;
         }
         if (isSlashCommand(prompt)) {
-          const effect=executeSlashCommand(this.model,prompt);
-          if(effect?.type==='page') this.dispatch({type:'SET_PAGE',page:effect.page});
-          else if(effect?.type==='message') this.dispatch({type:'SET_NOTIFICATION',text:effect.text});
-          else if(!effect) this.dispatch({type:'SET_NOTIFICATION',text:'Unknown command. Press Ctrl+P to search available commands.'});
-          this.dispatch({type:'INPUT_CLEAR'});
+          const effect = executeSlashCommand(this.model, prompt);
+          if (effect?.type === 'page') this.dispatch({ type:'SET_PAGE', page:effect.page });
+          else if (effect?.type === 'message') this.dispatch({ type:'SET_NOTIFICATION', text:effect.text });
+          else if (!effect) this.dispatch({ type:'SET_NOTIFICATION', text:'Unknown command. Type / to browse commands.' });
+          this.dispatch({ type:'INPUT_CLEAR' });
           break;
         }
         this.dispatch({ type: 'INPUT_CLEAR' });
@@ -262,22 +253,36 @@ export class EamilOSTuiApp {
   }
 
   private async startSession(prompt: string): Promise<void> {
-    if (this.model.missionState === 'running' || this.model.missionState === 'queued') return;
-    
-    this.dispatch({ type: 'MISSION_QUEUED', objective: prompt });
-    
-    const agents = Array.from(this.model.agents.values()).filter(a => a.status === 'ready');
-    const mode = agents.some(a => a.id === 'opencode' || a.id === 'claude-code' || a.id === 'aider') ? 'execution' : 'communication';
-    this.dispatch({ type: 'STATUS_TEXT', text: 'Starting mission…' });
-
-    runSession(prompt, this.model.strategy, mode, {
-      dispatch: (msg) => this.dispatch(msg),
-      getModel: () => this.getModel(),
-      onLog: (text) => this.onLog(text),
-    }).catch((err) => {
-      this.dispatch({ type: 'SESSION_ERROR', error: err instanceof Error ? err.message : String(err) });
-    });
+    this.promptQueue.push(prompt);
+    if (this.activePrompt) {
+      this.dispatch({ type: 'STATUS_TEXT', text: `${this.promptQueue.length} prompt${this.promptQueue.length === 1 ? '' : 's'} queued` });
+      return;
+    }
+    await this.drainPromptQueue();
   }
+
+  private async drainPromptQueue(): Promise<void> {
+    if (this.activePrompt) return;
+    const prompt = this.promptQueue.shift();
+    if (!prompt) return;
+    this.activePrompt = true;
+    try {
+      await runSession(prompt, this.model.strategy, 'auto', {
+        registry: this.registry,
+        dispatch: (msg) => this.dispatch(msg),
+        getModel: () => this.getModel(),
+        onLog: (text) => this.onLog(text),
+      });
+    } catch (err) {
+      this.dispatch({ type: 'SESSION_ERROR', error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      this.activePrompt = false;
+      if (this.promptQueue.length) {
+        queueMicrotask(() => void this.drainPromptQueue());
+      }
+    }
+  }
+
 
   private cancelSession(): void {
     this.dispatch({ type: 'EXECUTION_CANCELLED', reason: 'Cancelled by user' });

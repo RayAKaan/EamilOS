@@ -71,17 +71,8 @@ export class GooseAgent extends BaseAgent {
 
   private sendOneShot(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
     return new Promise((resolve) => {
-      let finalCmd: string;
-      let args: string[];
-
-      try {
-        execSync('goose --version 2>&1', { timeout: 1000, stdio: 'pipe' });
-        finalCmd = 'goose';
-        args = ['run', prompt];
-      } catch {
-        finalCmd = this.command;
-        args = ['--yes', '@block/goose', 'run', prompt];
-      }
+      const finalCmd = 'goose';
+      const args = ['run', '--no-session', '--output-format', 'stream-json', '-t', prompt];
 
       let output = '';
       let stderr = '';
@@ -92,6 +83,7 @@ export class GooseAgent extends BaseAgent {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: buildAgentEnv('goose', { NO_COLOR: 'true', ...this.config.env }),
       });
+      this.trackProcess(proc);
 
       proc.on('error', async () => {
         if (!timedOut) { clearTimeout(timeout); resolve(await this.executeKernelFallback(prompt, id, startTime)); }
@@ -163,6 +155,11 @@ export class GooseAgent extends BaseAgent {
         const parsed = JSON.parse(trimmed);
         if (parsed.type === 'text' && parsed.content) {
           output += parsed.content;
+        } else if (parsed.type === 'message' && parsed.message) {
+          const blocks = Array.isArray(parsed.message.content) ? parsed.message.content : [];
+          for (const block of blocks) {
+            if (block?.type === 'text' && typeof block.text === 'string') output += block.text;
+          }
         } else if (parsed.type === 'tool_call' || parsed.type === 'tool_use') {
           tools.push({
             name: parsed.tool || parsed.name || 'unknown',

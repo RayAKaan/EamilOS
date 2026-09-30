@@ -42,7 +42,7 @@ export class CodexCliAgent extends BaseAgent {
 
   private async sendOneShot(prompt: string, id: string, startTime: number): Promise<TerminalMessage> {
     return new Promise((resolve) => {
-      const args = ['exec', '--prompt', prompt];
+      const args = ['exec', '--json', prompt];
 
       let output = '';
       let stderr = '';
@@ -58,6 +58,7 @@ export class CodexCliAgent extends BaseAgent {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: buildAgentEnv('codex-cli', { NO_COLOR: 'true', ...this.config.env }),
       });
+      this.trackProcess(proc);
 
       proc.on('error', async () => {
         if (!timedOut) {

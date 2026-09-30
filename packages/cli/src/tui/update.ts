@@ -35,6 +35,7 @@ export type Msg =
   | { type: 'NOTIFY'; text: string }
   | { type: 'DETECTION_START' }
   | { type: 'DETECTION_COMPLETE'; agents: AgentEntry[] }
+  | { type: 'AGENT_DISCOVERED'; agent: AgentEntry }
   | { type: 'DETECTION_FAILED'; error: string }
   | { type: 'SESSION_STARTED' }
   | { type: 'SESSION_COMPLETED'; summary: RunSummary }
@@ -327,6 +328,19 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'DETECTION_START':
       return { ...model, detectionState: 'detecting', statusText: 'Detecting agents…' };
+
+    case 'AGENT_DISCOVERED': {
+      const agents = new Map(model.agents);
+      agents.set(msg.agent.id, msg.agent);
+      return {
+        ...model,
+        agents,
+        detectionState: 'detecting',
+        statusText: msg.agent.status === 'ready'
+          ? `${msg.agent.name} ready`
+          : `${msg.agent.name} unavailable`,
+      };
+    }
 
     case 'DETECTION_COMPLETE': {
       const agents = new Map(model.agents);
