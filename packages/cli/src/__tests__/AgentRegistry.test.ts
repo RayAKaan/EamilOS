@@ -28,7 +28,7 @@ describe('AgentRegistry', () => {
   });
 
   it('detects incrementally and reuses the in-flight promise', async () => {
-    const incremental = AgentRegistry.create();
+    const incremental = new AgentRegistry();
     const seen: string[] = [];
     let detectorCalls = 0;
     incremental.registerDetector({
