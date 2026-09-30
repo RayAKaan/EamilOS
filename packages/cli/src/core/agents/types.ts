@@ -1,4 +1,4 @@
-export type AgentKind = 'cli' | 'api' | 'local' | 'plugin';
+export type AgentKind = 'cli' | 'api' | 'local' | 'plugin' | 'harness';
 
 export type AgentMode = 'communication' | 'execution';
 

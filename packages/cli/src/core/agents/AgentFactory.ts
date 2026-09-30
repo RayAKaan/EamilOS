@@ -6,6 +6,7 @@ import { GeminiCliAgent } from '../../multi-agent/agents/GeminiCliAgent.js';
 import { AiderAgent } from '../../multi-agent/agents/AiderAgent.js';
 import { GooseAgent } from '../../multi-agent/agents/GooseAgent.js';
 import { CodexCliAgent } from '../../multi-agent/agents/CodexCliAgent.js';
+import { DeepSeekHarnessAgent } from '../../multi-agent/agents/DeepSeekHarnessAgent.js';
 import { extractFileChanges } from '../parsers/ResponseParser.js';
 import { OpenAIAgentAdapter } from './adapters/OpenAIAgentAdapter.js';
 import { AnthropicAgentAdapter } from './adapters/AnthropicAgentAdapter.js';
@@ -102,6 +103,7 @@ const BASE_CAPABILITIES: Record<string, AgentCapabilities> = {
   aider: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
   goose: { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
   'codex-cli': { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false, longContext: true, local: true, cloud: false, multimodal: false },
+  'deepseek-harness': { codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: true, longContext: true, local: true, cloud: true, multimodal: false },
 };
 
 async function runCancellable(
@@ -139,6 +141,7 @@ const AGENT_KINDS: Record<string, AgentKind> = {
   aider: 'cli',
   goose: 'cli',
   'codex-cli': 'cli',
+  'deepseek-harness': 'harness',
 };
 
 export class AgentFactory {
@@ -156,6 +159,8 @@ export class AgentFactory {
         return new GooseAgentAdapter(config);
       case 'codex-cli':
         return new CodexCliAgentAdapter(config);
+      case 'deepseek-harness':
+        return new DeepSeekHarnessAgentAdapter(config);
       case 'openai-api':
         return new OpenAIAgentAdapter();
       case 'anthropic-api':
@@ -442,6 +447,51 @@ class GooseAgentAdapter implements EamilOSAgent {
       const msg = await runCancellable(this.inner, request);
       const fileChanges = extractFileChanges(msg.content, this.id);
       return terminalMessageToAgentResponse(this.id, msg, start, fileChanges);
+    } catch (err) {
+      return errorToAgentResponse(this.id, err, start);
+    }
+  }
+
+  async stop(): Promise<void> {
+    await this.inner.terminate();
+  }
+}
+
+class DeepSeekHarnessAgentAdapter implements EamilOSAgent {
+  id = 'deepseek-harness';
+  name = 'DeepSeek Harness';
+  kind: AgentKind = 'harness';
+  capabilities: AgentCapabilities = BASE_CAPABILITIES['deepseek-harness'];
+  private inner: DeepSeekHarnessAgent;
+
+  constructor(config?: { workingDir?: string; timeoutMs?: number }) {
+    this.inner = new DeepSeekHarnessAgent({
+      workingDir: config?.workingDir,
+      timeoutMs: config?.timeoutMs ?? 240000,
+    });
+  }
+
+  async checkStatus(): Promise<RegisteredAgent> {
+    const result = await this.inner.checkInstalled();
+    return {
+      id: this.id,
+      name: this.name,
+      kind: this.kind,
+      provider: 'deepseek',
+      status: result.available ? 'available' : 'not_installed',
+      version: result.version,
+      capabilities: this.capabilities,
+      supportedModes: ['communication', 'execution'],
+      priority: 5,
+      error: result.error,
+    };
+  }
+
+  async run(request: AgentRequest): Promise<AgentResponse> {
+    const start = Date.now();
+    try {
+      const msg = await runCancellable(this.inner, request);
+      return terminalMessageToAgentResponse(this.id, msg, start, extractFileChanges(msg.content, this.id));
     } catch (err) {
       return errorToAgentResponse(this.id, err, start);
     }
