@@ -123,7 +123,7 @@ export abstract class BaseAgent extends EventEmitter {
         cwd: this.config.workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: fullEnv,
-      });
+      }));
 
       this.process.stdout?.on('data', (data: Buffer) => {
         this.handleStdout(data.toString());
