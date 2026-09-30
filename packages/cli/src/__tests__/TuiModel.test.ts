@@ -113,6 +113,13 @@ describe('update — detection', () => {
     expect(m.statusText).toContain('Detecting');
   });
 
+  it('AGENT_DISCOVERED projects agents before discovery completes', () => {
+    const agent: AgentEntry = { id: 'goose', name: 'Goose', callsign: 'Epsilon', status: 'ready', version: '1.0.0' };
+    const m = update(makeModel(), { type: 'AGENT_DISCOVERED', agent });
+    expect(m.agents.get('goose')?.status).toBe('ready');
+    expect(m.detectionState).toBe('detecting');
+  });
+
   it('DETECTION_COMPLETE adds agents', () => {
     const agents: AgentEntry[] = [{
       id: 'opencode', name: 'OpenCode AI', callsign: 'Alpha', status: 'ready',
