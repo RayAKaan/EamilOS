@@ -18,7 +18,6 @@ export function renderInputBar(model: AppModel, layout: Layout): [string, string
 
   const queueNote = model.running ? 'running · prompt queues' : 'ready';
   const prompt = '  ' + styled('PROMPT', BOLD, FG.CYAN) + styled('  › ', DIM, FG.BRIGHT_BLACK) + content;
-  const border = styled('─'.repeat(Math.max(0, width - 4)), DIM, FG.BRIGHT_BLACK);
   const promptRow = onChrome(fit(prompt, width));
 
   const kb = (key: string, label: string) =>
