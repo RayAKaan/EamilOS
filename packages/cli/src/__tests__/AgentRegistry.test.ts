@@ -27,6 +27,30 @@ describe('AgentRegistry', () => {
     expect(best).toBeNull();
   });
 
+  it('detects incrementally and reuses the in-flight promise', async () => {
+    const incremental = AgentRegistry.create();
+    const seen: string[] = [];
+    incremental.registerDetector({
+      id: 'test-agent',
+      name: 'Test Agent',
+      kind: 'cli',
+      provider: 'test',
+      supportedModes: ['communication'],
+      priority: 99,
+      capabilities: { codeGeneration: false, fileEditing: false, commandExecution: false, webResearch: false, longContext: false, local: true, cloud: false, multimodal: false },
+      detect: async () => {
+        await new Promise(resolve => setTimeout(resolve, 5));
+        return { available: true, version: 'test' };
+      },
+    });
+    const p1 = incremental.detect({ onAgent: (agent) => seen.push(agent.id) });
+    const p2 = incremental.detect();
+    expect(p1).toBe(p2);
+    await p1;
+    expect(seen).toEqual(['test-agent']);
+    expect(incremental.getAvailableAgents('communication').map(a => a.id)).toEqual(['test-agent']);
+  });
+
   it('suggestStrategy returns fallback for empty registry', () => {
     const suggestion = registry.suggestStrategy('build a web app');
     expect(suggestion).toBe('fallback');
