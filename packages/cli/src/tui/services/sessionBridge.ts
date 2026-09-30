@@ -49,9 +49,13 @@ export async function runSession(
   dispatch({ type: 'LOOP_STAGE', stage: 'interpret', status: 'completed' });
   dispatch({ type: 'LOOP_STAGE', stage: 'plan', status: 'active' });
 
-  const available = registry.getAvailableAgents();
+  let available = registry.getAvailableAgents();
   if (available.length === 0) {
-    dispatch({ type: 'SESSION_ERROR', error: 'No agents available. Agent discovery is still running or no supported agent is installed.' });
+    await registry.detect();
+    available = registry.getAvailableAgents();
+  }
+  if (available.length === 0) {
+    dispatch({ type: 'SESSION_ERROR', error: 'No supported agents were found. Check the Agents view for discovery diagnostics.' });
     activeController = null;
     return;
   }
