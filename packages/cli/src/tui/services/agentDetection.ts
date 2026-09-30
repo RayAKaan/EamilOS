@@ -1,26 +1,30 @@
 import type { AgentEntry } from '../model.js';
 import { AgentRegistry } from '../../core/agents/AgentRegistry.js';
+import type { RegisteredAgent } from '../../core/agents/types.js';
 
-export async function runAgentDetection(): Promise<AgentEntry[]> {
-  const registry = AgentRegistry.create();
-  await registry.detect();
+export function createAgentRegistry(): AgentRegistry {
+  return AgentRegistry.create();
+}
 
-  const allAgents = registry.getAllAgents();
-  const entries: AgentEntry[] = [];
+export function agentEntryFromRegistered(agent: RegisteredAgent): AgentEntry {
+  return {
+    id: agent.id,
+    name: agent.name,
+    callsign: agent.id.toUpperCase().slice(0, 4),
+    status: agent.status === 'available' ? 'ready' : 'not_installed',
+    version: agent.version,
+    error: agent.error,
+  };
+}
 
-  for (const agent of allAgents) {
-    const entry: AgentEntry = {
-      id: agent.id,
-      name: agent.name,
-      callsign: agent.id.toUpperCase().slice(0, 4),
-      status: agent.status === 'available' ? 'ready' : 'not_installed',
-      version: agent.version,
-      error: agent.error,
-    };
-    entries.push(entry);
-  }
-
-  return entries;
+export async function runAgentDetection(
+  registry: AgentRegistry,
+  onAgent?: (entry: AgentEntry) => void,
+): Promise<AgentRegistry> {
+  await registry.detect({
+    onAgent: (agent) => onAgent?.(agentEntryFromRegistered(agent)),
+  });
+  return registry;
 }
 
 export function assignCallsigns(agents: AgentEntry[]): AgentEntry[] {
