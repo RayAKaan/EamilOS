@@ -94,7 +94,7 @@ export class AgentRegistry {
         const work = this.detectors.map(async (d) => {
           const status = await Promise.race([
             d.detect(),
-            new Promise<{ available: boolean; error?: string }>(resolve =>
+            new Promise<{ available: boolean; version?: string; error?: string }>(resolve =>
               setTimeout(() => resolve({ available: false, error: `Detection timeout after ${timeoutMs}ms` }), timeoutMs)
             ),
           ]);
