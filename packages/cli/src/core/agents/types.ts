@@ -57,6 +57,7 @@ export interface AgentRequest {
   timeoutMs: number;
   context?: Record<string, unknown>;
   onOutput?: (chunk: string) => void;
+  signal?: AbortSignal;
 }
 
 export interface ProposedFileChange {
@@ -108,4 +109,6 @@ export interface SessionConfig {
   preferredModel?: string;
   maxRetries?: number;
   timeoutMs?: number;
+  registry?: import('./AgentRegistry.js').AgentRegistry;
+  signal?: AbortSignal;
 }
