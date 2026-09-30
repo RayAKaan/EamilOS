@@ -55,7 +55,8 @@ export interface HealthStatus {
 }
 
 export abstract class BaseAgent extends EventEmitter {
-  protected process: ChildProcess | null = null;\n  protected activeProcesses = new Set<ChildProcess>();
+  protected process: ChildProcess | null = null;
+  protected activeProcesses = new Set<ChildProcess>();
   protected sessionId: string;
   protected config: AgentConfig;
   protected pendingMessages = new Map<string, (msg: TerminalMessage) => void>();
@@ -103,7 +104,18 @@ export abstract class BaseAgent extends EventEmitter {
     }
   }
 
-  protected trackProcess(proc: ChildProcess): ChildProcess {\n    this.activeProcesses.add(proc);\n    const cleanup = () => {\n      this.activeProcesses.delete(proc);\n      if (this.process === proc) this.process = null;\n    };\n    proc.once('close', cleanup);\n    proc.once('error', cleanup);\n    return proc;\n  }\n\n  protected async spawnProcess(command: string, args: string[], agentId?: string): Promise<void> {
+  protected trackProcess(proc: ChildProcess): ChildProcess {
+    this.activeProcesses.add(proc);
+    const cleanup = () => {
+      this.activeProcesses.delete(proc);
+      if (this.process === proc) this.process = null;
+    };
+    proc.once('close', cleanup);
+    proc.once('error', cleanup);
+    return proc;
+  }
+
+  protected async spawnProcess(command: string, args: string[], agentId?: string): Promise<void> {
     return new Promise((resolve) => {
       const fullEnv = buildAgentEnv(agentId || this.name, this.config.env);
 
