@@ -8,6 +8,8 @@ export type SessionEventType =
   | 'agent.fallback'
   | 'agent.completed'
   | 'agent.error'
+  | 'agent.cancelled'
+  | 'session.cancelled'
   | 'file.proposed'
   | 'validation.started'
   | 'validation.passed'
@@ -32,6 +34,7 @@ export interface SessionEventMap {
   'agent.fallback': { from: string; to: string; reason: string };
   'agent.completed': { agentId: string; result: AgentResponse };
   'agent.error': { agentId: string; error: string; errorType?: string };
+  'agent.cancelled': { agentId: string; reason?: string };
   'file.proposed': { file: ProposedFileChange };
   'validation.started': {};
   'validation.passed': {};
@@ -41,6 +44,7 @@ export interface SessionEventMap {
   'staging.cleaned': { sessionId: string };
   'session.completed': { success: boolean; duration: number };
   'session.error': { error: string };
+  'session.cancelled': { reason: string };
   'permission.requested': { agentId: string; action: string; details: string; requestId?: string };
   'budget.updated': { tokensUsed: number; cost: number };
 }
