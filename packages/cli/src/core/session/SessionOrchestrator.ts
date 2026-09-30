@@ -706,9 +706,7 @@ IMPORTANT: You are in READ-ONLY mode. Do not write, edit, or modify any files. O
         };
       }
       if (response.content) {
-        this.appendAgentLog(agent.id, response.content.endsWith('
-') ? response.content : `${response.content}
-`);
+        this.appendAgentLog(agent.id, response.content.endsWith('\n') ? response.content : `${response.content}\n`);
       }
       if (!response.success || response.error) {
         const error = response.error ?? response.content ?? `${agent.id} failed`;
