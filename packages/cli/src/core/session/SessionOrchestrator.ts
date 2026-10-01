@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { randomUUID } from 'node:crypto';
 import { EventSourcedSession } from './EventSourcedSession.js';
 import { InvariantRegistry } from '../runtime/InvariantRegistry.js';
+import { MissionEventStore } from '../runtime/MissionEventStore.js';
 import { AgentScope } from '../agents/AgentScope.js';
 import { mkdirSync, writeFileSync, appendFileSync } from 'fs';
 import { resolve } from 'path';
@@ -67,6 +68,8 @@ export class SessionOrchestrator extends EventEmitter {
   private eventSession: EventSourcedSession;
   private readonly invariants = new InvariantRegistry();
   private readonly agentScope = new AgentScope();
+  /** Canonical mission-level history; EventSourcedSession remains the compatibility projection. */
+  private missionEventStore: MissionEventStore;
 
   constructor(config: SessionConfig) {
     super();
@@ -82,6 +85,7 @@ export class SessionOrchestrator extends EventEmitter {
     this.policy = parsePolicy(config.policy);
     this.permissionService = getPermissionService();
     this.eventSession = new EventSourcedSession('uninitialized', { status: 'created', goal: config.goal });
+    this.missionEventStore = new MissionEventStore();
     this.permissionService.on('permission:requested', (request) => {
       this.emit('permission.requested', {
         agentId: request.agentId,
@@ -102,7 +106,27 @@ export class SessionOrchestrator extends EventEmitter {
 
   private async commitEvent(type: string, data: Record<string, unknown>): Promise<void> {
     await this.eventSession.append(type, data);
+    const missionEvent = this.toMissionEvent(type, data);
+    if (missionEvent) {
+      await this.missionEventStore.append(missionEvent);
+    }
     this.emit(type as keyof SessionEventMap, data as never);
+  }
+
+  private toMissionEvent(type: string, data: Record<string, unknown>): Parameters<MissionEventStore['append']>[0] | undefined {
+    const missionId = this.sessionId;
+    switch (type) {
+      case 'session.started':
+        return { missionId, type: 'runtime.started', actor: 'session-orchestrator', payload: { goal: data.goal, mode: data.mode, strategy: data.strategy } };
+      case 'session.completed':
+        return { missionId, type: 'runtime.completed', actor: 'session-orchestrator', payload: { success: data.success, duration: data.duration } };
+      case 'session.cancelled':
+        return { missionId, type: 'runtime.stopped', actor: 'session-orchestrator', payload: { reason: data.reason } };
+      case 'session.error':
+        return { missionId, type: 'runtime.failed', actor: 'session-orchestrator', payload: { error: data.error } };
+      default:
+        return undefined;
+    }
   }
 
   private throwIfAborted(): void {
@@ -114,6 +138,7 @@ export class SessionOrchestrator extends EventEmitter {
   async run(): Promise<SessionResult> {
     this.startTime = Date.now();
     this.sessionId = `session_${randomUUID()}`;
+    this.missionEventStore = new MissionEventStore();
     this.eventSession = new EventSourcedSession(this.sessionId, {
       status: 'created',
       goal: this.config.goal,

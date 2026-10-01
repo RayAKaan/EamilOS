@@ -16,3 +16,8 @@ export type { JobState, JobSnapshot, JobContext } from './JobRuntime.js';
 export * from './CapabilityCatalog.js';
 
 export * from './ExecutionCapabilities.js';
+
+export * from './MissionEventStore.js';
+export * from './MissionProjection.js';
+export * from './MissionReplay.js';
+export * from './MissionRecovery.js';
