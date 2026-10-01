@@ -41,17 +41,17 @@ function shellLines(tool: ToolCall): string[] {
 
 function diffLines(tool: ToolCall): string[] {
   const raw = tool.result?.trim() || tool.args?.trim() || '';
-  return raw.split(/\r?\n/).map(line => sanitiseLine(line));
+  return raw.split(/\r?\n/).map(line => sanitiseLine(line, 1024));
 }
 
 function testLines(tool: ToolCall): string[] {
   const raw = tool.result?.trim() || tool.args?.trim() || '';
-  return raw.split(/\r?\n/).map(line => sanitiseLine(line));
+  return raw.split(/\r?\n/).map(line => sanitiseLine(line, 1024));
 }
 
 function approvalLines(tool: ToolCall): string[] {
   const raw = tool.result?.trim() || tool.args?.trim() || '';
-  return raw.split(/\r?\n/).map(line => sanitiseLine(line));
+  return raw.split(/\r?\n/).map(line => sanitiseLine(line, 1024));
 }
 
 function bodyFor(tool: ToolCall, kind: ToolCardKind): string[] {
@@ -60,7 +60,7 @@ function bodyFor(tool: ToolCall, kind: ToolCardKind): string[] {
     case 'diff': return diffLines(tool);
     case 'test': return testLines(tool);
     case 'approval': return approvalLines(tool);
-    default: return (tool.result ?? tool.args ?? '').split(/\r?\n/).map(line => sanitiseLine(line));
+    default: return (tool.result ?? tool.args ?? '').split(/\r?\n/).map(line => sanitiseLine(line, 1024));
   }
 }
 
@@ -80,7 +80,7 @@ function limitFor(density: TranscriptDensity): number {
   return density === 'expanded' ? 18 : 7;
 }
 
-function cardLine(prefix: string, content: string, suffix: string, width: number, colour = FG.WHITE): string {
+function cardLine(prefix: string, content: string, suffix: string, width: number, colour: string = FG.WHITE): string {
   const inner = Math.max(8, width - 4);
   return onChat(fit(prefix + styled(truncate(content, inner), colour) + suffix, width));
 }
