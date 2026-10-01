@@ -15,6 +15,9 @@ import { readGitHubState } from './services/gitHubState.js';
 import { paletteOpen, paletteClose, paletteInput, paletteBackspace, paletteMove } from './palette.js';
 import { commandMatches } from './commands/registry.js';
 import { executeSlashCommand, isSlashCommand, isShellEscape } from './commands/input.js';
+import { detectTerminalCapabilities, terminalCapabilitySummary } from './terminal/capabilities.js';
+import { createThemeConfig } from './theme/engine.js';
+import { colorDepth } from './theme.js';
 
 const VALID_STRATEGIES = ['single', 'single-fallback', 'fallback', 'swarm', 'manual'];
 
@@ -42,18 +45,12 @@ export class EamilOSTuiApp {
 
   private dispatch(msg: Msg): void {
     this.model = update(this.model, msg);
-    if (this.model.renderRequested) {
-      this.scheduleRender();
-    }
+    if (this.model.renderRequested) this.scheduleRender();
   }
 
-  private getModel(): AppModel {
-    return this.model;
-  }
+  private getModel(): AppModel { return this.model; }
 
-  private onLog(text: string): void {
-    this.dispatch({ type: 'LOG', text });
-  }
+  private onLog(text: string): void { this.dispatch({ type: 'LOG', text }); }
 
   private scheduleRender(): void {
     if (this.renderScheduled) return;
@@ -65,26 +62,26 @@ export class EamilOSTuiApp {
     });
   }
 
-  private requestRender(): void {
-    this.dispatch({ type: 'REQUEST_RENDER' });
-  }
+  private requestRender(): void { this.dispatch({ type: 'REQUEST_RENDER' }); }
 
   async start(): Promise<void> {
-    if (!process.stdin.isTTY || !process.stdout.isTTY) {
-      this.dispatch({ type: 'SET_NOTIFICATION', text: 'Interactive TUI requires a TTY; use the non-interactive CLI/JSON interface instead.' });
+    const capabilities = detectTerminalCapabilities();
+    const theme = createThemeConfig(colorDepth());
+    if (capabilities.mode === 'line') {
+      this.dispatch({ type: 'SET_NOTIFICATION', text: `Interactive TUI unavailable: ${terminalCapabilitySummary(capabilities)}` });
       this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'stopped' });
       return;
     }
-    startConsoleCapture();
-    enterFullScreen();
-    installCrashRecovery();
 
+    startConsoleCapture();
+    enterFullScreen(capabilities);
+    installCrashRecovery();
+    this.dispatch({ type: 'SET_NOTIFICATION', text: `EamilOS ${theme.name} · ${theme.motion} motion · ${terminalCapabilitySummary(capabilities)}` });
     this.dispatch({ type: 'SET_APPLICATION_STATE', state: 'ready' });
 
     this.stopResize = onResize((size) => {
       this.dispatch({ type: 'RESIZE', width: size.width, height: size.height });
     });
-
     this.stopInput = startInput((event: KeyEvent) => this.handleKey(event));
 
     this.frameInterval = setInterval(() => {
@@ -136,28 +133,13 @@ export class EamilOSTuiApp {
         this.dispatch({ type: 'INPUT_CHAR', char: event.char });
         break;
       }
-
       case 'enter': {
-        if (this.model.commandPalette.open) {
-          this.dispatch({ type: 'COMMAND_PALETTE_EXECUTE' });
-          break;
-        }
-        if (this.model.page === 'decisions') {
-          const id = this.model.decisions.selectedDecisionId;
-          if (id) this.dispatch({ type: 'SELECT_DECISION', decisionId: id });
-          break;
-        }
-        if (this.model.page === 'approvals') {
-          const id = this.model.approvals.selectedApprovalId;
-          if (id) this.dispatch({ type: 'SELECT_APPROVAL', approvalId: id });
-          break;
-        }
+        if (this.model.commandPalette.open) { this.dispatch({ type: 'COMMAND_PALETTE_EXECUTE' }); break; }
+        if (this.model.page === 'decisions') { const id = this.model.decisions.selectedDecisionId; if (id) this.dispatch({ type: 'SELECT_DECISION', decisionId: id }); break; }
+        if (this.model.page === 'approvals') { const id = this.model.approvals.selectedApprovalId; if (id) this.dispatch({ type: 'SELECT_APPROVAL', approvalId: id }); break; }
         const prompt = this.model.input.trim();
         if (!prompt) break;
-        if (isShellEscape(prompt)) {
-          this.dispatch({ type:'SET_NOTIFICATION', text:'Shell escape is intentionally disabled in the mission prompt.' });
-          break;
-        }
+        if (isShellEscape(prompt)) { this.dispatch({ type:'SET_NOTIFICATION', text:'Shell escape is intentionally disabled in the mission prompt.' }); break; }
         if (isSlashCommand(prompt)) {
           const effect = executeSlashCommand(this.model, prompt);
           if (effect?.type === 'page') this.dispatch({ type:'SET_PAGE', page:effect.page });
@@ -170,29 +152,22 @@ export class EamilOSTuiApp {
         this.startSession(prompt);
         break;
       }
-
-      case 'backspace': if(this.model.commandPalette.open)this.dispatch({type:'COMMAND_PALETTE_BACKSPACE'}); else this.dispatch({ type: 'INPUT_BACKSPACE' }); break;
+      case 'backspace': if(this.model.commandPalette.open)this.dispatch({type:'COMMAND_PALETTE_BACKSPACE'}); else this.dispatch({type:'INPUT_BACKSPACE'}); break;
       case 'escape': if(this.model.commandPalette.open){this.dispatch({type:'COMMAND_PALETTE_CLOSE'});break;} this.handleEscape(); break;
-
       case 'ctrl':
         if (event.key === 'p') { this.dispatch({ type: 'COMMAND_PALETTE_OPEN' }); break; }
         if (event.key === 'o') { this.dispatch({ type: 'TOGGLE_TRANSCRIPT_DENSITY' }); break; }
-        if (event.key === 'c') {
-          this.handleCtrlC();
-          break;
-        } else if (event.key === 's') this.dispatch({ type: 'TOGGLE_SIDEBAR' });
+        if (event.key === 'c') { this.handleCtrlC(); break; }
+        if (event.key === 's') this.dispatch({ type: 'TOGGLE_SIDEBAR' });
         else if (event.key === 'l') this.dispatch({ type: 'CLEAR_CHAT' });
-        else if (event.key === 'p') this.dispatch({ type: 'INPUT_RECALL' });
         else if (event.key === 'q') this.requestShutdown();
         break;
-
       case 'tab': {
         const strats = ['single', 'single-fallback', 'fallback', 'swarm', 'manual'] as const;
         const idx = strats.indexOf(this.model.strategy);
         this.dispatch({ type: 'SET_STRATEGY', strategy: strats[(idx + 1) % strats.length]! });
         break;
       }
-
       case 'right': {
         if (this.model.page === 'graph') { const node=this.model.graph.focus.nodeId; if(node) this.dispatch({type:'GRAPH_TOGGLE_EXPAND',nodeId:node}); }
         break;
@@ -205,47 +180,33 @@ export class EamilOSTuiApp {
       case 'pagedown': this.dispatch({ type: 'SCROLL_DOWN', lines: 10 }); break;
       case 'up': {
         if (this.model.commandPalette.open) { this.dispatch({type:'COMMAND_PALETTE_MOVE',delta:-1}); break; }
-        if (this.model.page === 'decisions') {
-          const rs=this.model.decisions.records;if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.max(0,i-1)]!.id});}
-        } else if (this.model.page === 'approvals') {
-          const rs=this.model.approvals.requests;if(rs.length){const i=Math.max(0,rs.findIndex(a=>a.id===this.model.approvals.selectedApprovalId));this.dispatch({type:'SELECT_APPROVAL',approvalId:rs[Math.max(0,i-1)]!.id});}
-        } else if (this.model.page === 'graph') {
-          const nodes=this.model.graph.nodes;if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));this.dispatch({type:'GRAPH_FOCUS',nodeId:nodes[Math.max(0,i-1)]!.id});}
-        } else if (this.model.page === 'fleet') {
-          const agents=this.model.fleet.agents;if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.max(0,i-1)]!.id});}
-        } else this.dispatch({type:'SCROLL_UP',lines:1});
+        if (this.model.page === 'decisions') { const rs=this.model.decisions.records;if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.max(0,i-1)]!.id});} }
+        else if (this.model.page === 'approvals') { const rs=this.model.approvals.requests;if(rs.length){const i=Math.max(0,rs.findIndex(a=>a.id===this.model.approvals.selectedApprovalId));this.dispatch({type:'SELECT_APPROVAL',approvalId:rs[Math.max(0,i-1)]!.id});} }
+        else if (this.model.page === 'graph') { const nodes=this.model.graph.nodes;if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));this.dispatch({type:'GRAPH_FOCUS',nodeId:nodes[Math.max(0,i-1)]!.id});} }
+        else if (this.model.page === 'fleet') { const agents=this.model.fleet.agents;if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.max(0,i-1)]!.id});} }
+        else this.dispatch({type:'SCROLL_UP',lines:1});
         break;
       }
       case 'down': {
         if (this.model.commandPalette.open) { this.dispatch({type:'COMMAND_PALETTE_MOVE',delta:1}); break; }
-        if (this.model.page === 'decisions') {
-          const rs=this.model.decisions.records;if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.min(rs.length-1,i+1)]!.id});}
-        } else if (this.model.page === 'approvals') {
-          const rs=this.model.approvals.requests;if(rs.length){const i=Math.max(0,rs.findIndex(a=>a.id===this.model.approvals.selectedApprovalId));this.dispatch({type:'SELECT_APPROVAL',approvalId:rs[Math.min(rs.length-1,i+1)]!.id});}
-        } else if (this.model.page === 'graph') {
-          const nodes=this.model.graph.nodes;if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));this.dispatch({type:'GRAPH_FOCUS',nodeId:nodes[Math.min(nodes.length-1,i+1)]!.id});}
-        } else if (this.model.page === 'fleet') {
-          const agents=this.model.fleet.agents;if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.min(agents.length-1,i+1)]!.id});}
-        } else this.dispatch({type:'SCROLL_DOWN',lines:1});
+        if (this.model.page === 'decisions') { const rs=this.model.decisions.records;if(rs.length){const i=Math.max(0,rs.findIndex(d=>d.id===this.model.decisions.selectedDecisionId));this.dispatch({type:'SELECT_DECISION',decisionId:rs[Math.min(rs.length-1,i+1)]!.id});} }
+        else if (this.model.page === 'approvals') { const rs=this.model.approvals.requests;if(rs.length){const i=Math.max(0,rs.findIndex(a=>a.id===this.model.approvals.selectedApprovalId));this.dispatch({type:'SELECT_APPROVAL',approvalId:rs[Math.min(rs.length-1,i+1)]!.id});} }
+        else if (this.model.page === 'graph') { const nodes=this.model.graph.nodes;if(nodes.length){const i=Math.max(0,nodes.findIndex(n=>n.id===this.model.graph.focus.nodeId));this.dispatch({type:'GRAPH_FOCUS',nodeId:nodes[Math.min(nodes.length-1,i+1)]!.id});} }
+        else if (this.model.page === 'fleet') { const agents=this.model.fleet.agents;if(agents.length){const i=Math.max(0,agents.findIndex(a=>a.id===this.model.fleet.selectedAgentId));this.dispatch({type:'FLEET_SELECT_AGENT',agentId:agents[Math.min(agents.length-1,i+1)]!.id});} }
+        else this.dispatch({type:'SCROLL_DOWN',lines:1});
         break;
       }
     }
   }
 
   private handleEscape(): void {
-    if (this.model.running) {
-      this.cancelSession();
-    } else if (this.model.applicationState === 'idle' || this.model.applicationState === 'ready') {
-      this.dispatch({ type: 'SET_NOTIFICATION', text: 'Press Ctrl+Q to exit or Ctrl+C to cancel' });
-    }
+    if (this.model.running) this.cancelSession();
+    else if (this.model.applicationState === 'idle' || this.model.applicationState === 'ready') this.dispatch({ type: 'SET_NOTIFICATION', text: 'Press Ctrl+Q to exit or Ctrl+C to cancel' });
   }
 
   private handleCtrlC(): void {
     this.dispatch({ type: 'CTRL_C_PRESS' });
-    
-    if (this.model.applicationState === 'shutting_down') {
-      this.requestShutdown();
-    }
+    if (this.model.applicationState === 'shutting_down') this.requestShutdown();
   }
 
   private requestShutdown(): void {
@@ -278,20 +239,13 @@ export class EamilOSTuiApp {
       this.dispatch({ type: 'SESSION_ERROR', error: err instanceof Error ? err.message : String(err) });
     } finally {
       this.activePrompt = false;
-      if (this.promptQueue.length) {
-        queueMicrotask(() => void this.drainPromptQueue());
-      }
+      if (this.promptQueue.length) queueMicrotask(() => void this.drainPromptQueue());
     }
   }
 
+  private cancelSession(): void { this.dispatch({ type: 'EXECUTION_CANCELLED', reason: 'Cancelled by user' }); }
 
-  private cancelSession(): void {
-    this.dispatch({ type: 'EXECUTION_CANCELLED', reason: 'Cancelled by user' });
-  }
-
-  private renderFrame(): void {
-    writeFrame(buildFrame(this.model));
-  }
+  private renderFrame(): void { writeFrame(buildFrame(this.model)); }
 
   private shutdown(): void {
     if (this.frameInterval) { clearInterval(this.frameInterval); this.frameInterval = null; }
