@@ -9,7 +9,8 @@ describe('Phase E user capabilities', () => {
   it('registers, disables and executes skills', async () => {
     const runtime = new SkillRuntime();
     runtime.register({ id: 'greet', version: '1.0.0', description: 'Greeting', run: async ({ input }) => `hello ${input}` });
-    expect((await runtime.run('greet', 'ray')).toString()).toBe('hello ray');
+    const result = await runtime.run<string, string>('greet', 'ray');
+    expect(result).toBe('hello ray');
     runtime.disable('greet');
     await expect(runtime.run('greet', 'ray')).rejects.toThrow('disabled');
   });
