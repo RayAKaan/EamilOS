@@ -22,7 +22,7 @@ function sectionHeader(label: string, colour: string, timestamp: number, width: 
 }
 
 export function renderUserMsg(msg: Message, width: number): string[] {
-  const body = wrapPlain(msg.content, Math.max(0, width - 2)).map(l => onChat(fit('  ' + styled(sanitiseLine(l), FG.BRIGHT_YELLOW), width)));
+  const body = wrapPlain(msg.content, Math.max(0, width - 2)).map(l => onChat(fit('  ' + styled(sanitiseLine(l, width), FG.BRIGHT_YELLOW), width)));
   return [sectionHeader('you', FG.BRIGHT_YELLOW, msg.timestamp, width), ...body, onChat(fit('', width))];
 }
 
@@ -32,7 +32,7 @@ export function renderAgentMsg(msg: Message, width: number, spinFrame: number, d
   if (msg.content.trim()) {
     for (const l of wrapPlain(msg.content, Math.max(0, width - 2))) {
       if (/\[.*\]\(http/.test(l)) continue;
-      lines.push(onChat(fit('  ' + styled(sanitiseLine(l), FG.WHITE), width)));
+      lines.push(onChat(fit('  ' + styled(sanitiseLine(l, width), FG.WHITE), width)));
     }
   }
   if (density !== 'hidden') {
@@ -66,11 +66,11 @@ export function renderSystemMsg(msg: Message, width: number): string[] {
 }
 
 export function renderErrorMsg(msg: Message, width: number): string[] {
-  return [...wrapPlain(msg.content, Math.max(0, width - 6)).map((l, i) => onChat(fit('  ' + (i === 0 ? styled('✖ ', BOLD, FG.RED) : '  ') + styled(sanitiseLine(l), FG.RED), width))), onChat(fit('', width))];
+  return [...wrapPlain(msg.content, Math.max(0, width - 6)).map((l, i) => onChat(fit('  ' + (i === 0 ? styled('✖ ', BOLD, FG.RED) : '  ') + styled(sanitiseLine(l, width), FG.RED), width))), onChat(fit('', width))];
 }
 
 export function renderArbiterMsg(msg: Message, width: number): string[] {
-  return [onChat(fit('  ' + styled('⊕', FG.MAGENTA) + styled('  arbiter  ', DIM, FG.BRIGHT_BLACK) + styled(sanitiseLine(msg.content), FG.MAGENTA), width)), onChat(fit('', width))];
+  return [onChat(fit('  ' + styled('⊕', FG.MAGENTA) + styled('  arbiter  ', DIM, FG.BRIGHT_BLACK) + styled(sanitiseLine(msg.content, width), FG.MAGENTA), width)), onChat(fit('', width))];
 }
 
 export function renderRunSummary(msg: Message, width: number): string[] {
