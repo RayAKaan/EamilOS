@@ -45,8 +45,9 @@ export class RuntimeDependencyGraph {
 
   snapshot(availableCapabilities: Iterable<string> = []): DependencyGraphSnapshot {
     const available = new Set(availableCapabilities);
+    const providedByPlugin = new Set(this.edges.filter(edge => edge.kind === 'provides').map(edge => edge.to));
     const unresolved = [...new Set(this.edges
-      .filter(edge => edge.kind === 'requires' && !available.has(edge.to.slice('capability:'.length)) && !this.nodes.has(`provider:${edge.to}`))
+      .filter(edge => edge.kind === 'requires' && !available.has(edge.to.slice('capability:'.length)) && !providedByPlugin.has(edge.to))
       .map(edge => edge.to))];
 
     const adjacency = new Map<string, string[]>();
@@ -84,7 +85,6 @@ export class RuntimeDependencyGraph {
       if (node.kind === 'plugin') visit(node.id);
     }
 
-    const incoming = new Set(this.edges.filter(e => e.kind === 'requires').map(e => e.to));
     const roots = [...this.nodes.values()]
       .filter(node => node.kind === 'plugin' && !this.edges.some(e => e.kind === 'requires' && e.from === node.id))
       .map(node => node.id)
