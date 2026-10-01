@@ -47,6 +47,16 @@ export function renderUserMsg(msg: Message, width: number): string[] {
 }
 
 // ── Agent ─────────────────────────────────────────────────────────────────────
+function toolKind(name: string): { icon: string; label: string } {
+  const n = name.toLowerCase();
+  if (n.includes('terminal') || n.includes('bash') || n.includes('shell') || n.includes('exec')) return { icon: '⏱', label: 'terminal' };
+  if (n.includes('diff') || n.includes('edit') || n.includes('write')) return { icon: '±', label: 'diff' };
+  if (n.includes('search') || n.includes('grep') || n.includes('glob')) return { icon: '⌕', label: 'search' };
+  if (n.includes('web') || n.includes('fetch') || n.includes('browser')) return { icon: '◌', label: 'web' };
+  if (n.includes('read') || n.includes('file') || n.includes('cat')) return { icon: '▤', label: 'read' };
+  return { icon: '·', label: 'tool' };
+}
+
 function toolStatus(tool: ToolCall, spinFrame: number): { mark: string; colour: string; label: string } {
   if (tool.status === 'running') return { mark: spinAt(spinFrame), colour: FG.YELLOW, label: 'running' };
   if (tool.status === 'failed') return { mark: '✖', colour: FG.RED, label: 'failed' };
@@ -54,17 +64,39 @@ function toolStatus(tool: ToolCall, spinFrame: number): { mark: string; colour: 
   return { mark: '○', colour: FG.BRIGHT_BLACK, label: 'pending' };
 }
 
+function boxLine(prefix: string, body: string, suffix: string, width: number): string {
+  const inner = Math.max(8, width - 4);
+  return onChat(fit(prefix + ' ' + truncate(body, inner) + suffix, width));
+}
+
 function renderToolCard(tool: ToolCall, width: number, spinFrame: number, density: TranscriptDensity): string[] {
   if (density === 'hidden') return [];
   const state = toolStatus(tool, spinFrame);
-  const header = onChat(fit('  ' + styled(state.mark + '  Tool / ' + tool.name, BOLD, state.colour), width));
-  const raw = tool.result ?? tool.args ?? '';
-  const lines = raw.split(/\r?\n/).map(sanitiseLine).filter(Boolean);
-  const limit = density === 'expanded' ? 16 : 8;
-  const shown = lines.length > limit ? [...lines.slice(0, Math.ceil(limit / 2)), '… ' + String(lines.length - limit) + ' lines omitted …', ...lines.slice(-Math.floor(limit / 2))] : lines;
-  const body = shown.map(line => onChat(fit('    ' + styled(line, DIM, FG.WHITE), width)));
-  const footer = onChat(fit('    ' + styled(state.label + (tool.lines ? ' · ' + tool.lines + ' lines' : ''), DIM, FG.BRIGHT_BLACK), width));
-  return [header, ...body, footer];
+  const kind = toolKind(tool.name);
+  const inner = Math.max(8, width - 4);
+  const title = kind.label === 'terminal' ? (tool.args || tool.name) : tool.name;
+  const titleLine = '  ┌─ ' + styled(state.mark + ' ' + kind.icon + ' ' + truncate(title, inner - 10), BOLD, state.colour) + ' '.repeat(Math.max(0, inner - visibleWidth(title) - 8)) + '┐';
+  const bodyRaw = tool.result ?? tool.args ?? '';
+  const bodyLines = bodyRaw.split(/\r?\n/).map(sanitiseLine).filter(Boolean);
+  const limit = density === 'expanded' ? 14 : 6;
+  const shown = bodyLines.length > limit
+    ? [...bodyLines.slice(0, Math.ceil(limit / 2)), '… +' + String(bodyLines.length - limit) + ' lines', ...bodyLines.slice(-Math.floor(limit / 2))]
+    : bodyLines;
+  const body = shown.map(line => boxLine('  │', styled(truncate(line, inner - 2), DIM, FG.WHITE), ' │', width));
+  if (body.length === 0 && kind.label === 'terminal' && tool.args) body.push(boxLine('  │', styled('$ ' + tool.args, DIM, FG.WHITE), ' │', width));
+  const footerText = state.label + (tool.lines ? ' · ' + tool.lines + ' lines' : '');
+  return [
+    titleLine,
+    ...body,
+    boxLine('  └─', styled(footerText, DIM, state.colour), ' ─', width),
+  ];
+}
+
+function renderCollapsedReadOnly(tools: ToolCall[], width: number): string[] {
+  const count = tools.length;
+  const names = tools.slice(0, 3).map(t => toolKind(t.name).label).join(', ');
+  const more = count > 3 ? ' +' + String(count - 3) : '';
+  return [onChat(fit('  ' + styled('↳ ', DIM, FG.BRIGHT_BLACK) + styled(String(count) + ' read-only calls', BOLD, FG.WHITE) + styled('  ' + names + more + ' · Ctrl+O to expand', DIM, FG.BRIGHT_BLACK), width))];
 }
 
 export function renderAgentMsg(msg: Message, width: number, spinFrame: number, density: TranscriptDensity = 'normal'): string[] {
@@ -79,7 +111,22 @@ export function renderAgentMsg(msg: Message, width: number, spinFrame: number, d
       lines.push(onChat(fit('  ' + styled(sanitiseLine(l, iw), FG.WHITE), width)));
     }
   }
-  for (const tool of msg.tools) lines.push(...renderToolCard(tool, width, spinFrame, density));
+  if (density !== 'hidden') {
+    let i = 0;
+    while (i < msg.tools.length) {
+      const tool = msg.tools[i]!;
+      const readOnly = ['read','search','web'].includes(toolKind(tool.name).label);
+      if (density === 'normal' && readOnly) {
+        const group: ToolCall[] = [];
+        while (i < msg.tools.length && ['read','search','web'].includes(toolKind(msg.tools[i]!.name).label)) group.push(msg.tools[i++]!);
+        if (group.length >= 2) lines.push(...renderCollapsedReadOnly(group, width));
+        else lines.push(...renderToolCard(group[0]!, width, spinFrame, density));
+      } else {
+        lines.push(...renderToolCard(tool, width, spinFrame, density));
+        i++;
+      }
+    }
+  }
   if (msg.streaming) lines.push(onChat(fit('  ' + styled(spinAt(spinFrame), colour) + ' ' + styled('streaming…', DIM, FG.BRIGHT_BLACK), width)));
   lines.push(onChat(fit('', width)));
   return lines;
