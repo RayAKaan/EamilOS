@@ -35,9 +35,11 @@ function detectUnicode(env: NodeJS.ProcessEnv): boolean {
   return !/^C(?:\.|$)/i.test(locale);
 }
 
-export function detectTerminalCapabilities(env: NodeJS.ProcessEnv = process.env): TerminalCapabilities {
-  const stdinTTY = Boolean(process.stdin.isTTY);
-  const stdoutTTY = Boolean(process.stdout.isTTY);
+export interface TerminalDetectionOverrides { stdinTTY?: boolean; stdoutTTY?: boolean; width?: number; height?: number; }
+
+export function detectTerminalCapabilities(env: NodeJS.ProcessEnv = process.env, overrides: TerminalDetectionOverrides = {}): TerminalCapabilities {
+  const stdinTTY = overrides.stdinTTY ?? Boolean(process.stdin.isTTY);
+  const stdoutTTY = overrides.stdoutTTY ?? Boolean(process.stdout.isTTY);
   const ssh = Boolean(env.SSH_CONNECTION || env.SSH_TTY || env.SSH_CLIENT);
   const tmux = Boolean(env.TMUX);
   const screen = Boolean(env.STY);
@@ -57,8 +59,8 @@ export function detectTerminalCapabilities(env: NodeJS.ProcessEnv = process.env)
     isTTY: stdinTTY && stdoutTTY,
     stdinTTY,
     stdoutTTY,
-    width: process.stdout.columns || 80,
-    height: process.stdout.rows || 24,
+    width: overrides.width ?? process.stdout.columns ?? 80,
+    height: overrides.height ?? process.stdout.rows ?? 24,
     color: detectColor(env),
     unicode: detectUnicode(env),
     mouse: stdinTTY && stdoutTTY && env.EAMILOS_MOUSE !== '0',
