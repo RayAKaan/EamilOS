@@ -8,6 +8,7 @@ import { initLogger, Logger } from './logger.js';
 import type { AgentExecutionResult } from './agent-runner.js';
 import { getOrchestrator } from './orchestrator/StrictOrchestrator.js';
 import { loadConfig as loadConfigFromFile } from './config.js';
+import { createEamilOSRuntime, type EamilOSRuntimeKernel } from './runtime/EamilOSRuntimeKernel.js';
 
 export class EamilOS {
   private _db: DatabaseManager | null = null;
@@ -16,10 +17,12 @@ export class EamilOS {
   private _eventBus: EventBus | null = null;
   private logger: Logger;
   readonly instanceId: string;
+  readonly runtime: EamilOSRuntimeKernel;
 
   constructor() {
     this.instanceId = nanoid(8);
     this.logger = initLogger();
+    this.runtime = createEamilOSRuntime();
     this.logger.info(`EamilOS ${this.instanceId} ready (lazy init)`);
   }
 
@@ -248,6 +251,7 @@ export class EamilOS {
   shutdown(): void {
     this.logger.info('Shutting down EamilOS');
     if (this._db) this._db.close();
+    void this.runtime.shutdown();
   }
 }
 
@@ -257,6 +261,7 @@ export async function initEamilOS(): Promise<EamilOS> {
   if (globalInstance) return globalInstance;
   await loadConfigFromFile();
   globalInstance = new EamilOS();
+  await globalInstance.runtime.boot();
   return globalInstance;
 }
 
