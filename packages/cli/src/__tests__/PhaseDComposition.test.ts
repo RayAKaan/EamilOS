@@ -91,7 +91,7 @@ describe('Phase D runtime composition', () => {
       name: 'external-test',
       entry: './fixtures/external-plugin.mjs',
       provides: ['external.answer'],
-    }, new URL('.', import.meta.url).pathname);
+    }, process.cwd() + '/src/__tests__/fixtures');
     expect(runtime.dependencyGraph().nodes.some(x => x.id === 'plugin:external-test')).toBe(true);
     await dispose();
   });
