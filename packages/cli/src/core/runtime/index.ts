@@ -14,3 +14,5 @@ export type { EamilOSPlugin as RuntimePluginDefinition, PluginContext as Runtime
 export { JobRuntime } from './JobRuntime.js';
 export type { JobState, JobSnapshot, JobContext } from './JobRuntime.js';
 export * from './CapabilityCatalog.js';
+
+export * from './ExecutionCapabilities.js';
