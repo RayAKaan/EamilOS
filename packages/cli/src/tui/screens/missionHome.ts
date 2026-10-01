@@ -4,6 +4,8 @@ import type { AgentEvent } from '../events/agent-event.js';
 import { fit, truncate } from '../terminal/text.js';
 import { BOLD, DIM, FG, styled } from '../terminal/ansi.js';
 import { onChat } from '../theme.js';
+import { renderMissionAttention, renderMissionMetrics, renderMissionPlan } from '../components/missionOverview.js';
+
 
 function status(status: AppModel['missionUi']['status']): string {
   if (status === 'running') return styled('● RUNNING', BOLD, FG.GREEN);
@@ -45,40 +47,41 @@ function eventSummary(event: AgentEvent): { icon: string; text: string; color: s
 export function renderMissionHome(model: AppModel, layout: Layout): string[] {
   const width = layout.mainWidth;
   const height = layout.viewportHeight;
-  const m = model.missionUi;
   const lines: string[] = [];
   const add = (s: string) => lines.push(onChat(fit(s, width)));
-  const title = truncate(m.title || 'No active mission', Math.max(10, width - 44));
+  const m = model.missionUi;
 
-  add('  ' + styled('EAMILOS', BOLD, FG.CYAN) + '   ' + title + '   ' + status(m.status) + '   ' + styled(String(m.progress) + '%', BOLD, FG.BRIGHT_WHITE) + '   ' + styled(m.cost ?? '—', FG.BRIGHT_WHITE));
-  add('  ' + styled('─'.repeat(Math.max(0, width - 4)), DIM, FG.BRIGHT_BLACK));
+  add('  ' + styled('MISSION CONTROL', BOLD, FG.CYAN) + '   ' +
+    truncate(m.title || 'No active mission', Math.max(12, width - 48)) + '   ' +
+    status(m.status));
+  add('  ' + styled('Objective', DIM, FG.BRIGHT_BLACK) + '  ' +
+    truncate(m.objective || 'Start a mission from the prompt below.', width - 14));
+  add('  ' + progressBar(m.progress, Math.max(8, Math.min(42, width - 22))) + '  ' +
+    styled(String(Math.round(m.progress)) + '%', BOLD, FG.BRIGHT_WHITE));
+
+  const attention = renderMissionAttention(model, layout);
+  if (attention.length) {
+    lines.push(...attention);
+    add('');
+  }
+
+  lines.push(...renderMissionPlan(model, layout));
   add('');
-  add('  ' + styled('MISSION', BOLD, FG.WHITE));
-  add('  ' + styled(m.objective || 'Start a mission from the prompt below.', FG.BRIGHT_WHITE));
+  lines.push(...renderMissionMetrics(model, layout));
   add('');
   add('  ' + styled('CURRENT ACTION', BOLD, FG.WHITE));
   add('  ' + styled('● ', FG.CYAN) + truncate(m.currentAction || 'Waiting for a mission.', width - 6));
   add('');
-  add('  ' + styled('EXECUTION', BOLD, FG.WHITE));
-  const taskIcon = m.status === 'completed' ? styled('✓', FG.GREEN) : m.status === 'failed' ? styled('!', FG.RED) : m.status === 'running' || m.status === 'paused' ? styled('→', FG.CYAN) : styled('○', DIM, FG.WHITE);
-  add('  ' + taskIcon + ' ' + truncate(m.currentAction || 'Mission execution', width - 8));
-  const barWidth = Math.max(8, Math.min(42, width - 12));
-  add('  ' + progressBar(m.progress, barWidth) + ' ' + String(m.progress) + '%');
-  add('');
-  add('  ' + styled('LIVE ACTIVITY', BOLD, FG.WHITE));
-  const recent = m.activity.slice(-4);
-  if (recent.length === 0) {
-    add('  ' + styled('No activity yet — start a mission from the prompt.', DIM, FG.WHITE));
-  } else {
-    for (const item of recent) {
-      const icon = item.severity === 'success' ? styled('✓', FG.GREEN) : item.severity === 'error' ? styled('!', FG.RED) : item.severity === 'warning' ? styled('!', FG.YELLOW) : styled('●', FG.CYAN);
-      add('  ' + icon + ' ' + truncate(item.title + (item.detail ? ' / ' + item.detail : ''), width - 8));
-    }
+  add('  ' + styled('RECENT ACTIVITY', BOLD, FG.WHITE));
+  const recent = m.activity.slice(-Math.max(3, layout.compact ? 3 : 5));
+  if (!recent.length) add('  ' + styled('No activity yet.', DIM, FG.WHITE));
+  for (const item of recent) {
+    const icon = item.severity === 'success' ? styled('✓', FG.GREEN)
+      : item.severity === 'error' ? styled('!', FG.RED)
+      : item.severity === 'warning' ? styled('!', FG.YELLOW)
+      : styled('●', FG.CYAN);
+    add('  ' + icon + ' ' + truncate(item.title + (item.detail ? ' · ' + item.detail : ''), width - 8));
   }
-  add('');
-  add('  ' + styled('● ' + String(Array.from(model.agents.values()).filter(a => a.status === 'busy').length) + ' agents', FG.GREEN) + '   ' + styled('● ' + (m.deviceCount == null ? '—' : String(m.deviceCount)) + ' devices', FG.CYAN) + '   ' + (m.pendingApprovals ? styled('! ' + String(m.pendingApprovals) + ' approval', FG.YELLOW) : styled('✓ no approvals', DIM, FG.WHITE)) + '   ' + validation(m.validation));
-  add('');
-  add('  ' + styled('M', BOLD, FG.CYAN) + ' Mission   ' + styled('X', BOLD, FG.CYAN) + ' Live execution   ' + styled('↑↓', BOLD, FG.WHITE) + ' activity   ' + styled('Enter', BOLD, FG.WHITE) + ' prompt');
 
   while (lines.length < height) add('');
   return lines.slice(0, height);
