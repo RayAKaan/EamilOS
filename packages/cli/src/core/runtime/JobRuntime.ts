@@ -76,4 +76,11 @@ export class JobRuntime {
       if (['completed', 'failed', 'cancelled'].includes(record.snapshot.state)) this.jobs.delete(id);
     }
   }
+
+  dispose(): void {
+    for (const record of this.jobs.values()) {
+      if (!['completed', 'failed', 'cancelled'].includes(record.snapshot.state)) record.controller.abort('runtime disposed');
+    }
+    this.jobs.clear();
+  }
 }

@@ -41,7 +41,19 @@ export class BundleRuntime {
     const { plugins } = this.resolve(id);
     const disposers: Array<() => Promise<void>> = [];
     try {
-      for (const plugin of plugins) disposers.push(await runtime.use(plugin));
+      const pending = new Map(plugins.map(plugin => [plugin.name, plugin]));
+      while (pending.size) {
+        let progressed = false;
+        const providedByPending = new Set([...pending.values()].flatMap(plugin => plugin.provides ?? []));
+        for (const [name, plugin] of pending) {
+          const unresolved = (plugin.inject ?? []).filter(dependency => providedByPending.has(dependency));
+          if (unresolved.length) continue;
+          disposers.push(await runtime.use(plugin));
+          pending.delete(name);
+          progressed = true;
+        }
+        if (!progressed) throw new Error(`Bundle ${id} has an unsatisfied or cyclic plugin dependency: ${[...pending.keys()].join(', ')}`);
+      }
     } catch (error) {
       for (const dispose of [...disposers].reverse()) await dispose();
       throw error;
