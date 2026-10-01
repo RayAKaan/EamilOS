@@ -683,7 +683,7 @@ export function update(model: AppModel, msg: Msg): AppModel {
         const tools = [...m.tools];
         for (let j = tools.length - 1; j >= 0; j--) {
           if (tools[j]!.name === msg.tool && (tools[j]!.status === 'running' || tools[j]!.status === 'pending')) {
-            tools[j] = { ...tools[j]!, status: 'done', result: msg.result, lines: msg.result.split(/\\r?\\n/).length };
+            tools[j] = { ...tools[j]!, status: 'done', result: msg.result, lines: msg.result.split(/\r?\n/).length };
             break;
           }
         }
