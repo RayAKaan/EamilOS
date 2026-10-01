@@ -10,12 +10,6 @@ export interface JobSnapshot<T = unknown> {
   finishedAt?: number;
   result?: T;
   error?: string;
-  dispose(): void {
-    for (const record of this.jobs.values()) {
-      if (!['completed', 'failed', 'cancelled'].includes(record.snapshot.state)) record.controller.abort('runtime disposed');
-    }
-    this.jobs.clear();
-  }
 }
 
 export interface JobContext {
@@ -81,5 +75,12 @@ export class JobRuntime {
     for (const [id, record] of this.jobs) {
       if (['completed', 'failed', 'cancelled'].includes(record.snapshot.state)) this.jobs.delete(id);
     }
+  }
+
+  dispose(): void {
+    for (const record of this.jobs.values()) {
+      if (!['completed', 'failed', 'cancelled'].includes(record.snapshot.state)) record.controller.abort('runtime disposed');
+    }
+    this.jobs.clear();
   }
 }
