@@ -423,3 +423,6 @@ export * from './web/index.js';
 export * from './webhook/index.js';
 export * from './sdk/index.js';
 export * from './acp/index.js';
+
+export * from './differentiation/index.js';
+export { PhaseFDifferentiationRuntime } from './differentiation/PhaseFDifferentiationRuntime.js';
