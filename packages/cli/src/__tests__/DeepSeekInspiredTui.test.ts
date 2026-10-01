@@ -4,7 +4,7 @@ import { update } from '../tui/update.js';
 import { renderMessage } from '../tui/components/message.js';
 
 function plain(lines: string[]): string {
-  return lines.join('\n').replace(/\x1b\\[[0-9;]*m/g, '');
+  return lines.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
 }
 
 describe('DeepSeek-inspired TUI presentation', () => {
