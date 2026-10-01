@@ -25,8 +25,9 @@ export function renderInputBar(model: AppModel, layout: Layout): [string, string
   const left = '  ' + styled('PROMPT', BOLD, FG.CYAN) +
     styled('  │  ', DIM, FG.BRIGHT_BLACK) +
     styled(queueNote, model.running ? FG.YELLOW : FG.GREEN);
+  const density = model.transcriptDensity === 'normal' ? 'transcript' : model.transcriptDensity === 'expanded' ? 'expanded' : 'tools hidden';
   const hints = kb('Enter', 'send') + '  ' + kb('/', 'commands') + '  ' +
-    kb('Ctrl+C', 'cancel') + '  ' + kb('Ctrl+Q', 'exit') + '  ';
+    kb('Ctrl+C', 'cancel') + '  ' + kb('Ctrl+O', density) + '  ' + kb('Ctrl+Q', 'exit') + '  ';
 
   return [
     onChrome(fit(prompt, width)),

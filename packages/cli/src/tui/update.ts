@@ -1,4 +1,4 @@
-import type { AppModel, ApplicationState, MissionState, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem } from './model.js';
+import type { AppModel, ApplicationState, MissionState, Page, AgentMode, Strategy, AgentEntry, TerminalEntry, Message, RunSummary, ModifiedFile, MissionActivityItem, TranscriptDensity } from './model.js';
 import type { FleetAgentStatus } from './fleet-data.js';
 import type { AgentEvent } from './events/agent-event.js';
 import { nextActivityId, nextMsgId } from './model.js';
@@ -29,6 +29,7 @@ export type Msg =
   | { type: 'SCROLL_TOP' }
   | { type: 'SCROLL_BOTTOM' }
   | { type: 'TOGGLE_SIDEBAR' }
+  | { type: 'TOGGLE_TRANSCRIPT_DENSITY' }
   | { type: 'TOGGLE_ACTIVITY_FOLLOW' }
   | { type: 'CLEAR_CHAT' }
   | { type: 'TICK' }
@@ -199,6 +200,13 @@ export function update(model: AppModel, msg: Msg): AppModel {
 
     case 'TOGGLE_SIDEBAR':
       return { ...model, sidebarVisible: !model.sidebarVisible };
+
+    case 'TOGGLE_TRANSCRIPT_DENSITY': {
+      const order: TranscriptDensity[] = ['normal', 'expanded', 'hidden'];
+      const next = order[(order.indexOf(model.transcriptDensity) + 1) % order.length]!;
+      const label = next === 'normal' ? 'Transcript: normal' : next === 'expanded' ? 'Transcript: expanded' : 'Transcript: tools hidden';
+      return { ...model, transcriptDensity: next, notification: label };
+    }
 
     case 'TOGGLE_ACTIVITY_FOLLOW':
       return { ...model, activityFollow: !model.activityFollow, activityScroll: 0 };
@@ -656,17 +664,33 @@ export function update(model: AppModel, msg: Msg): AppModel {
     }
 
     case 'TOOL_STARTED': {
-      return {
-        ...model,
-        missionUi: { ...model.missionUi, currentAction: 'Tool: ' + msg.tool, activity: appendActivity(model.missionUi.activity, activity('Tool started', 'info', msg.tool)) },
-      };
+      const messages = [...model.messages];
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i]!;
+        if (m.agentId === msg.agentId && m.type === 'agent') {
+          messages[i] = { ...m, tools: [...m.tools, { name: msg.tool, args: msg.args, status: 'running' }] };
+          break;
+        }
+      }
+      return { ...model, messages, missionUi: { ...model.missionUi, currentAction: 'Tool: ' + msg.tool, activity: appendActivity(model.missionUi.activity, activity('Tool started', 'info', msg.tool)) } };
     }
 
     case 'TOOL_OUTPUT': {
-      return {
-        ...model,
-        missionUi: { ...model.missionUi, currentAction: 'Tool completed: ' + msg.tool, activity: appendActivity(model.missionUi.activity, activity('Tool output', 'success', msg.tool)) },
-      };
+      const messages = [...model.messages];
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i]!;
+        if (m.agentId !== msg.agentId || m.type !== 'agent') continue;
+        const tools = [...m.tools];
+        for (let j = tools.length - 1; j >= 0; j--) {
+          if (tools[j]!.name === msg.tool && (tools[j]!.status === 'running' || tools[j]!.status === 'pending')) {
+            tools[j] = { ...tools[j]!, status: 'done', result: msg.result, lines: msg.result.split(/\r?\n/).length };
+            break;
+          }
+        }
+        messages[i] = { ...m, tools };
+        break;
+      }
+      return { ...model, messages, missionUi: { ...model.missionUi, currentAction: 'Tool completed: ' + msg.tool, activity: appendActivity(model.missionUi.activity, activity('Tool output', 'success', msg.tool)) } };
     }
 
     case 'FILE_CHANGED': {

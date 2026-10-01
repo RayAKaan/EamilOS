@@ -20,6 +20,7 @@ export type Strategy = 'single' | 'single-fallback' | 'fallback' | 'swarm' | 'ma
 export type DetectionState = 'idle' | 'detecting' | 'complete' | 'failed';
 export type MissionStatus = 'draft' | 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 export type MissionValidation = 'idle' | 'running' | 'passed' | 'failed';
+export type TranscriptDensity = 'normal' | 'expanded' | 'hidden';
 
 export type ApplicationState = 'starting' | 'ready' | 'running' | 'cancelling' | 'idle' | 'error' | 'shutting_down' | 'stopped';
 export type MissionState = 'idle' | 'queued' | 'running' | 'waiting' | 'validating' | 'completed' | 'failed' | 'cancelled';
@@ -131,6 +132,7 @@ export interface AppModel {
   cursor: number;
   lastPrompt: string;
   scroll: number;
+  transcriptDensity: TranscriptDensity;
   sidebarVisible: boolean;
   detectionState: DetectionState;
   agents: Map<string, AgentEntry>;
@@ -188,6 +190,7 @@ export function initialModel(width: number, height: number): AppModel {
     cursor: 0,
     lastPrompt: '',
     scroll: 0,
+    transcriptDensity: 'normal',
     sidebarVisible: true,
     detectionState: 'idle',
     agents: new Map(),
