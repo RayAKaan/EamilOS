@@ -77,3 +77,21 @@ export class JobRuntime {
     }
   }
 }
+
+
+  dispose(): void {
+    for (const record of this.jobs.values()) {
+      if (!['completed', 'failed', 'cancelled'].includes(record.snapshot.state)) {
+        record.controller.abort('runtime disposed');
+      }
+    }
+    this.jobs.clear();
+  }\n\n  dispose(): void {
+    for (const record of this.jobs.values()) {
+      if (!['completed', 'failed', 'cancelled'].includes(record.snapshot.state)) {
+        record.controller.abort('runtime disposed');
+      }
+    }
+    this.jobs.clear();
+  }
+
