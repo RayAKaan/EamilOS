@@ -37,7 +37,8 @@ export async function run(
   options: RunOptions
 ): Promise<void> {
   if (options.mission) {
-    const control = new MissionControl();
+    const runtimeHost = eamilos ?? await (await import('../core/index.js')).initEamilOS();
+    const control = runtimeHost.runtime.missionControl;
     const mission = await control.create({
       goal,
       workingDir: process.cwd(),
@@ -52,7 +53,7 @@ export async function run(
     });
     const result = await control.start(mission.id);
     console.log(JSON.stringify({ mission, ...result }, null, 2));
-    eamilos?.shutdown();
+    runtimeHost.shutdown();
     return;
   }
 
