@@ -113,7 +113,7 @@ export function renderToolCard(tool: ToolCall, width: number, spinFrame: number,
   }
 
   const inner = Math.max(8, width - 4);
-  const title = descriptor.kind === 'terminal' ? (tool.args || descriptor.title) : descriptor.title;
+  const title = descriptor.kind === 'terminal' ? '⏱ ' + (tool.args || descriptor.title) : descriptor.title;
   const header = '  ┌─ ' +
     styled(state.mark + ' ' + descriptor.icon + ' ' + truncate(title, Math.max(8, inner - 10)), BOLD, state.colour) +
     ' ┐';
@@ -141,7 +141,7 @@ export function renderToolCard(tool: ToolCall, width: number, spinFrame: number,
     return cardLine('  │ ', clean, ' │', width, colour);
   });
 
-  if (!body.length) {
+  if (!body.length || (descriptor.kind === 'approval' && tool.status === 'running')) {
     const placeholder = descriptor.kind === 'approval' ? 'Awaiting approval decision' :
       descriptor.kind === 'test' ? 'Waiting for test output' : descriptor.kind === 'diff' ? 'No diff output' : 'No output';
     body.push(cardLine('  │ ', placeholder, ' │', width, DIM));
