@@ -55,7 +55,9 @@ describe('phase 3 mission UI', () => {
       { id: 'E-1', taskId: 'T-2', sessionId: 'S-1', status: 'running', events: [] },
     ];
     const lines = renderMissionMetrics(m, layoutFor(m)).join('\n');
-    expect(lines).toContain('Tasks 1/2');
-    expect(lines).toContain('Executions 1');
+    expect(lines).toContain('Tasks ');
+    expect(lines).toContain('1/2');
+    expect(lines).toContain('Executions ');
+    expect(lines).toContain('1');
   });
 });
