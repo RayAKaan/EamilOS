@@ -19,3 +19,6 @@ export { detectTerminalCapabilities, terminalCapabilitySummary } from './termina
 export type { TerminalCapabilities, TerminalMode } from './terminal/capabilities.js';
 export type { ThemeConfig, ThemeName, ThemeTokens, MotionMode } from './theme/types.js';
 export { createThemeConfig, detectThemeName, resolveMotion, resolveTheme, themeTokens } from './theme/engine.js';
+
+export { missionStages, renderMissionAttention, renderMissionMetrics, renderMissionPlan } from './components/missionOverview.js';
+export type { MissionStage } from './components/missionOverview.js';
