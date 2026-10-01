@@ -38,17 +38,6 @@ export class MissionReplay {
       updatedAt: last.timestamp,
     };
     const state = events.reduce<RuntimeSnapshot>((current, event) => applyRuntimeSnapshot(current, event), initial);
-    /*
-      version: 1,
-      missionId,
-      state: 'CREATED',
-      health: 'HEALTHY',
-      counters: { executions: 0, retries: 0, replans: 0, jevDecisions: 0, layaPlans: 0, costUsd: 0, startedAt: last.timestamp },
-      activeExecutions: [],
-      lastEventId: undefined,
-      lastCheckpointId: undefined,
-      updatedAt: last.timestamp,
-    }; */
     return state;
   }
 }
