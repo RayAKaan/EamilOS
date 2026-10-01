@@ -16,21 +16,21 @@ export function renderInputBar(model: AppModel, layout: Layout): [string, string
   const visibleAfter = truncate(after, Math.max(0, maxW - visibleBefore.length - 1));
   const content = visibleBefore + cursorStyled + visibleAfter;
 
-  const queueNote = model.running ? 'running · prompt queues' : 'ready';
-  const prompt = '  ' + styled('PROMPT', BOLD, FG.CYAN) + styled('  › ', DIM, FG.BRIGHT_BLACK) + content;
+  const queueCount = model.running ? Math.max(0, model.sessions.filter((s) => s.status === 'running').length - 1) : 0;
+  const mode = model.running ? 'STEER' : 'READY';
+  const prompt = '  ' + styled('>', BOLD, FG.CYAN) + styled('  ', DIM, FG.BRIGHT_BLACK) + content;
   const promptRow = onChrome(fit(prompt, width));
 
   const kb = (key: string, label: string) =>
     styled(key, BOLD, FG.WHITE) + styled(' ' + label, DIM, FG.BRIGHT_BLACK);
-  const left = '  ' + styled('PROMPT', BOLD, FG.CYAN) +
+  const left = '  ' + styled('MODE', BOLD, FG.CYAN) +
+    styled('  ', DIM, FG.BRIGHT_BLACK) +
+    styled(mode, model.running ? FG.YELLOW : FG.GREEN) +
     styled('  │  ', DIM, FG.BRIGHT_BLACK) +
-    styled(queueNote, model.running ? FG.YELLOW : FG.GREEN);
+    styled(`QUEUED: ${queueCount}`, DIM, FG.WHITE);
   const density = model.transcriptDensity === 'normal' ? 'transcript' : model.transcriptDensity === 'expanded' ? 'expanded' : 'tools hidden';
-  const hints = kb('Enter', 'send') + '  ' + kb('/', 'commands') + '  ' +
-    kb('Ctrl+C', 'cancel') + '  ' + kb('Ctrl+O', density) + '  ' + kb('Ctrl+Q', 'exit') + '  ';
+  const hints = kb('Enter', model.running ? 'steer' : 'send') + '  ' + kb('Ctrl+Enter', 'queue') + '  ' +
+    kb('/', 'commands') + '  ' + kb('Ctrl+O', density) + '  ' + kb('Ctrl+Q', 'exit') + '  ';
 
-  return [
-    onChrome(fit(prompt, width)),
-    onChrome(fit(splitLine(left, hints, width), width)),
-  ];
+  return [onChrome(fit(prompt, width)), onChrome(fit(splitLine(left, hints, width), width))];
 }
