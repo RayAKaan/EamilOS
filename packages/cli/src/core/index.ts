@@ -412,3 +412,7 @@ export { GitHubWorkspaceManager } from './git/GitHubWorkspaceManager.js';
 export * from './loop/index.js';
 
 export * from './mission-interface/index.js';
+
+export * from './llm/index.js';
+export * from './mcp/index.js';
+export * from './sandbox/index.js';
