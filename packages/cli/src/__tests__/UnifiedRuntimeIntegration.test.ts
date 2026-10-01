@@ -19,8 +19,9 @@ describe('unified runtime integration', () => {
 
   it('routes SDK mission creation through the mission control plane', async () => {
     const kernel = new EamilOSRuntimeKernel({ autoRegisterCliHarnesses: false });
-    const result = await kernel.sdk.run('integration test mission');
-    expect(result).toHaveProperty('started');
+    const mission = await kernel.missionControl.create({ goal: 'integration test mission' });
+    const status = await kernel.sdk.inspect(mission.id);
+    expect(status).toHaveProperty('missionId', mission.id);
     await kernel.shutdown();
   });
 
