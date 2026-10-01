@@ -21,3 +21,9 @@ export * from './MissionEventStore.js';
 export * from './MissionProjection.js';
 export * from './MissionReplay.js';
 export * from './MissionRecovery.js';
+
+export * from './ProfileRuntime.js';
+export * from './BundleRuntime.js';
+export * from './RuntimeInspector.js';
+export * from './CompositionRuntime.js';
+export * from './ExternalPluginRuntime.js';
