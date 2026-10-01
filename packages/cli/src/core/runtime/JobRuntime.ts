@@ -23,7 +23,7 @@ interface JobRecord<T> {
 }
 
 export class JobRuntime {
-  private readonly jobs = new Map<string, JobRecord>();
+  private readonly jobs = new Map<string, JobRecord<unknown>>();
 
   start<T>(work: (ctx: JobContext) => Promise<T>, signal?: AbortSignal): string {
     const id = randomUUID();
