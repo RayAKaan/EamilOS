@@ -11,3 +11,6 @@ export * from './RuntimeEventVocabulary.js';
 export * from './RuntimeDependencyGraph.js';
 export { PluginRuntime } from './PluginRuntime.js';
 export type { EamilOSPlugin as RuntimePluginDefinition, PluginContext as RuntimePluginContext } from './PluginRuntime.js';
+export { JobRuntime } from './JobRuntime.js';
+export type { JobState, JobSnapshot, JobContext } from './JobRuntime.js';
+export * from './CapabilityCatalog.js';
