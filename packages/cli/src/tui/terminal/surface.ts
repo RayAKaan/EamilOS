@@ -6,9 +6,11 @@ import {
   HIDE_CURSOR, SHOW_CURSOR,
   CLEAR_SCREEN, CURSOR_HOME,
 } from './ansi.js';
+import type { TerminalCapabilities } from './capabilities.js';
+import { detectTerminalCapabilities } from './capabilities.js';
 
 export interface TerminalSize {
-  width:  number;
+  width: number;
   height: number;
 }
 
@@ -17,12 +19,12 @@ const _resizeListeners: Array<(size: TerminalSize) => void> = [];
 
 export function getTerminalSize(): TerminalSize {
   return {
-    width:  process.stdout.columns || 80,
-    height: process.stdout.rows    || 24,
+    width: process.stdout.columns || 80,
+    height: process.stdout.rows || 24,
   };
 }
 
-export function enterFullScreen(): void {
+export function enterFullScreen(capabilities: TerminalCapabilities = detectTerminalCapabilities()): void {
   if (_active) return;
   _active = true;
 
@@ -34,8 +36,9 @@ export function enterFullScreen(): void {
 
   if (!process.stdout.isTTY) return;
 
+  const useAlternateScreen = capabilities.alternateScreen && capabilities.mode !== 'inline';
   process.stdout.write(
-    ENTER_ALT_SCREEN + HIDE_CURSOR + CLEAR_SCREEN + CURSOR_HOME,
+    (useAlternateScreen ? ENTER_ALT_SCREEN : '') + HIDE_CURSOR + CLEAR_SCREEN + CURSOR_HOME,
   );
 
   process.stdout.on('resize', () => {
@@ -53,7 +56,6 @@ export function exitFullScreen(): void {
   if (process.stdout.isTTY) process.stdout.write(SHOW_CURSOR + EXIT_ALT_SCREEN);
 }
 
-// Write a complete pre-built frame in one syscall.
 export function writeFrame(frame: string): void {
   if (!process.stdout.isTTY) return;
   process.stdout.write(CURSOR_HOME + frame);
@@ -70,9 +72,9 @@ export function onResize(fn: (size: TerminalSize) => void): () => void {
 export function installCrashRecovery(): void {
   const restore = () => { try { exitFullScreen(); } catch { /* ignore */ } };
 
-  process.on('exit',              restore);
-  process.on('SIGINT',            () => { restore(); process.exit(0); });
-  process.on('SIGTERM',           () => { restore(); process.exit(0); });
+  process.on('exit', restore);
+  process.on('SIGINT', () => { restore(); process.exit(0); });
+  process.on('SIGTERM', () => { restore(); process.exit(0); });
   process.on('uncaughtException', (err) => {
     restore();
     process.stderr.write(`\nEamilOS: uncaught error: ${String(err)}\n`);
