@@ -13,7 +13,7 @@ describe('DeepSeek-inspired TUI presentation', () => {
     const started = update(model, { type: 'AGENT_STARTED', agentId: 'codex-cli' });
     const withTool = update(started, { type: 'TOOL_STARTED', agentId: 'codex-cli', tool: 'terminal', args: 'npm test' });
     const rendered = plain(renderMessage(withTool.messages.at(-1)!, 100, 0, 'normal'));
-    expect(rendered).toContain('Tool / terminal');
+    expect(rendered).toContain('⏱ npm test');
     expect(rendered).toContain('npm test');
   });
 
@@ -23,8 +23,8 @@ describe('DeepSeek-inspired TUI presentation', () => {
     const withTool = update(started, { type: 'TOOL_STARTED', agentId: 'codex-cli', tool: 'terminal', args: 'echo hello' });
     const normal = plain(renderMessage(withTool.messages.at(-1)!, 100, 0, 'normal'));
     const hidden = plain(renderMessage(withTool.messages.at(-1)!, 100, 0, 'hidden'));
-    expect(normal).toContain('Tool / terminal');
-    expect(hidden).not.toContain('Tool / terminal');
+    expect(normal).toContain('⏱ echo hello');
+    expect(hidden).not.toContain('echo hello');
   });
 
   it('records tool completion and bounded output in session-facing UI state', () => {
