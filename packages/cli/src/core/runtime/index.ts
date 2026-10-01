@@ -27,3 +27,5 @@ export * from './BundleRuntime.js';
 export * from './RuntimeInspector.js';
 export * from './CompositionRuntime.js';
 export * from './ExternalPluginRuntime.js';
+
+export * from './EamilOSRuntimeKernel.js';
