@@ -16,7 +16,8 @@ describe('unified runtime integration', () => {
       MISSION_EVENTS, MISSION_REPLAY, MISSION_RECOVERY, HARNESS_REGISTRY,
       DIFFERENTIATION_RUNTIME, MISSION_CONTROL, SDK_RUNTIME, COMPOSITION_RUNTIME,
     ];
-    for (const key of keys) expect(kernel.plugins.resolveCapability(key)).toBeDefined();
+    const registered = kernel.plugins.listCapabilities().map(capability => capability.id);
+    expect(registered).toEqual(expect.arrayContaining(keys.map(key => key.id)));
     const inspection = kernel.inspect();
     expect(inspection.capabilities.length).toBeGreaterThanOrEqual(keys.length);
     expect(inspection.dependencyGraph.unresolved).toHaveLength(0);
