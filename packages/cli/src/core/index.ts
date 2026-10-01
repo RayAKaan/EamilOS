@@ -416,3 +416,10 @@ export * from './mission-interface/index.js';
 export * from './llm/index.js';
 export * from './mcp/index.js';
 export * from './sandbox/index.js';
+
+export * from './skills/index.js';
+export * from './scheduler/index.js';
+export * from './web/index.js';
+export * from './webhook/index.js';
+export * from './sdk/index.js';
+export * from './acp/index.js';
