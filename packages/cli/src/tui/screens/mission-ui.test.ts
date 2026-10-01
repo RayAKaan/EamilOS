@@ -50,6 +50,6 @@ describe('Phase 13.2 Mission UI', () => {
     model = update(model, { type: 'SESSION_COMPLETED', summary: { strategy: 'single', agentUsed: 'a1', durationMs: 100, fileCount: 2, validated: true, errors: [] } });
     expect(model.missionUi.progress).toBe(100);
     expect(model.missionUi.validation).toBe('passed');
-    expect(renderLiveExecution(model, { width: 100, height: 30, mainWidth: 100, mainHeight: 25, mainTop: 0, mainLeft: 0, viewportHeight: 25, bodyHeight: 25, bodyTop: 0, statusBarRow: 0, topSepRow: 0, botSepRow: 0, inputRow: 0, inputStatusRow: 0, sidebarLeft: 100, sidebarWidth: 0, sidebarTop: 0, sidebarHeight: 25, dividerCol: -1, showSidebar: false, compact: false, activityPane: false }).some(line => line.includes('hidden chain-of-thought'))).toBe(true);
+    expect(renderLiveExecution(model, { tier: 'standard', hudHeight: 4, hudTop: 2, width: 100, height: 30, mainWidth: 100, mainHeight: 25, mainTop: 0, mainLeft: 0, viewportHeight: 25, bodyHeight: 25, bodyTop: 0, statusBarRow: 0, topSepRow: 0, botSepRow: 0, inputRow: 0, inputStatusRow: 0, sidebarLeft: 100, sidebarWidth: 0, sidebarTop: 0, sidebarHeight: 25, dividerCol: -1, showSidebar: false, compact: false, activityPane: false }).some(line => line.includes('hidden chain-of-thought'))).toBe(true);
   });
 });
