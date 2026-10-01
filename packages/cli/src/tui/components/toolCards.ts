@@ -126,7 +126,7 @@ export function renderToolCard(tool: ToolCall, width: number, spinFrame: number,
 
   const body = shown.map(line => {
     const clean = sanitiseLine(line, inner - 2);
-    let colour = FG.WHITE;
+    let colour: string = FG.WHITE;
     if (descriptor.kind === 'diff') {
       if (clean.startsWith('+') && !clean.startsWith('+++')) colour = FG.GREEN;
       else if (clean.startsWith('-') && !clean.startsWith('---')) colour = FG.RED;
