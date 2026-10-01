@@ -1,5 +1,4 @@
 import { EamilOS } from '../core/index.js';
-import { MissionControl } from '../core/mission-interface/MissionControl.js';
 import { header, success, info, kv, divider, error as printError } from '../ui.js';
 import { createSessionOrchestrator } from '../core/session/SessionOrchestrator.js';
 import type { ExecutionStrategy } from '../core/agents/types.js';
