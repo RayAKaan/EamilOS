@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BundleRuntime } from '../core/runtime/BundleRuntime.js';
 import { CompositionRuntime } from '../core/runtime/CompositionRuntime.js';
@@ -91,7 +93,7 @@ describe('Phase D runtime composition', () => {
       name: 'external-test',
       entry: './fixtures/external-plugin.mjs',
       provides: ['external.answer'],
-    }, process.cwd() + '/src/__tests__/fixtures');
+    }, dirname(fileURLToPath(import.meta.url)));
     expect(runtime.dependencyGraph().nodes.some(x => x.id === 'plugin:external-test')).toBe(true);
     await dispose();
   });
