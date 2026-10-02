@@ -114,6 +114,7 @@ export class EamilosSqliteDistributedEventLog implements DistributedEventLog {
   private appendUnsafe(input: AppendEventInput): EamilosEvent {
     const latest = this.latest();
     const sequence = (latest?.sequence ?? 0) + 1;
+    if (latest && input.occurredAt && input.occurredAt < latest.occurredAt) throw new EventLogConflictError('EVENT_TIME_REGRESSION');
     const previousHash = latest?.hash ?? null;
     if (input.expectedSequence !== undefined && input.expectedSequence !== sequence) throw new EventLogConflictError(`EXPECTED_SEQUENCE_MISMATCH:${input.expectedSequence}:${sequence}`);
     if (input.expectedPreviousHash !== undefined && input.expectedPreviousHash !== previousHash) throw new EventLogConflictError('EXPECTED_PREVIOUS_HASH_MISMATCH');
