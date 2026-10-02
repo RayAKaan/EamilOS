@@ -505,7 +505,7 @@ class DeepSeekHarnessAgentAdapter implements EamilOSAgent {
 
 
 class UniversalAgentAdapter implements EamilOSAgent {
-  readonly kind: AgentKind = 'cli';
+  readonly kind: AgentKind;
   readonly capabilities: AgentCapabilities;
   private readonly agentId: string;
   readonly name: string;
@@ -514,6 +514,7 @@ class UniversalAgentAdapter implements EamilOSAgent {
     const definition = getUniversalAgentPlatform().registry.get(agentId);
     if (!definition) throw new Error('Unknown universal agent: ' + agentId);
     this.agentId = agentId;
+    this.kind = definition.kind === 'harness' ? 'harness' : definition.kind === 'api' ? 'api' : 'cli';
     this.name = definition.name;
     this.capabilities = {
       codeGeneration: definition.capabilities.codeGeneration,
@@ -545,7 +546,7 @@ class UniversalAgentAdapter implements EamilOSAgent {
     const platform = getUniversalAgentPlatform();
     const result = await platform.scheduler.execute({
       request: { ...request, workingDir: request.workingDir || this.config?.workingDir || process.cwd(), timeoutMs: request.timeoutMs || this.config?.timeoutMs || 180000 },
-      preferredAgentId: this.agentId,
+      preferredAgentId: this.agentId, strictAgentId: true,
     });
     return result.response;
   }
