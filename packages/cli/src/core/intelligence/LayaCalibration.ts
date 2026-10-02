@@ -8,7 +8,7 @@ function normalize(probabilities: Record<string, number>) {
 }
 function temperatureScale(probabilities: Record<string, number>, temperature: number) {
   if (temperature === 1) return normalize(probabilities);
-  const t = Math.max(0.05, temperature);
+  const t = Number.isFinite(temperature) ? Math.min(5, Math.max(0.5, temperature)) : 1;
   const logits = Object.entries(normalize(probabilities)).map(([key, probability]) => [key, Math.log(Math.max(1e-12, probability)) / t] as const);
   const max = Math.max(...logits.map(([, value]) => value));
   const exps = logits.map(([key, value]) => [key, Math.exp(value - max)] as const);
@@ -33,7 +33,7 @@ function transform(answer: LayaAnswer, temperature: number): LayaAnswer {
     return { ...answer, score, probabilities, confidence: entropyConfidence(probabilities), answerConfidence: Math.max(...Object.values(probabilities), 0) };
   }
   const p = clamp(answer.noul);
-  const t = Math.max(0.05, temperature);
+  const t = Number.isFinite(temperature) ? Math.min(5, Math.max(0.5, temperature)) : 1;
   const logit = Math.log(Math.max(1e-12, p) / Math.max(1e-12, 1 - p));
   const scaled = 1 / (1 + Math.exp(-logit / t));
   return { ...answer, noul: scaled, confidence: Math.max(scaled, 1 - scaled), answerConfidence: Math.max(scaled, 1 - scaled) };
