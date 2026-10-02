@@ -357,6 +357,33 @@ Every behavior is tunable. Every default is battle-tested.
 
 ---
 
+## Laya Typed Decisions
+
+Phase 2C adds Laya as an optional typed-decision provider. Laya answers choice, score, and noul questions over the EamilOS state; its output is treated as a signal and remains subject to deterministic routing and EamilOS policy. Current Laya exposes these typed decision primitives and a Jev-compatible POST /v1/systemone serving interface.
+
+Configure a local Laya HTTP server:
+
+```bash
+export EAMILOS_LAYA_URL=http://127.0.0.1:8000
+export EAMILOS_LAYA_MODEL=typed-decisions
+export EAMILOS_LAYA_API_KEY=...
+```
+
+Optional calibration gates:
+
+```bash
+export EAMILOS_LAYA_CALIBRATION=1
+export EAMILOS_LAYA_CHOICE_TEMPERATURE=1.0
+export EAMILOS_LAYA_SCORE_TEMPERATURE=1.0
+export EAMILOS_LAYA_NOUL_TEMPERATURE=1.0
+export EAMILOS_LAYA_MIN_CONFIDENCE=0.6
+export EAMILOS_LAYA_MIN_PROBABILITY=0.6
+```
+
+Calibration is disabled by default because Laya recommends fitting calibration on deployment-specific validation traffic before trusting probability thresholds.
+
+Without Laya, deterministic Phase 2B intelligence remains available; Laya is never required for core execution.
+
 ## Requirements
 
 - **Node.js >= 18**
