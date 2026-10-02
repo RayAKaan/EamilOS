@@ -89,8 +89,6 @@ export class UniversalAgentScheduler {
         const executionId = randomUUID();
         const startedAt = Date.now();
         this.perAgent.set(match.agent.id, count + 1);
-        this.events?.emitEvent({ type: 'agent:state-changed', agentId: match.agent.id, sessionId: executionId, state: 'starting', timestamp: startedAt });
-
         const promise = (async () => {
           const runtime = this.registry.createRuntime(match.agent.id, {
             workingDir: task.request.workingDir,
