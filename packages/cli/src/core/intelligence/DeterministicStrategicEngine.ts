@@ -24,7 +24,8 @@ export class DeterministicStrategicEngine {
       return this.recovery.decide(context, trigger);
     }
 
-    if (context.taskGraph.readyTasks.length >= 2 && context.mission.constraints.maxConcurrentTasks > 1) {
+    const maxConcurrentTasks = Number(context.mission.constraints.maxConcurrentTasks ?? 1);
+    if (context.taskGraph.readyTasks.length >= 2 && maxConcurrentTasks > 1) {
       return this.parallelization.decide(context);
     }
 
