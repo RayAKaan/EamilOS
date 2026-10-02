@@ -40,6 +40,7 @@ export interface DistributedEventLog {
   append(input: AppendEventInput): EamilosEvent;
   get(eventId: string): EamilosEvent | undefined;
   list(query?: EventQuery): EamilosEvent[];
+  replay<T>(fromSequence: number, reducer: (state: T, event: EamilosEvent) => T, initialState: T): T;
   latest(): EamilosEvent | undefined;
   verifyIntegrity(): void;
   close?(): void;
@@ -84,6 +85,14 @@ export class EamilosSqliteDistributedEventLog implements DistributedEventLog {
     const sql = `SELECT * FROM eamilos_events${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''} ORDER BY sequence ASC LIMIT ?`;
     values.push(limit);
     return (this.db.prepare(sql).all(...values) as EventRow[]).map(hydrate);
+  }
+
+  replay<T>(fromSequence: number, reducer: (state: T, event: EamilosEvent) => T, initialState: T): T {
+    if (!Number.isInteger(fromSequence) || fromSequence < 1) throw new Error('INVALID_REPLAY_SEQUENCE');
+    this.verifyIntegrity();
+    let state = initialState;
+    for (const event of this.list({ fromSequence })) state = reducer(state, event);
+    return state;
   }
 
   latest(): EamilosEvent | undefined {
