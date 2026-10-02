@@ -149,7 +149,7 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
     if (!record) throw new Error(`Execution '${executionId}' not found`);
     return {
       id: `checkpoint_${executionId}`,
-      missionId: record.taskId ? 'unknown' : 'unknown',
+      missionId: record.missionId ?? 'unknown',
       taskId: record.taskId,
       executionId,
       harnessId: record.agentId,
