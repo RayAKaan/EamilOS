@@ -1,9 +1,6 @@
 import { UniversalAgentRegistry } from '../agents/universal/UniversalAgentRegistry.js';
 import { ExecutionStore } from './ExecutionStore.js';
 import { createUniversalHarnessAdapters } from './UniversalHarnessAdapter.js';
-import {
-  createCliHarnessAdapter,
-} from './AgentFactoryHarnessAdapter.js';
 import type { HarnessAdapter } from './HarnessAdapter.js';
 import type {
   HarnessAvailability,
