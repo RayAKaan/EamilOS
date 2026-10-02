@@ -26,7 +26,7 @@ export class AgentInstaller {
 
   plan(definition: UniversalAgentDefinition): string {
     const plan = this.planner.plan(definition);
-    if (plan.commands.length) return plan.commands.map(command => [command.executable.replace(/\\.cmd$/i, ''), ...command.args].join(' ')).join(' && ');
+    if (plan.commands.length) return plan.commands.map(command => [command.executable.replace(/\.cmd$/i, ''), ...command.args].join(' ')).join(' && ');
     return plan.manualAction ?? definition.installation.notes ?? 'Manual/provider installation required';
   }
 
