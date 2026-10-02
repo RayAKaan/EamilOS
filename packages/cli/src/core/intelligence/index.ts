@@ -41,3 +41,8 @@ export { LayaQuestionBuilder } from './LayaQuestionBuilder.js';
 export { LayaHttpDecisionAdapter } from './LayaHttpDecisionAdapter.js';
 export { LayaProcessDecisionAdapter } from './LayaProcessDecisionAdapter.js';
 export { LayaTypedDecisionProvider } from './LayaTypedDecisionProvider.js';
+
+export * from './JevSystemOneTypes.js';
+export { JevQuestionBuilder } from './JevQuestionBuilder.js';
+export { JevDecisionMapper } from './JevDecisionMapper.js';
+export { JevHttpProvider } from './JevHttpProvider.js';
