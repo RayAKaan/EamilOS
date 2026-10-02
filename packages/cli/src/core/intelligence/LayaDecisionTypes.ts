@@ -45,6 +45,17 @@ export interface LayaDecisionBundle {
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
   routing?: Record<string, unknown>;
 }
+export const LayaPredictResponseSchema = z.object({
+  model: z.string().optional(),
+  answers: z.record(z.string(), z.union([
+    z.object({ type: z.literal('choice'), choice: z.string(), probabilities: z.record(z.string(), z.number()), confidence: z.number().optional(), answer_confidence: z.number().optional() }).transform(value => ({ ...value, answerConfidence: value.answer_confidence })),
+    z.object({ type: z.literal('score'), score: z.number(), probabilities: z.record(z.string(), z.number()), legend: z.record(z.string(), z.string()).optional(), confidence: z.number().optional(), answer_confidence: z.number().optional() }).transform(value => ({ ...value, answerConfidence: value.answer_confidence })),
+    z.object({ type: z.literal('noul'), noul: z.number(), confidence: z.number().optional(), answer_confidence: z.number().optional() }).transform(value => ({ ...value, answerConfidence: value.answer_confidence })),
+  ])),
+  usage: z.object({ input_tokens: z.number().optional(), output_tokens: z.number().optional(), total_tokens: z.number().optional() }).optional(),
+  routing: z.record(z.string(), z.unknown()).optional(),
+});
+
 export interface LayaDecisionAdapter {
   readonly id: string;
   predict(request: LayaPredictRequest): Promise<LayaPredictResponse>;
