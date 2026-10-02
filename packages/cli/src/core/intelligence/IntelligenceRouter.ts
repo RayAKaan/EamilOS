@@ -21,7 +21,7 @@ export class IntelligenceRouter {
     const candidates = this.registry.list().filter(provider => supports(provider, request.type));
     const preferred = request.preferredProviders ?? [];
     const ordered = [
-      ...preferred.map(id => candidates.find(provider => provider.id === id)).filter(Boolean),
+      ...preferred.map(id => candidates.find(provider => provider.id === id)).filter((provider): provider is typeof candidates[number] => provider !== undefined),
       ...candidates.filter(provider => !preferred.includes(provider.id)),
     ];
 
