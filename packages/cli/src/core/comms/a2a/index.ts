@@ -10,3 +10,5 @@ export * from './EamilosA2ATaskStore.js';
 export * from './EamilosA2AClient.js';
 
 export * from './EamilosA2AServer.js';
+
+export * from './EamilosA2ASqliteTaskStore.js';

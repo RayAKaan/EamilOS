@@ -1,5 +1,14 @@
 import { isTerminalMessage, taskRequestFingerprint, type TaskRequest, type EamilosA2AMessage } from './EamilosA2AProtocol.js';
 
+export interface EamilosA2ATaskStoreLike {
+  put(request: TaskRequest): StoredTask;
+  get(executionId: string): StoredTask | undefined;
+  getByIdempotencyKey(key: string): StoredTask | undefined;
+  append(message: EamilosA2AMessage): StoredTask;
+  list(): StoredTask[];
+  close?: () => void;
+}
+
 export interface StoredTask {
   request: TaskRequest;
   fingerprint: string;
