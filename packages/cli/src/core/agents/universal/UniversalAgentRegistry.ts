@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { UniversalAgentDefinition, AgentDetectionResult, AgentHealthResult } from './types.js';
 import { UNIVERSAL_AGENT_CATALOG } from './catalog.js';
+import { UniversalAgentRuntime } from './AgentRuntime.js';
 
 function commandExists(command: string, timeoutMs = 3000): Promise<{ ok: boolean; version?: string; error?: string }> {
   return new Promise((resolve) => {
@@ -18,14 +19,14 @@ function commandExists(command: string, timeoutMs = 3000): Promise<{ ok: boolean
     };
     const timer = setTimeout(() => {
       try { child.kill(); } catch {}
-      finish({ ok: false, error: `timeout after ${timeoutMs}ms` });
+      finish({ ok: false, error: 'timeout after ' + timeoutMs + 'ms' });
     }, timeoutMs);
     child.stdout?.on('data', (d: Buffer) => { out += d.toString(); });
     child.stderr?.on('data', (d: Buffer) => { err += d.toString(); });
     child.once('error', (e) => finish({ ok: false, error: e.message }));
     child.once('close', (code) => {
       if (code === 0) finish({ ok: true, version: (out || err).trim().split(/\r?\n/)[0] || 'installed' });
-      else finish({ ok: false, error: err.trim() || `exit code ${code ?? 'unknown'}` });
+      else finish({ ok: false, error: err.trim() || 'exit code ' + (code ?? 'unknown') });
     });
   });
 }
@@ -38,22 +39,15 @@ export class UniversalAgentRegistry {
     for (const definition of definitions) this.definitions.set(definition.id, definition);
   }
 
-  list(): UniversalAgentDefinition[] {
-    return [...this.definitions.values()];
-  }
-
-  get(id: string): UniversalAgentDefinition | undefined {
-    return this.definitions.get(id);
-  }
+  list(): UniversalAgentDefinition[] { return [...this.definitions.values()]; }
+  get(id: string): UniversalAgentDefinition | undefined { return this.definitions.get(id); }
 
   detectOne(id: string, timeoutMs = 3000): Promise<AgentDetectionResult> {
     const definition = this.get(id);
     if (!definition) return Promise.resolve({ id, installed: false, error: 'Unknown agent' });
-
-    const candidates = definition.executableCandidates;
     return (async () => {
       let lastError = 'not found';
-      for (const executable of candidates) {
+      for (const executable of definition.executableCandidates) {
         const result = await commandExists(executable, timeoutMs);
         if (result.ok) {
           const detection = { id, installed: true, executable, version: result.version };
@@ -69,37 +63,29 @@ export class UniversalAgentRegistry {
   }
 
   async detectAll(options: { timeoutMs?: number } = {}): Promise<AgentDetectionResult[]> {
-    const timeoutMs = options.timeoutMs ?? 3000;
-    return Promise.all(this.list().map((agent) => this.detectOne(agent.id, timeoutMs)));
+    return Promise.all(this.list().map((agent) => this.detectOne(agent.id, options.timeoutMs ?? 3000)));
   }
 
   async health(id: string, timeoutMs = 3000): Promise<AgentHealthResult> {
     const definition = this.get(id);
-    if (!definition) {
-      return { id, installed: false, authenticated: false, ready: false, checks: [{ name: 'definition', ok: false, detail: 'Unknown agent' }] };
-    }
-
+    if (!definition) return { id, installed: false, authenticated: false, ready: false, checks: [{ name: 'definition', ok: false, detail: 'Unknown agent' }] };
     const detection = await this.detectOne(id, timeoutMs);
     const checks = [{ name: 'installed', ok: detection.installed, detail: detection.version ?? detection.error }];
-
-    if (!detection.installed) {
-      return { ...detection, authenticated: false, ready: false, checks };
-    }
-
+    if (!detection.installed) return { ...detection, authenticated: false, ready: false, checks };
+    checks.push({ name: 'protocol', ok: definition.protocols.length > 0, detail: definition.protocols.join(', ') });
     const authEnv = definition.authentication.environmentVariables ?? [];
     const hasEnvAuth = authEnv.length === 0 || authEnv.some((key) => Boolean(process.env[key]));
     checks.push({ name: 'authentication', ok: hasEnvAuth, detail: authEnv.length ? (hasEnvAuth ? 'credential detected' : 'credential not detected') : 'agent-managed' });
-
     const authenticated: boolean | 'unknown' = authEnv.length === 0 ? 'unknown' : hasEnvAuth;
-    const ready = detection.installed && authenticated !== false;
-    return { ...detection, authenticated, ready, checks };
+    return { ...detection, authenticated, ready: detection.installed && authenticated !== false, checks };
   }
 
-  getDetection(id: string): AgentDetectionResult | undefined {
-    return this.detections.get(id);
-  }
+  getDetection(id: string): AgentDetectionResult | undefined { return this.detections.get(id); }
+  getInstalled(): UniversalAgentDefinition[] { return this.list().filter((agent) => this.detections.get(agent.id)?.installed); }
 
-  getInstalled(): UniversalAgentDefinition[] {
-    return this.list().filter((agent) => this.detections.get(agent.id)?.installed);
+  createRuntime(id: string, options: { workingDir: string; timeoutMs?: number }): UniversalAgentRuntime {
+    const definition = this.get(id);
+    if (!definition) throw new Error('Unknown agent: ' + id);
+    return new UniversalAgentRuntime(definition, options);
   }
 }
