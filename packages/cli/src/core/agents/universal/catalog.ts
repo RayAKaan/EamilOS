@@ -4,7 +4,7 @@ const base = (overrides: Partial<UniversalCapabilities> = {}): UniversalCapabili
   codeGeneration: true, fileEditing: true, commandExecution: true, webResearch: false,
   browser: false, longContext: false, multimodal: false, planning: true, testing: true,
   debugging: true, refactoring: true, git: true, mcp: false, acp: false, a2a: false,
-  subagents: false, interactive: true, nativeTui: true, headless: true, local: true,
+  subagents: false, interactive: true, nativeTui: true, headless: false, local: true,
   cloud: true, persistentSessions: false, resumeSessions: false, streaming: true,
   structuredOutput: false, sandboxing: false, remoteExecution: false, ...overrides,
 });
@@ -17,8 +17,8 @@ const cli = (
 ): UniversalAgentDefinition => ({
   id, name, provider, kind: 'cli', integrationStatus: 'supported',
   protocols: ['pty', 'stdio'], platforms: ['darwin', 'linux', 'win32'],
-  capabilities: base(capabilities), installation, executableCandidates: [executable],
-  versionArgs: ['--version'], authentication: { methods: ['environment', 'api-key', 'oauth'], environmentVariables: provider === 'openai' ? ['OPENAI_API_KEY'] : provider === 'anthropic' ? ['ANTHROPIC_API_KEY'] : provider === 'google' ? ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] : provider === 'mistral' ? ['MISTRAL_API_KEY'] : provider === 'moonshot' ? ['MOONSHOT_API_KEY'] : provider === 'deepseek' ? ['DEEPSEEK_API_KEY'] : [] },
+  capabilities: base({ ...capabilities, headless: capabilities.headless ?? Boolean(extra.runArgs) }), installation, executableCandidates: [executable],
+  versionArgs: ['--version'], promptDelivery: extra.runArgs ? 'argv' : 'interactive-stdin', authentication: { methods: ['environment', 'api-key', 'oauth'], environmentVariables: provider === 'openai' ? ['OPENAI_API_KEY'] : provider === 'anthropic' ? ['ANTHROPIC_API_KEY'] : provider === 'google' ? ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] : provider === 'mistral' ? ['MISTRAL_API_KEY'] : provider === 'moonshot' ? ['MOONSHOT_API_KEY'] : provider === 'deepseek' ? ['DEEPSEEK_API_KEY'] : [] },
   ...extra,
 });
 
@@ -50,7 +50,7 @@ export const UNIVERSAL_AGENT_CATALOG: UniversalAgentDefinition[] = [
   cli('deepseek-harness', 'DeepSeek Harness', 'deepseek', 'dsh',
     { strategy: 'manual', package: '@deepseek-ai/dsh', notes: 'Install the DeepSeek harness/provider separately.' },
     { webResearch: true, longContext: true },
-    { upstreamUrl: 'https://www.deepseek.com' }),
+    { kind: 'harness', upstreamUrl: 'https://www.deepseek.com' }),
 
   cli('qwen-code', 'Qwen Code', 'qwen', 'qwen',
     { strategy: 'npm', package: '@qwen-code/qwen-code', command: 'npm install -g @qwen-code/qwen-code' },
