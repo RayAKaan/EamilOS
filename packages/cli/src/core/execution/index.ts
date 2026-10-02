@@ -9,3 +9,5 @@ export * from './CandidateSelector.js';
 export * from './FailurePolicy.js';
 export * from './ExecutionSupervisor.js';
 export * from './HarnessScheduler.js';
+
+export * from './UniversalHarnessAdapter.js';
