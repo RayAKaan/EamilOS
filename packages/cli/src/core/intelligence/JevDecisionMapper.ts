@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { DecisionContext, DecisionAction, JevDecision } from './types.js';
 import type { JevSystemOneResponse } from './JevSystemOneTypes.js';
 
@@ -25,7 +26,7 @@ export class JevDecisionMapper {
     const humanReviewProbability = humanReview?.type === 'noul' ? humanReview.noul : 0;
     const confidence = actionAnswer.confidence ?? (actionAnswer.type === 'choice' ? Math.max(...Object.values(actionAnswer.probabilities), 0) : 0);
     const decision: JevDecision = {
-      decisionId: 'jev_' + crypto.randomUUID(),
+      decisionId: 'jev_' + randomUUID(),
       missionId: context.mission.id,
       action,
       reasoning: 'Jev System One selected ' + action + ' from the bounded EamilOS action set.' + (humanReviewProbability >= 0.5 ? ' Human review was also indicated by the model signal.' : ''),
