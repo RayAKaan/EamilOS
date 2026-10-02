@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EamilosA2AServer } from './EamilosA2AServer.js';
 import { EamilosA2AClient } from './EamilosA2AClient.js';
 import { EamilosSqliteResourceLeaseManager } from './EamilosResourceLeaseManager.js';
+import { EamilosSqliteCheckpointStore } from './EamilosCheckpointStore.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
