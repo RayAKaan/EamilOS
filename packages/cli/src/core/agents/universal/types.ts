@@ -1,6 +1,6 @@
 export type UniversalAgentKind = 'cli' | 'binary' | 'python' | 'node' | 'container' | 'harness' | 'api' | 'remote';
 export type AgentProtocol = 'pty' | 'stdio' | 'json-rpc' | 'http' | 'websocket' | 'acp' | 'mcp' | 'a2a';
-export type InstallStrategy = 'existing' | 'npm' | 'pip' | 'uv' | 'brew' | 'binary' | 'script' | 'provider' | 'manual';
+export type InstallStrategy = 'existing' | 'npm' | 'pip' | 'uv' | 'brew' | 'binary' | 'github-release' | 'script' | 'provider' | 'manual';
 export type IntegrationStatus = 'experimental' | 'supported' | 'verified' | 'production';
 
 export interface UniversalCapabilities {
@@ -27,7 +27,7 @@ export interface UniversalAgentDefinition {
   integrationStatus: IntegrationStatus; protocols: AgentProtocol[]; platforms: NodeJS.Platform[];
   capabilities: UniversalCapabilities; installation: InstallationDefinition;
   authentication: AuthenticationDefinition; executableCandidates: string[];
-  versionArgs: string[]; runArgs?: (prompt: string) => string[]; notes?: string; upstreamUrl?: string;
+  versionArgs: string[]; runArgs?: (prompt: string) => string[]; promptDelivery?: 'interactive-stdin' | 'argv' | 'env' | 'none'; promptEnv?: string;\n  notes?: string; upstreamUrl?: string;
 }
 
 export interface AgentDetectionResult {
