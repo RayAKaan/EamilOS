@@ -18,6 +18,13 @@ export class FusedJevProvider implements JevProvider {
     private readonly outcomes = new DecisionOutcomeStore(),
   ) {}
 
+  async health(): Promise<{ healthy: boolean; error?: string }> {
+    const providers = this.registry.list().filter(provider => provider.id !== this.id && provider.capabilities().strategicDecision);
+    const results = await Promise.all(providers.map(provider => provider.health().catch(() => ({ status: 'UNAVAILABLE' as const }))));
+    const healthy = results.some(result => result.status === 'READY' || result.status === 'DEGRADED');
+    return healthy ? { healthy: true } : { healthy: false, error: 'No strategic intelligence provider is healthy.' };
+  }
+
   async decide(context: DecisionContext): Promise<JevProviderResponse> {
     const sanitized = this.sanitizer.sanitize(context);
     const contextHash = ContextHasher.hash(sanitized);
