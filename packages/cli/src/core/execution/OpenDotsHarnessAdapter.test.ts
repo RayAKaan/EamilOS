@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { OpenDotsHarnessAdapter } from './OpenDotsHarnessAdapter.js';
+import type { HarnessExecutionRequest } from './types.js';
 
-const request = {
+const request: HarnessExecutionRequest = {
   executionId: 'exec_1',
   missionId: 'mission_1',
   taskId: 'task_1',
@@ -20,7 +21,7 @@ const request = {
   timeoutMs: 30_000,
   environment: {},
   policy: {},
-} as const;
+};
 
 describe('OpenDotsHarnessAdapter', () => {
   it('discovers an advertised agent', async () => {
