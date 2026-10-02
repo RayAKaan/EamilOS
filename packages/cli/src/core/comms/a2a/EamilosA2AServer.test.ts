@@ -124,4 +124,61 @@ describe('EamilOS A2A server', () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+  it('persists lifecycle checkpoints and resumes the latest checkpoint', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'eamilos-server-checkpoint-'));
+    const filename = join(directory, 'checkpoints.sqlite');
+    const checkpoints = new EamilosSqliteCheckpointStore({ filename });
+    const server = new EamilosA2AServer({
+      workerId: 'worker-1',
+      checkpointStore: checkpoints,
+      currentGraphVersion: () => 1,
+      currentContextVersion: () => 1,
+      currentContextHash: () => 'a'.repeat(64),
+      card: {
+        kind: 'agent.card', protocolVersion: 1, workerId: 'worker-1', agentId: 'agent-1',
+        harnessId: 'harness-1', name: 'worker', description: 'checkpoint worker',
+        endpoint: 'http://127.0.0.1:1', capabilities: ['code.execution'], maxConcurrency: 2,
+        streaming: true, checkpointResume: true, authentication: [], metadata: {},
+        advertisedAt: new Date().toISOString(),
+      },
+    });
+    const checkpointRequest = { ...request, executionId: 'checkpoint-e1', idempotencyKey: 'm1:t1:checkpoint-e1' };
+    const address = await server.start();
+    const endpoint = `http://${address.host}:${address.port}`;
+    try {
+      expect((await fetch(`${endpoint}/eamilos/a2a/tasks`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(checkpointRequest),
+      })).status).toBe(202);
+
+      const progress = await fetch(`${endpoint}/eamilos/a2a/tasks/${checkpointRequest.executionId}/messages`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'task.progress', protocolVersion: 1, missionId: checkpointRequest.missionId,
+          taskId: checkpointRequest.taskId, executionId: checkpointRequest.executionId,
+          requestId: checkpointRequest.requestId, idempotencyKey: checkpointRequest.idempotencyKey,
+          graphVersion: 1, timestamp: new Date().toISOString(), workerId: 'worker-1',
+          progress: 0.5, checkpoint: { step: 7, cursor: 'abc' },
+        }),
+      });
+      expect(progress.status).toBe(200);
+
+      const latest = await fetch(`${endpoint}/eamilos/a2a/tasks/${checkpointRequest.executionId}/checkpoints`);
+      expect(latest.status).toBe(200);
+      const checkpoint = await latest.json() as { sequence: number; state: Record<string, unknown> };
+      expect(checkpoint.sequence).toBe(1);
+      expect(checkpoint.state).toEqual({ step: 7, cursor: 'abc' });
+
+      const resumed = await fetch(`${endpoint}/eamilos/a2a/tasks/${checkpointRequest.executionId}/resume`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ graphVersion: 1, contextHash: 'a'.repeat(64) }),
+      });
+      expect(resumed.status).toBe(200);
+      expect((await resumed.json() as { state: Record<string, unknown> }).state).toEqual({ step: 7, cursor: 'abc' });
+    } finally {
+      await server.stop();
+      checkpoints.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
 });
