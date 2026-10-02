@@ -25,3 +25,10 @@ export { IntelligenceLifecycleManager } from './IntelligenceLifecycleManager.js'
 export { IntelligenceRuntime } from './IntelligenceRuntime.js';
 export { createIntelligenceFoundation } from './IntelligenceFoundation.js';
 export { LegacyJevProviderAdapter, LegacyLayaProviderAdapter } from './providers/LegacyProviderAdapters.js';
+
+export { DeterministicAgentSelector } from './DeterministicAgentSelector.js';
+export { DeterministicPlanner } from './DeterministicPlanner.js';
+export { DeterministicRecoveryEngine } from './DeterministicRecoveryEngine.js';
+export { DeterministicParallelizationEngine } from './DeterministicParallelizationEngine.js';
+export { DeterministicStrategicEngine } from './DeterministicStrategicEngine.js';
+export { DeterministicIntelligenceProvider } from './DeterministicIntelligenceProvider.js';
