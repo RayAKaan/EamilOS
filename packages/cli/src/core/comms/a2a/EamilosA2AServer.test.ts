@@ -111,6 +111,8 @@ describe('EamilOS A2A server', () => {
       const third = await fetch(`${endpoint}/eamilos/a2a/tasks`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
           ...secondRequest,
+          executionId: 'lock-e3',
+          idempotencyKey: 'm1:t1:lock-e3',
           requestId: 'r3',
         }),
       });
