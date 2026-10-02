@@ -79,8 +79,11 @@ export class JevHttpProvider implements JevProvider {
       } catch (error) {
         lastError = error;
         if (attempt >= (this.options.maxRetries ?? 2) || !this.shouldRetry(error)) throw error;
-        const delay = Math.min(this.options.maxBackoffMs ?? 5000, (this.options.baseBackoffMs ?? 250) * 2 ** attempt);
-        await sleep(delay);
+        const retryAfter = error && typeof error === 'object' && 'retryAfterMs' in error
+          ? (error as { retryAfterMs?: number }).retryAfterMs
+          : undefined;
+        const exponential = Math.min(this.options.maxBackoffMs ?? 5000, (this.options.baseBackoffMs ?? 250) * 2 ** attempt);
+        await sleep(Math.min(this.options.maxBackoffMs ?? 5000, retryAfter ?? exponential));
       }
     }
     throw lastError instanceof Error ? lastError : new Error('Jev request failed.');
