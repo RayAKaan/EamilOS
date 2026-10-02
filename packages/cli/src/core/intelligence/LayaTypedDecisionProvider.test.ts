@@ -3,7 +3,7 @@ import { LayaCalibration } from './LayaCalibration.js';
 import { LayaQuestionBuilder } from './LayaQuestionBuilder.js';
 import { LayaTypedDecisionProvider } from './LayaTypedDecisionProvider.js';
 import { LayaPredictResponseSchema } from './LayaDecisionTypes.js';
-import type { LayaDecisionAdapter } from './LayaDecisionTypes.js';
+import { DEFAULT_LAYA_CALIBRATION, type LayaDecisionAdapter } from './LayaDecisionTypes.js';
 import type { DecisionContext } from './types.js';
 
 const context = (): DecisionContext => ({
