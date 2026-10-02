@@ -1,4 +1,5 @@
 import { UniversalAgentRegistry } from '../agents/universal/UniversalAgentRegistry.js';
+import { ExecutionStore as UniversalExecutionStore } from '../agents/universal/ExecutionStore.js';
 import { UniversalAgentRuntime } from '../agents/universal/AgentRuntime.js';
 import { ExecutionStore } from '../agents/universal/ExecutionStore.js';
 import type { UniversalAgentDefinition } from '../agents/universal/types.js';
@@ -68,16 +69,16 @@ function descriptorFor(definition: UniversalAgentDefinition): HarnessDescriptor 
 export class UniversalHarnessAdapter implements HarnessAdapter {
   readonly descriptor: HarnessDescriptor;
   private runtime?: UniversalAgentRuntime;
-  private readonly store: import('../agents/universal/ExecutionStore.js').ExecutionStore;
+  private readonly store: UniversalExecutionStore;
   private readonly missionStore: ExecutionStore;
 
   constructor(
     private readonly definition: UniversalAgentDefinition,
     private readonly registry: UniversalAgentRegistry,
-    store?: import('../agents/universal/ExecutionStore.js').ExecutionStore,
+    store?: UniversalExecutionStore,
   ) {
     this.descriptor = descriptorFor(definition);
-    this.store = store ?? new (requireUniversalExecutionStore())();
+    this.store = store ?? new UniversalExecutionStore();
     this.missionStore = new ExecutionStore();
   }
 
@@ -275,8 +276,4 @@ export function createUniversalHarnessAdapters(
   store = new ExecutionStore(),
 ): UniversalHarnessAdapter[] {
   return registry.list().map((definition) => new UniversalHarnessAdapter(definition, registry, store));
-}
-
-function requireUniversalExecutionStore() {
-  return require('../agents/universal/ExecutionStore.js').ExecutionStore as typeof import('../agents/universal/ExecutionStore.js').ExecutionStore;
 }
