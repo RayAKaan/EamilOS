@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import type { LayaDecisionAdapter, LayaPredictRequest, LayaPredictResponse } from './LayaDecisionTypes.js';
 export interface LayaProcessDecisionOptions { command: string; args?: string[]; timeoutMs?: number; cwd?: string; environment?: Record<string, string>; }
 export class LayaProcessDecisionAdapter implements LayaDecisionAdapter {
-  readonly id = 'laya-local';
+  readonly id = 'laya-local-typed';
   constructor(private readonly options: LayaProcessDecisionOptions) { if (!options.command) throw new Error('Laya command is required'); }
   async predict(request: LayaPredictRequest): Promise<LayaPredictResponse> {
     const output = await new Promise<string>((resolve, reject) => {
