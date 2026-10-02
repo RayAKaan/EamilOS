@@ -57,7 +57,7 @@ export class InstallationPlanner {
         break;
       case 'script':
         supported = false;
-        manualAction = 'Run the official installer manually. EamilOS never executes arbitrary remote scripts.';
+        manualAction = 'Run the official installer manually. Remote scripts are never executed automatically.';
         break;
       case 'provider':
       case 'manual':
