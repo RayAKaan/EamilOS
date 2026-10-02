@@ -69,6 +69,8 @@ export class FusedJevProvider implements JevProvider {
 
   private sourceFor(providerId: string): FusionCandidate['source'] {
     if (providerId.startsWith('laya')) return 'laya';
+    // The Phase 2B deterministic fallback is exposed through the legacy `jev` adapter id.
+    if (providerId === 'jev' && !process.env.EAMILOS_JEV_API_KEY && !process.env.TYPESAFE_API_KEY) return 'deterministic';
     if (providerId.startsWith('jev')) return 'jev';
     return 'deterministic';
   }
