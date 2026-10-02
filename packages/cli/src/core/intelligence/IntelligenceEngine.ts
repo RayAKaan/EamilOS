@@ -13,6 +13,7 @@ import type { IntelligenceConfig, JevProvider, LayaModelAdapter } from './types.
 import type { LayaDecisionAdapter, LayaCalibrationConfig } from './LayaDecisionTypes.js';
 import type { FleetIntelligenceProvider } from './FleetIntelligence.js';
 import { DeterministicJevProvider } from './DeterministicJevProvider.js';
+import { FusedJevProvider } from './FusedJevProvider.js';
 
 export class IntelligenceEngine {
   readonly context: DecisionContextBuilder;
@@ -40,7 +41,13 @@ export class IntelligenceEngine {
     this.foundation = foundation ?? createIntelligenceFoundation({ jev, laya, layaTyped, layaCalibration });
     this.context = new DecisionContextBuilder(missions, coordination, executions, decisions, registry, fleet);
     this.decisions = decisions;
-    this.runtime = new DecisionRuntime(jev, undefined, config.jev.maxRetries, new DeterministicJevProvider());
+
+    // Phase 2E is the default strategic path. Set EAMILOS_INTELLIGENCE_FUSION=0
+    // only when debugging an individual Jev provider in isolation.
+    const provider: JevProvider = process.env.EAMILOS_INTELLIGENCE_FUSION === '0'
+      ? jev
+      : new FusedJevProvider(this.foundation.registry);
+    this.runtime = new DecisionRuntime(provider, undefined, config.jev.maxRetries, new DeterministicJevProvider());
     this.applier = new DecisionApplier(missions, coordination, scheduler, laya, executions);
     this.loop = new StrategicLoop(this.context, this.runtime, this.applier, decisions, config);
   }
