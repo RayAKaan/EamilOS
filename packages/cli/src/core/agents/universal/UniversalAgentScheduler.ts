@@ -7,7 +7,7 @@ import { ExecutionStore } from './ExecutionStore.js';
 
 export interface UniversalAgentTask {
   id?: string; request: AgentRequest; requirements?: AgentCapabilityRequirements; preferredAgentId?: string;
-  maxAttempts?: number; priority?: number;
+  maxAttempts?: number; priority?: number; strictAgentId?: boolean;
 }
 export interface UniversalAgentExecution {
   id: string; taskId: string; agentId: string; startedAt: number; finishedAt: number; response: AgentResponse; match: AgentMatch;
@@ -32,7 +32,7 @@ export class UniversalAgentScheduler {
       ...task.requirements,
       preferredAgentIds: [task.preferredAgentId, ...(task.requirements?.preferredAgentIds ?? [])].filter(Boolean) as string[],
     };
-    const candidates = this.matcher.match(definitions, requirements).sort((a,b) => b.score - a.score);
+    const candidates = this.matcher.match(definitions, requirements).sort((a,b) => b.score - a.score).filter(match => !task.strictAgentId || match.agent.id === task.preferredAgentId);
     let lastError = 'No universal agent satisfies the task requirements';
 
     for (const match of candidates) {
