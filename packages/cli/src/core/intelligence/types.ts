@@ -202,7 +202,7 @@ export interface JevProviderResponse {
   decision: JevDecision;
   provider: string;
   model?: string;
-  usage?: { inputTokens?: number; outputTokens?: number; costUsd?: number };
+  usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; costUsd?: number };
   latencyMs: number;
 }
 
