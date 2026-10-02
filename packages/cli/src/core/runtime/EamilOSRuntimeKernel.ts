@@ -7,6 +7,7 @@ import { WebhookRuntime } from '../webhook/WebhookRuntime.js';
 import { EamilOSSDK } from '../sdk/EamilOSSDK.js';
 import { PhaseFDifferentiationRuntime } from '../differentiation/PhaseFDifferentiationRuntime.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
+import { getUniversalAgentPlatform } from '../agents/universal/UniversalAgentPlatform.js';
 import { MissionEventStore } from './MissionEventStore.js';
 import { MissionReplay } from './MissionReplay.js';
 import { MissionRecovery } from './MissionRecovery.js';
@@ -69,7 +70,8 @@ export class EamilOSRuntimeKernel {
     this.web = new WebRuntime();
     this.webhooks = new WebhookRuntime();
     this.acp = new ACPRuntime();
-    this.harnesses = new HarnessRegistry(options.autoRegisterCliHarnesses ?? true);
+    const universalPlatform = getUniversalAgentPlatform();
+    this.harnesses = new HarnessRegistry(options.autoRegisterCliHarnesses ?? true, universalPlatform.registry, universalPlatform.store);
     this.differentiation = new PhaseFDifferentiationRuntime();
     this.sdk = new EamilOSSDK({
       runtime: this.plugins,
