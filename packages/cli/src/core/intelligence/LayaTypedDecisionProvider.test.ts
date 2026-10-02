@@ -29,6 +29,10 @@ describe('Laya typed decisions', () => {
     const result = new LayaQuestionBuilder().build({ requestId: 'r1', missionId: 'mission_laya', type: 'TASK_DECISION', priority: 'NORMAL', contextVersion: 3, contextHash: 'hash', context: context() }, context());
     expect(result.questionIds).toEqual(['action']); expect(result.request.questions.action.type).toBe('choice');
   });
+  it('supports caller-defined score questions', () => {
+    const result = new LayaQuestionBuilder().build({ requestId: 'score', missionId: 'mission_laya', type: 'TASK_DECISION', priority: 'NORMAL', contextVersion: 3, contextHash: 'hash', context: context(), metadata: { layaQuestions: { urgency: { type: 'score', instructions: 'How urgent is this task?', criteria: ['low', 'medium', 'critical'] } } } }, context());
+    expect(result.request.questions.urgency.type).toBe('score');
+  });
   it('accepts a high-confidence typed decision', async () => {
     const result = await new LayaTypedDecisionProvider(new FakeAdapter()).evaluate({ requestId: 'r2', missionId: 'mission_laya', type: 'TASK_DECISION', priority: 'NORMAL', contextVersion: 3, contextHash: 'hash', context: context() });
     expect(result.status).toBe('SUCCESS'); expect(result.result?.decisions[0].answer.choice).toBe('EXECUTE');
