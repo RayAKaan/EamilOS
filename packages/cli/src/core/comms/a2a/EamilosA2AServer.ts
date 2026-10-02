@@ -153,7 +153,7 @@ export class EamilosA2AServer {
         const match = path.match(/^\/eamilos\/a2a\/leases\/([^/]+)\/renew$/)!;
         if (!this.leases) return this.send(res, 404, { error: 'RESOURCE_LEASING_DISABLED' });
         const body = await this.parseBody(req) as { ownerId?: unknown; fencingToken?: unknown; ttlMs?: unknown };
-        if (typeof body.ownerId !== 'string' || !Number.isInteger(body.fencingToken) || !Number.isInteger(body.ttlMs)) {
+        if (typeof body.ownerId !== 'string' || typeof body.fencingToken !== 'number' || !Number.isInteger(body.fencingToken) || typeof body.ttlMs !== 'number' || !Number.isInteger(body.ttlMs)) {
           return this.send(res, 400, { error: 'INVALID_LEASE_RENEWAL' });
         }
         const lease = this.leases.renew(decodeURIComponent(match[1]!), body.ownerId, body.fencingToken, body.ttlMs);
@@ -182,8 +182,9 @@ export class EamilosA2AServer {
         }
         this.tasks.append(parsed);
         if (parsed.kind === 'task.completed' || parsed.kind === 'task.failed' || parsed.kind === 'task.cancelled') {
-          const lease = this.leases?.getByExecution(executionId);
-          if (lease) this.leases.release(lease.leaseId, lease.ownerId, lease.fencingToken);
+          const leases = this.leases;
+          const lease = leases?.getByExecution(executionId);
+          if (lease) leases.release(lease.leaseId, lease.ownerId, lease.fencingToken);
         }
         return this.send(res, 200, parsed);
       }
