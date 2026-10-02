@@ -44,6 +44,7 @@ export const TaskSummarySchema = z.object({
   acceptanceCriteria: z.array(z.string()),
   owner: z.string().optional(),
   attempt: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive().optional(),
 });
 export type TaskSummary = z.infer<typeof TaskSummarySchema>;
 
