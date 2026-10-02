@@ -9,3 +9,9 @@ export * from './AuthenticationManager.js';
 export * from './CapabilityMatcher.js';
 export * from './UniversalAgentScheduler.js';
 export * from './AgentRecoveryCoordinator.js';
+
+export * from './AgentLaunchContract.js';
+export * from './InstallationPlanner.js';
+export * from './InstallationVerifier.js';
+export * from './GitHubReleaseInstaller.js';
+export * from './ExecutionStore.js';

@@ -4,6 +4,7 @@ import { UNIVERSAL_AGENT_CATALOG } from './catalog.js';
 import { UniversalAgentRuntime } from './AgentRuntime.js';
 import { AuthenticationManager } from './AuthenticationManager.js';
 import type { UniversalAgentEventBus } from './AgentEventBus.js';
+import type { ExecutionStore } from './ExecutionStore.js';
 
 function commandExists(command: string, args: string[], timeoutMs = 3000): Promise<{ ok: boolean; version?: string; error?: string }> {
   return new Promise((resolve) => {
@@ -88,7 +89,7 @@ export class UniversalAgentRegistry {
     return this.list().filter((agent) => Object.entries(requirements).every(([key, required]) => !required || agent.capabilities[key as keyof UniversalCapabilities]));
   }
 
-  createRuntime(id: string, options: { workingDir: string; timeoutMs?: number; events?: UniversalAgentEventBus }): UniversalAgentRuntime {
+  createRuntime(id: string, options: { workingDir: string; timeoutMs?: number; events?: UniversalAgentEventBus; store?: ExecutionStore }): UniversalAgentRuntime {
     const definition = this.get(id);
     if (!definition) throw new Error('Unknown agent: ' + id);
     return new UniversalAgentRuntime(definition, options);

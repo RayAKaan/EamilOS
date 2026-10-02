@@ -1,6 +1,6 @@
 export type UniversalAgentKind = 'cli' | 'binary' | 'python' | 'node' | 'container' | 'harness' | 'api' | 'remote';
 export type AgentProtocol = 'pty' | 'stdio' | 'json-rpc' | 'http' | 'websocket' | 'acp' | 'mcp' | 'a2a';
-export type InstallStrategy = 'existing' | 'npm' | 'pip' | 'uv' | 'brew' | 'binary' | 'script' | 'provider' | 'manual';
+export type InstallStrategy = 'existing' | 'npm' | 'pip' | 'uv' | 'brew' | 'binary' | 'github-release' | 'script' | 'provider' | 'manual';
 export type IntegrationStatus = 'experimental' | 'supported' | 'verified' | 'production';
 
 export interface UniversalCapabilities {
@@ -12,9 +12,17 @@ export interface UniversalCapabilities {
   structuredOutput: boolean; sandboxing: boolean; remoteExecution: boolean;
 }
 
+export interface ReleaseDefinition {
+  repository: string;
+  assets: Partial<Record<NodeJS.Platform, string[]>>;
+  checksumAssets?: string[];
+  archive?: 'zip' | 'tar.gz' | 'binary';
+  executable?: string;
+}
+
 export interface InstallationDefinition {
   strategy: InstallStrategy; package?: string; executable?: string; command?: string; args?: string[];
-  platform?: Partial<Record<NodeJS.Platform, string>>; requires?: string[]; notes?: string;
+  platform?: Partial<Record<NodeJS.Platform, string>>; requires?: string[]; notes?: string; release?: ReleaseDefinition;
 }
 
 export interface AuthenticationDefinition {
@@ -27,7 +35,8 @@ export interface UniversalAgentDefinition {
   integrationStatus: IntegrationStatus; protocols: AgentProtocol[]; platforms: NodeJS.Platform[];
   capabilities: UniversalCapabilities; installation: InstallationDefinition;
   authentication: AuthenticationDefinition; executableCandidates: string[];
-  versionArgs: string[]; runArgs?: (prompt: string) => string[]; notes?: string; upstreamUrl?: string;
+  versionArgs: string[]; runArgs?: (prompt: string) => string[]; promptDelivery?: 'interactive-stdin' | 'argv' | 'env' | 'none'; promptEnv?: string;
+  notes?: string; upstreamUrl?: string;
 }
 
 export interface AgentDetectionResult {

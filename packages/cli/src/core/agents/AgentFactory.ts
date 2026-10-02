@@ -505,15 +505,17 @@ class DeepSeekHarnessAgentAdapter implements EamilOSAgent {
 
 
 class UniversalAgentAdapter implements EamilOSAgent {
-  readonly kind: AgentKind = 'cli';
+  readonly kind: AgentKind;
   readonly capabilities: AgentCapabilities;
   private readonly agentId: string;
+  private activeExecutionId?: string;
   readonly name: string;
 
   constructor(agentId: string, private readonly config?: { workingDir?: string; timeoutMs?: number }) {
     const definition = getUniversalAgentPlatform().registry.get(agentId);
     if (!definition) throw new Error('Unknown universal agent: ' + agentId);
     this.agentId = agentId;
+    this.kind = definition.kind === 'harness' ? 'harness' : definition.kind === 'api' ? 'api' : 'cli';
     this.name = definition.name;
     this.capabilities = {
       codeGeneration: definition.capabilities.codeGeneration,
@@ -545,12 +547,14 @@ class UniversalAgentAdapter implements EamilOSAgent {
     const platform = getUniversalAgentPlatform();
     const result = await platform.scheduler.execute({
       request: { ...request, workingDir: request.workingDir || this.config?.workingDir || process.cwd(), timeoutMs: request.timeoutMs || this.config?.timeoutMs || 180000 },
-      preferredAgentId: this.agentId,
+      preferredAgentId: this.agentId, strictAgentId: true,
     });
+    this.activeExecutionId = result.id;
     return result.response;
   }
 
   async stop(): Promise<void> {
-    // Universal sessions are owned by the terminal manager/runtime; lifecycle shutdown is handled by the runtime.
+    if (this.activeExecutionId) await getUniversalAgentPlatform().scheduler.stop(this.activeExecutionId);
+    this.activeExecutionId = undefined;
   }
 }

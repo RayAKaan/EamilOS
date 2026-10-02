@@ -1,135 +1,81 @@
 import { spawn } from 'node:child_process';
 import type { AgentInstallationResult, AgentInstallOptions, AgentRemovalResult, UniversalAgentDefinition } from './types.js';
+import { InstallationPlanner } from './InstallationPlanner.js';
+import { InstallationVerifier } from './InstallationVerifier.js';
+import { GitHubReleaseInstaller } from './GitHubReleaseInstaller.js';
 
 function run(command: string, args: string[] = [], timeoutMs = 120000): Promise<{ code: number | null; output: string }> {
   return new Promise((resolve, reject) => {
     const child = process.platform === 'win32'
       ? spawn('cmd.exe', ['/d', '/c', command, ...args], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
       : spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let output = '';
-    let settled = false;
-    const finish = (value: { code: number | null; output: string }) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-    child.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
-    child.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
-    const timer = setTimeout(() => {
-      try { child.kill(); } catch {}
-      if (!settled) { settled = true; reject(new Error(`command timeout after ${timeoutMs}ms`)); }
-    }, timeoutMs);
-    child.once('error', (e) => { clearTimeout(timer); reject(e); });
-    child.once('close', (code) => finish({ code, output: output.trim() }));
+    let output = ''; let settled = false;
+    const finish = (value: { code: number | null; output: string }) => { if (settled) return; settled = true; clearTimeout(timer); resolve(value); };
+    const timer = setTimeout(() => { try { child.kill(); } catch {} if (!settled) { settled = true; reject(new Error(`command timeout after ${timeoutMs}ms`)); } }, timeoutMs);
+    child.stdout?.on('data', d => { output += d.toString(); });
+    child.stderr?.on('data', d => { output += d.toString(); });
+    child.once('error', e => { clearTimeout(timer); reject(e); });
+    child.once('close', code => finish({ code, output: output.trim() }));
   });
 }
 
-function toolCommand(strategy: string): string {
-  if (strategy === 'npm') return process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  if (strategy === 'pip') return process.platform === 'win32' ? 'python' : 'python3';
-  if (strategy === 'uv') return process.platform === 'win32' ? 'uv.exe' : 'uv';
-  return strategy;
-}
-
 export class AgentInstaller {
+  readonly planner = new InstallationPlanner();
+  readonly verifier = new InstallationVerifier();
+  readonly releases = new GitHubReleaseInstaller();
+
+  plan(definition: UniversalAgentDefinition): string {
+    const plan = this.planner.plan(definition);
+    if (plan.commands.length) return plan.commands.map(command => [command.executable.replace(/\.cmd$/i, ''), ...command.args].join(' ')).join(' && ');
+    return plan.manualAction ?? definition.installation.notes ?? 'Manual/provider installation required';
+  }
+
   async install(definition: UniversalAgentDefinition, options: AgentInstallOptions = {}): Promise<AgentInstallationResult> {
-    const spec = definition.installation;
-    if (options.dryRun) {
-      return { id: definition.id, success: true, changed: false, skipped: true, message: this.plan(definition), reason: 'dry-run' };
-    }
-    if (spec.strategy === 'existing') return { id: definition.id, success: true, changed: false, skipped: true, message: 'Uses an existing executable on PATH.' };
-    if (spec.strategy === 'manual' || spec.strategy === 'provider') {
-      return { id: definition.id, success: false, changed: false, message: spec.notes ?? 'Provider-specific/manual installation is required.' };
+    const plan = this.planner.plan(definition, options);
+    if (options.dryRun) return { id: definition.id, success: plan.supported || plan.manualAction !== undefined, changed: false, skipped: true, message: this.plan(definition), reason: 'dry-run' };
+    if (!plan.platformSupported) return { id: definition.id, success: false, changed: false, message: plan.manualAction ?? 'Unsupported platform' };
+
+    if (definition.installation.strategy === 'existing') {
+      const verification = await this.verifier.verify(definition, definition.installation.executable, options.timeoutMs ?? 5000);
+      return { id: definition.id, success: verification.installed, changed: false, message: verification.installed ? 'Executable is already installed.' : verification.error ?? 'Executable not found.' };
     }
 
-    if (spec.strategy === 'npm') {
-      if (!spec.package) return this.invalid(definition, 'npm package is not configured');
-      const command = toolCommand('npm');
-      const args = ['install', '-g', spec.package];
-      return this.execute(definition, command, args, options.timeoutMs, options.force ? 'npm install -g' : 'npm install -g');
+    if (definition.installation.strategy === 'github-release' || definition.installation.strategy === 'binary') {
+      const result = await this.releases.install(definition, options.timeoutMs ?? 120000);
+      if (!result.success) return { id: definition.id, success: false, changed: false, message: result.message };
+      const verification = await this.verifier.verify(definition, result.executable, options.timeoutMs ?? 5000);
+      return { id: definition.id, success: verification.installed, changed: verification.installed, message: verification.installed ? result.message : verification.error ?? 'Post-install verification failed.', command: this.plan(definition) };
     }
-    if (spec.strategy === 'pip') {
-      if (!spec.package) return this.invalid(definition, 'Python package is not configured');
-      const command = toolCommand('pip');
-      const args = ['-m', 'pip', 'install', spec.package];
-      return this.execute(definition, command, args, options.timeoutMs);
+
+    if (!plan.supported) return { id: definition.id, success: false, changed: false, message: plan.manualAction ?? 'No safe automated installer is configured.' };
+
+    const command = plan.commands[0];
+    if (!command) return { id: definition.id, success: false, changed: false, message: 'Installation plan contains no executable command.' };
+    try {
+      const result = await run(command.executable, command.args, options.timeoutMs ?? 120000);
+      if (result.code !== 0) return { id: definition.id, success: false, changed: false, message: result.output || `installation failed with exit code ${result.code ?? 'unknown'}`, command: [command.executable, ...command.args].join(' ') };
+      const verification = await this.verifier.verify(definition, definition.installation.executable, options.timeoutMs ?? 5000);
+      return { id: definition.id, success: verification.installed, changed: true, message: verification.installed ? result.output || 'installed and verified' : verification.error ?? 'installed but verification failed', command: [command.executable, ...command.args].join(' ') };
+    } catch (error) {
+      return { id: definition.id, success: false, changed: false, message: error instanceof Error ? error.message : String(error), command: [command.executable, ...command.args].join(' ') };
     }
-    if (spec.strategy === 'uv') {
-      if (!spec.package) return this.invalid(definition, 'uv package is not configured');
-      const command = toolCommand('uv');
-      const args = ['tool', 'install', spec.package];
-      return this.execute(definition, command, args, options.timeoutMs);
-    }
-    if (spec.strategy === 'brew') {
-      if (process.platform !== 'darwin') return { id: definition.id, success: false, changed: false, message: 'Homebrew installation is only supported on macOS.' };
-      if (!spec.package) return this.invalid(definition, 'brew package is not configured');
-      return this.execute(definition, 'brew', ['install', spec.package], options.timeoutMs);
-    }
-    if (spec.strategy === 'binary') {
-      return { id: definition.id, success: false, changed: false, message: spec.notes ?? 'No verified binary manifest is configured for this agent.' };
-    }
-    if (spec.strategy === 'script') {
-      return { id: definition.id, success: false, changed: false, message: 'Arbitrary remote scripts are never executed automatically. Use the official installer manually, then run eamilos agents doctor.' };
-    }
-    return this.invalid(definition, `unsupported installation strategy: ${spec.strategy}`);
   }
 
   async remove(definition: UniversalAgentDefinition, timeoutMs = 120000): Promise<AgentRemovalResult> {
     const spec = definition.installation;
-    if (!spec.package) return { id: definition.id, success: false, changed: false, message: 'No package identifier is configured; removal is manual.' };
-    if (spec.strategy === 'npm') {
-      const command = toolCommand('npm');
-      const args = ['uninstall', '-g', spec.package];
-      const result = await run(command, args, timeoutMs);
-      return { id: definition.id, success: result.code === 0, changed: result.code === 0, message: result.output || (result.code === 0 ? 'removed' : 'removal failed'), command: `${command} ${args.join(' ')}` };
-    }
-    if (spec.strategy === 'pip') {
-      const command = toolCommand('pip');
-      const args = ['-m', 'pip', 'uninstall', '-y', spec.package];
-      const result = await run(command, args, timeoutMs);
-      return { id: definition.id, success: result.code === 0, changed: result.code === 0, message: result.output || (result.code === 0 ? 'removed' : 'removal failed'), command: `${command} ${args.join(' ')}` };
-    }
-    if (spec.strategy === 'uv') {
-      const command = toolCommand('uv');
-      const args = ['tool', 'uninstall', spec.package];
-      const result = await run(command, args, timeoutMs);
-      return { id: definition.id, success: result.code === 0, changed: result.code === 0, message: result.output || (result.code === 0 ? 'removed' : 'removal failed'), command: `${command} ${args.join(' ')}` };
-    }
-    if (spec.strategy === 'brew') {
-      if (process.platform !== 'darwin') return { id: definition.id, success: false, changed: false, message: 'Homebrew removal is only supported on macOS.' };
-      const result = await run('brew', ['uninstall', spec.package], timeoutMs);
-      return { id: definition.id, success: result.code === 0, changed: result.code === 0, message: result.output || (result.code === 0 ? 'removed' : 'removal failed'), command: `brew uninstall ${spec.package}` };
-    }
+    if (spec.strategy === 'npm' && spec.package) return this.removeCommand(definition, process.platform === 'win32' ? 'npm.cmd' : 'npm', ['uninstall', '-g', spec.package], timeoutMs);
+    if (spec.strategy === 'pip' && spec.package) return this.removeCommand(definition, process.platform === 'win32' ? 'python' : 'python3', ['-m', 'pip', 'uninstall', '-y', spec.package], timeoutMs);
+    if (spec.strategy === 'uv' && spec.package) return this.removeCommand(definition, process.platform === 'win32' ? 'uv.exe' : 'uv', ['tool', 'uninstall', spec.package], timeoutMs);
+    if (spec.strategy === 'brew' && spec.package && (process.platform === 'darwin' || process.platform === 'linux')) return this.removeCommand(definition, 'brew', ['uninstall', spec.package], timeoutMs);
     return { id: definition.id, success: false, changed: false, message: 'Removal is not automated for this installation strategy.' };
   }
 
-  plan(definition: UniversalAgentDefinition): string {
-    const spec = definition.installation;
-    if (spec.command) return spec.command;
-    if (spec.strategy === 'npm' && spec.package) return `npm install -g ${spec.package}`;
-    if (spec.strategy === 'pip' && spec.package) return `python -m pip install ${spec.package}`;
-    if (spec.strategy === 'uv' && spec.package) return `uv tool install ${spec.package}`;
-    if (spec.strategy === 'brew' && spec.package) return `brew install ${spec.package}`;
-    return spec.notes ?? 'Manual/provider installation required';
-  }
-
-  private invalid(definition: UniversalAgentDefinition, message: string): AgentInstallationResult {
-    return { id: definition.id, success: false, changed: false, message };
-  }
-
-  private async execute(definition: UniversalAgentDefinition, command: string, args: string[], timeoutMs = 120000, _label?: string): Promise<AgentInstallationResult> {
+  private async removeCommand(definition: UniversalAgentDefinition, executable: string, args: string[], timeoutMs: number): Promise<AgentRemovalResult> {
     try {
-      const result = await run(command, args, timeoutMs);
-      return {
-        id: definition.id,
-        success: result.code === 0,
-        changed: result.code === 0,
-        message: result.output || (result.code === 0 ? 'installed successfully' : `installation failed with exit code ${result.code ?? 'unknown'}`),
-        command: `${command} ${args.join(' ')}`,
-      };
+      const result = await run(executable, args, timeoutMs);
+      return { id: definition.id, success: result.code === 0, changed: result.code === 0, message: result.output || (result.code === 0 ? 'removed' : 'removal failed'), command: [executable, ...args].join(' ') };
     } catch (error) {
-      return { id: definition.id, success: false, changed: false, message: error instanceof Error ? error.message : String(error), command: `${command} ${args.join(' ')}` };
+      return { id: definition.id, success: false, changed: false, message: error instanceof Error ? error.message : String(error), command: [executable, ...args].join(' ') };
     }
   }
 }
