@@ -35,7 +35,10 @@ describe('Laya typed decisions', () => {
   });
   it('accepts a high-confidence typed decision', async () => {
     const result = await new LayaTypedDecisionProvider(new FakeAdapter()).evaluate({ requestId: 'r2', missionId: 'mission_laya', type: 'TASK_DECISION', priority: 'NORMAL', contextVersion: 3, contextHash: 'hash', context: context() });
-    expect(result.status).toBe('SUCCESS'); expect(result.result?.decisions[0].answer.choice).toBe('EXECUTE');
+    expect(result.status).toBe('SUCCESS');
+    const answer = result.result?.decisions[0].answer;
+    expect(answer?.type).toBe('choice');
+    if (answer?.type === 'choice') expect(answer.choice).toBe('EXECUTE');
   });
   it('degrades low-confidence decisions', () => {
     const calibration = new LayaCalibration({ enabled: false, choiceTemperature: 1, scoreTemperature: 1, noulTemperature: 1, minimumConfidence: 0.9, minimumProbability: 0.9 });
