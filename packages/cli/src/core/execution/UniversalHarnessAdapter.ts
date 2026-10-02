@@ -1,7 +1,7 @@
 import { UniversalAgentRegistry } from '../agents/universal/UniversalAgentRegistry.js';
 import { ExecutionStore as UniversalExecutionStore } from '../agents/universal/ExecutionStore.js';
 import { UniversalAgentRuntime } from '../agents/universal/AgentRuntime.js';
-import { ExecutionStore } from '../agents/universal/ExecutionStore.js';
+import { ExecutionStore as MissionExecutionStore } from './ExecutionStore.js';
 import type { UniversalAgentDefinition } from '../agents/universal/types.js';
 import type { HarnessAdapter } from './HarnessAdapter.js';
 import type {
@@ -70,7 +70,7 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
   readonly descriptor: HarnessDescriptor;
   private runtime?: UniversalAgentRuntime;
   private readonly store: UniversalExecutionStore;
-  private readonly missionStore: ExecutionStore;
+  private readonly missionStore: MissionExecutionStore;
 
   constructor(
     private readonly definition: UniversalAgentDefinition,
@@ -79,7 +79,7 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
   ) {
     this.descriptor = descriptorFor(definition);
     this.store = store ?? new UniversalExecutionStore();
-    this.missionStore = new ExecutionStore();
+    this.missionStore = new MissionExecutionStore();
   }
 
   async detect(): Promise<HarnessAvailability> {
@@ -273,7 +273,7 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
 
 export function createUniversalHarnessAdapters(
   registry = new UniversalAgentRegistry(),
-  store = new ExecutionStore(),
+  store = new UniversalExecutionStore(),
 ): UniversalHarnessAdapter[] {
   return registry.list().map((definition) => new UniversalHarnessAdapter(definition, registry, store));
 }
