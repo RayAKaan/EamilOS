@@ -91,6 +91,7 @@ export function registerAgentsCommand(program: Command): void {
     if (!agent) throw new Error('Unknown agent: ' + agentId);
     const result = getUniversalAgentPlatform().auth.inspect(agent);
     console.log(result.status + ': ' + result.detail);
+    if (result.loginCommand) console.log('  Native login: ' + [result.loginCommand.executable, ...result.loginCommand.args].join(' '));
     if (result.checkedEnvironmentVariables.length) console.log('  Environment: ' + result.checkedEnvironmentVariables.join(', '));
     if (result.checkedConfigFiles.length) console.log('  Config paths checked: ' + result.checkedConfigFiles.join(', '));
   });
@@ -102,6 +103,7 @@ export function registerAgentsCommand(program: Command): void {
       const agent = registry.get(agentId);
       if (!agent) throw new Error('Unknown agent: ' + agentId);
       const platform = getUniversalAgentPlatform();
+      await platform.initialize();
       const response = await platform.scheduler.execute({
         request: {
           id: nanoid(12), sessionId: nanoid(12), prompt: prompt.join(' '), systemPrompt: '',
@@ -109,6 +111,7 @@ export function registerAgentsCommand(program: Command): void {
           onOutput: (chunk: string) => process.stdout.write(chunk),
         },
         preferredAgentId: agentId,
+        strictAgentId: true,
       });
       if (!response.response.success) process.exitCode = 1;
     });
