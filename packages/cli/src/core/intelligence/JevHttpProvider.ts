@@ -53,8 +53,11 @@ export class JevHttpProvider implements JevProvider {
         const usage = parsed.usage;
         const inputTokens = usage?.input_tokens;
         const costUsd = usage?.cost;
-        if (this.options.maxTokens !== undefined && inputTokens !== undefined && inputTokens > this.options.maxTokens) {
-          throw new Error('Jev token budget exceeded: ' + inputTokens + ' > ' + this.options.maxTokens);
+        const totalTokens = usage?.total_tokens ?? ((inputTokens ?? 0) + (usage?.output_tokens ?? 0));
+        if (this.options.maxTokens !== undefined && totalTokens > this.options.maxTokens) {
+          const budgetError = new Error('Jev token budget exceeded.');
+          (budgetError as Error & { retryable?: boolean }).retryable = false;
+          throw budgetError;
         }
         if (this.options.maxCostUsd !== undefined && costUsd !== undefined && costUsd > this.options.maxCostUsd) {
           throw new Error('Jev cost budget exceeded.');
@@ -68,6 +71,7 @@ export class JevHttpProvider implements JevProvider {
           usage: {
             inputTokens,
             outputTokens: usage?.output_tokens,
+            totalTokens,
             costUsd,
           },
           latencyMs: Date.now() - started,
@@ -107,8 +111,8 @@ export class JevHttpProvider implements JevProvider {
     if (!response.ok) {
       const retryable = retryableStatus(response.status);
       const retryAfter = retryAfterMs(response.headers.get('retry-after'));
-      const body = response.status === 401 || response.status === 403 ? '' : (await response.text()).slice(0, 300);
-      const error = new Error('Jev HTTP ' + response.status + (body ? ': ' + body : ''));
+      await response.text();
+      const error = new Error('Jev HTTP ' + response.status);
       (error as Error & { retryable?: boolean; retryAfterMs?: number }).retryable = retryable;
       (error as Error & { retryable?: boolean; retryAfterMs?: number }).retryAfterMs = retryAfter;
       throw error;
