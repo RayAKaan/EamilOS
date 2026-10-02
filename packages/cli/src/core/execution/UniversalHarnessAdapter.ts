@@ -68,15 +68,17 @@ function descriptorFor(definition: UniversalAgentDefinition): HarnessDescriptor 
 export class UniversalHarnessAdapter implements HarnessAdapter {
   readonly descriptor: HarnessDescriptor;
   private runtime?: UniversalAgentRuntime;
-  private readonly store: ExecutionStore;
+  private readonly store: import('../agents/universal/ExecutionStore.js').ExecutionStore;
+  private readonly missionStore: ExecutionStore;
 
   constructor(
     private readonly definition: UniversalAgentDefinition,
     private readonly registry: UniversalAgentRegistry,
-    store?: ExecutionStore,
+    store?: import('../agents/universal/ExecutionStore.js').ExecutionStore,
   ) {
     this.descriptor = descriptorFor(definition);
-    this.store = store ?? new ExecutionStore();
+    this.store = store ?? new (requireUniversalExecutionStore())();
+    this.missionStore = new ExecutionStore();
   }
 
   async detect(): Promise<HarnessAvailability> {
@@ -130,7 +132,23 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
       },
       onOutput,
     });
-    return this.toResult(request, response);
+    const result = this.toResult(request, response);
+    this.missionStore.saveExecution({
+      executionId: request.executionId,
+      missionId: request.missionId,
+      taskId: request.taskId,
+      harnessId: request.harnessId,
+      nodeId: request.nodeId,
+      state: result.status === 'COMPLETED' ? 'VALIDATING' : result.status === 'RECOVERABLE' ? 'RECOVERABLE' : result.status,
+      attempts: 1,
+      startedAt: result.metrics.startedAt,
+      completedAt: result.metrics.completedAt,
+      checkpointId: result.checkpoint?.id,
+      failure: result.error?.type,
+      result,
+      updatedAt: new Date().toISOString(),
+    });
+    return result;
   }
 
   async cancel(executionId: string): Promise<void> {
@@ -147,7 +165,7 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
     await this.ensureStoreLoaded();
     const record = this.store.get(executionId);
     if (!record) throw new Error(`Execution '${executionId}' not found`);
-    return {
+    const checkpoint: ExecutionCheckpoint = {
       id: `checkpoint_${executionId}`,
       missionId: record.missionId ?? 'unknown',
       taskId: record.taskId,
@@ -161,6 +179,8 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
       resumeContext: 'Resume from the recorded output without repeating completed work.',
       metadata: { source: 'universal-agent-execution-store' },
     };
+    this.missionStore.saveCheckpoint(checkpoint);
+    return checkpoint;
   }
 
   async resume(
@@ -225,7 +245,14 @@ export class UniversalHarnessAdapter implements HarnessAdapter {
       output: response.content,
       artifacts: response.fileChanges.map((change) => ({ path: change.path, type: 'file' })),
       fileChanges: response.fileChanges.map((change) => ({ path: change.path, action: change.action })),
-      evidence: [],
+      evidence: response.success ? ['agent-process-exited-successfully'] : [],
+      validation: {
+        passed: response.success,
+        checks: [
+          { name: 'agent-response', passed: response.success, details: response.success ? 'Agent returned a successful execution response.' : response.error },
+          { name: 'process-completion', passed: response.success, details: response.success ? 'Agent process completed successfully.' : 'Agent process did not complete successfully.' },
+        ],
+      },
       error: response.success || !failure ? undefined : {
         type: failure,
         message: response.error ?? 'Universal agent execution failed',
@@ -248,4 +275,8 @@ export function createUniversalHarnessAdapters(
   store = new ExecutionStore(),
 ): UniversalHarnessAdapter[] {
   return registry.list().map((definition) => new UniversalHarnessAdapter(definition, registry, store));
+}
+
+function requireUniversalExecutionStore() {
+  return require('../agents/universal/ExecutionStore.js').ExecutionStore as typeof import('../agents/universal/ExecutionStore.js').ExecutionStore;
 }
