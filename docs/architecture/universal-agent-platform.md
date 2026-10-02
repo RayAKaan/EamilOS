@@ -42,3 +42,13 @@ The universal registry is the authoritative catalog for the 35 supported worker 
 - eamilos agents install-all
 
 The platform is deliberately provider-agnostic: Jev, Laya, OpenDots and A2A are later phases and are not required for Phase 1 execution.
+
+## Phase 1 completion architecture
+
+The universal platform is now contract-driven. Each worker definition supplies installation metadata, authentication metadata, executable candidates, protocols, capabilities, and optional headless launch arguments. The runtime creates one terminal process per execution and uses an explicit prompt-delivery contract instead of starting a placeholder process and replacing it.
+
+Execution state is persisted through ExecutionStore with running/completed/failed/recovering records, checkpoints, response evidence, and output byte counts. The scheduler enforces global and per-worker concurrency, supports strict routing for explicitly selected workers, and exposes cancellation. Recovery reuses the canonical task request and appends bounded checkpoint context when moving to another compatible worker.
+
+Installation is split into planning, execution, verification, and optional GitHub-release installation. Remote scripts are never executed automatically. Release downloads can require SHA-256 verification before a binary is installed. Authentication inspection is secret-free and exposes native login plans without printing credentials.
+
+The event bus is the canonical runtime-to-TUI boundary and includes worker lifecycle, output, waiting, permission, question, authentication, completion, failure, and recovery events. Later TUI phases consume these events rather than owning execution state.
