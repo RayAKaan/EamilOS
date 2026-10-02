@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { A2AEnvelopeSchema, AgentCardSchema, TaskRequestSchema, assertTaskRequestFresh, type AgentCard, type TaskRequest, type EamilosA2AMessage, type TaskAccepted, type TaskRejected, type Heartbeat } from './EamilosA2AProtocol.js';
 import { EamilosA2ATaskStore, type EamilosA2ATaskStoreLike } from './EamilosA2ATaskStore.js';
+import { EamilosA2ASqliteTaskStore } from './EamilosA2ASqliteTaskStore.js';
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -8,6 +9,7 @@ export interface EamilosA2AServerOptions {
   card: AgentCard;
   workerId: string;
   taskStore?: EamilosA2ATaskStoreLike;
+  taskStoreFilename?: string;
   validateRequest?: (request: TaskRequest) => Promise<void> | void;
   onTaskRequest?: (request: TaskRequest) => Promise<TaskAccepted | TaskRejected>;
   onCancel?: (request: TaskRequest, reason?: string) => Promise<void> | void;
@@ -23,7 +25,9 @@ export class EamilosA2AServer {
 
   constructor(private readonly options: EamilosA2AServerOptions) {
     AgentCardSchema.parse(options.card);
-    this.tasks = options.taskStore ?? new EamilosA2ATaskStore();
+    if (options.taskStore && options.taskStoreFilename) throw new Error('Specify taskStore or taskStoreFilename, not both');
+    this.tasks = options.taskStore
+      ?? (options.taskStoreFilename ? new EamilosA2ASqliteTaskStore({ filename: options.taskStoreFilename }) : new EamilosA2ATaskStore());
   }
 
   async start(host = '127.0.0.1', port = 0): Promise<{ host: string; port: number }> {
