@@ -67,7 +67,7 @@ export class UniversalAgentRuntime {
 
   async execute(request: AgentRequest): Promise<AgentResponse> {
     const startedAt = Date.now();
-    const executionId = nanoid(16);
+    const executionId = request.id || nanoid(16);
     const session = await this.createSession(request);
     const manager = getTerminalSessionManager();
     const launch = createLaunchContract(this.definition, request, this.options.executable);
@@ -78,6 +78,7 @@ export class UniversalAgentRuntime {
     await this.store.upsert({
       id: executionId,
       taskId: request.id,
+      missionId: typeof request.context?.missionId === 'string' ? request.context.missionId : undefined,
       agentId: this.definition.id,
       sessionId: session.id,
       startedAt,
@@ -107,6 +108,7 @@ export class UniversalAgentRuntime {
         await this.store.upsert({
           id: executionId,
           taskId: request.id,
+          missionId: typeof request.context?.missionId === 'string' ? request.context.missionId : undefined,
           agentId: this.definition.id,
           sessionId: session.id,
           startedAt,
@@ -222,6 +224,7 @@ export class UniversalAgentRuntime {
     await this.store.upsert({
       id: executionId,
       taskId: request.id,
+      missionId: typeof request.context?.missionId === 'string' ? request.context.missionId : undefined,
       agentId: this.definition.id,
       sessionId: session.id,
       startedAt,

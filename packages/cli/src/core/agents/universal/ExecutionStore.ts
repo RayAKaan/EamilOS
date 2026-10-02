@@ -5,6 +5,7 @@ import type { AgentResponse } from '../types.js';
 export interface ExecutionRecord {
   id: string;
   taskId: string;
+  missionId?: string;
   agentId: string;
   sessionId?: string;
   startedAt: number;

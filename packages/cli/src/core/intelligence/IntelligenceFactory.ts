@@ -5,6 +5,7 @@ import { HarnessScheduler } from '../execution/HarnessScheduler.js';
 import { JevHttpProvider } from './JevHttpProvider.js';
 import { LayaProcessAdapter } from './LayaProcessAdapter.js';
 import { MockJevProvider } from './providers/MockJevProvider.js';
+import { FallbackLayaAdapter } from './providers/FallbackLayaAdapter.js';
 import type { IntelligenceConfig, JevProvider, LayaModelAdapter } from './types.js';
 import { IntelligenceEngine, defaultIntelligenceConfig } from './IntelligenceEngine.js';
 
@@ -32,13 +33,13 @@ function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
   if (process.env.EAMILOS_INTELLIGENCE_MOCK === '1') return new MockJevProvider();
   const endpoint = process.env.EAMILOS_JEV_URL;
   const apiKey = process.env.EAMILOS_JEV_API_KEY;
-  if (!endpoint || !apiKey) throw new Error('Jev is enabled but EAMILOS_JEV_URL and EAMILOS_JEV_API_KEY are not configured.');
+  if (!endpoint || !apiKey) return new MockJevProvider();
   return new JevHttpProvider({ endpoint, apiKey, timeoutMs: config.jev.timeoutMs, healthEndpoint: process.env.EAMILOS_JEV_HEALTH_URL });
 }
 
 function createLayaFromEnvironment(config: IntelligenceConfig): LayaModelAdapter {
   const command = process.env.EAMILOS_LAYA_COMMAND;
-  if (!command) throw new Error('Laya is enabled but EAMILOS_LAYA_COMMAND is not configured.');
+  if (!command) return new FallbackLayaAdapter();
   let args: string[] = [];
   if (process.env.EAMILOS_LAYA_ARGS) {
     const parsed = JSON.parse(process.env.EAMILOS_LAYA_ARGS);

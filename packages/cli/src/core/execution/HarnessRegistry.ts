@@ -1,7 +1,6 @@
-import { CLI_AGENT_DEFINITIONS } from '../agents/definitions.js';
-import {
-  createCliHarnessAdapter,
-} from './AgentFactoryHarnessAdapter.js';
+import { UniversalAgentRegistry } from '../agents/universal/UniversalAgentRegistry.js';
+import { ExecutionStore as UniversalExecutionStore } from '../agents/universal/ExecutionStore.js';
+import { createUniversalHarnessAdapters } from './UniversalHarnessAdapter.js';
 import type { HarnessAdapter } from './HarnessAdapter.js';
 import type {
   HarnessAvailability,
@@ -16,11 +15,10 @@ export class HarnessRegistry {
   private readonly descriptors = new Map<string, HarnessDescriptor>();
   private readonly healthState = new Map<string, HarnessHealth>();
 
-  constructor(autoRegisterCli = true) {
+  constructor(autoRegisterCli = true, universalRegistry = new UniversalAgentRegistry(), store = new UniversalExecutionStore()) {
     if (autoRegisterCli) {
-      for (const definition of CLI_AGENT_DEFINITIONS) {
-        const adapter = createCliHarnessAdapter(definition.id);
-        if (adapter) this.register(adapter);
+      for (const adapter of createUniversalHarnessAdapters(universalRegistry, store)) {
+        this.register(adapter);
       }
     }
   }
