@@ -308,6 +308,8 @@ export interface DecisionRecord {
   contextVersion: number;
   contextHash: string;
   provider: string;
+  model?: string;
+  usage?: JevProviderResponse['usage'];
   decision: JevDecision;
   status: DecisionRecordSummary['status'];
   rejectionReason?: string;
