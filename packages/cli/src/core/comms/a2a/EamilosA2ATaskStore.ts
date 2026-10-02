@@ -6,6 +6,7 @@ export interface EamilosA2ATaskStoreLike {
   getByIdempotencyKey(key: string): StoredTask | undefined;
   append(message: EamilosA2AMessage): StoredTask;
   list(): StoredTask[];
+  close?: () => void;
 }
 
 export interface StoredTask {
