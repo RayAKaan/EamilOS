@@ -121,12 +121,24 @@ describe('EamilOS A2A durable idempotency store', () => {
     }
   });
 
-  it('rolls back a rejected lifecycle append atomically', () => {
+  it('rolls back an invalid lifecycle append atomically', () => {
     const { directory, filename } = tempDatabase();
     try {
       const store = new EamilosA2ASqliteTaskStore({ filename });
       store.put(request);
-      expect(() => store.append({
+      store.append({
+        kind: 'task.accepted',
+        protocolVersion: 1,
+        missionId: request.missionId,
+        taskId: request.taskId,
+        executionId: request.executionId,
+        requestId: request.requestId,
+        idempotencyKey: request.idempotencyKey,
+        graphVersion: request.graphVersion,
+        timestamp: new Date().toISOString(),
+        workerId: 'worker-1',
+      });
+      store.append({
         kind: 'task.completed',
         protocolVersion: 1,
         missionId: request.missionId,
@@ -140,11 +152,24 @@ describe('EamilOS A2A durable idempotency store', () => {
         evidenceIds: [],
         artifactIds: [],
         output: {},
+      });
+
+      expect(() => store.append({
+        kind: 'task.progress',
+        protocolVersion: 1,
+        missionId: request.missionId,
+        taskId: request.taskId,
+        executionId: request.executionId,
+        requestId: request.requestId,
+        idempotencyKey: request.idempotencyKey,
+        graphVersion: request.graphVersion,
+        timestamp: new Date().toISOString(),
+        workerId: 'worker-1',
       })).toThrow('INVALID_A2A_TRANSITION');
 
       const restored = store.get(request.executionId);
-      expect(restored?.latest).toBeUndefined();
-      expect(restored?.history).toHaveLength(0);
+      expect(restored?.latest?.kind).toBe('task.completed');
+      expect(restored?.history).toHaveLength(2);
       store.close();
     } finally {
       rmSync(directory, { recursive: true, force: true });
