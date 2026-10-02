@@ -12,9 +12,17 @@ export interface UniversalCapabilities {
   structuredOutput: boolean; sandboxing: boolean; remoteExecution: boolean;
 }
 
+export interface ReleaseDefinition {
+  repository: string;
+  assets: Partial<Record<NodeJS.Platform, string[]>>;
+  checksumAssets?: string[];
+  archive?: 'zip' | 'tar.gz' | 'binary';
+  executable?: string;
+}
+
 export interface InstallationDefinition {
   strategy: InstallStrategy; package?: string; executable?: string; command?: string; args?: string[];
-  platform?: Partial<Record<NodeJS.Platform, string>>; requires?: string[]; notes?: string;
+  platform?: Partial<Record<NodeJS.Platform, string>>; requires?: string[]; notes?: string; release?: ReleaseDefinition;
 }
 
 export interface AuthenticationDefinition {
