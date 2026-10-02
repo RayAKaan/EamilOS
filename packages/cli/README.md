@@ -384,6 +384,41 @@ Calibration is disabled by default because Laya recommends fitting calibration o
 
 Without Laya, deterministic Phase 2B intelligence remains available; Laya is never required for core execution.
 
+## Jev Strategic Intelligence
+
+Phase 2D adds the production Jev provider. EamilOS sends a bounded JSON state and typed System One questions to Jev's `/v1/systemone` interface; Jev does not execute actions. The application maps the typed response into a validated EamilOS decision, while deterministic policy remains authoritative. Jev's current integration uses `state`, `model`, and `questions`, with `choice`, `score`, and `noul` primitives. citeturn1search0turn2search0
+
+### Configuration
+
+```bash
+export EAMILOS_JEV_API_KEY=...
+# TYPESAFE_API_KEY is also accepted
+export EAMILOS_JEV_MODEL=jev-latest
+# optional: pin a model for reproducibility
+# export EAMILOS_JEV_MODEL=jev-1.13.0
+export EAMILOS_JEV_URL=https://api.typesafe.ai/v1/systemone
+export EAMILOS_JEV_MAX_RETRIES=2
+export EAMILOS_JEV_BASE_BACKOFF_MS=250
+export EAMILOS_JEV_MAX_BACKOFF_MS=5000
+# optional budgets
+# export EAMILOS_JEV_MAX_TOKENS=64000
+# export EAMILOS_JEV_MAX_COST_USD=1.00
+```
+
+Keys remain server-side and are never included in the model state or decision events. A missing Jev key does not disable EamilOS; the deterministic intelligence provider remains the fallback.
+
+### Production behavior
+
+- retries transient 408/409/425/429/5xx/529 failures with capped exponential backoff and `Retry-After` support;
+- does not retry authentication, validation, schema, or budget failures;
+- validates the complete typed response before creating an EamilOS decision;
+- records resolved model and token/cost usage when supplied;
+- rejects decisions for unknown tasks, incompatible graph versions, invalid actions, or policy violations through the existing `DecisionValidator`;
+- embeds the request context version and SHA-256 context hash into the decision so stale responses cannot silently become authoritative;
+- preserves a human-review signal as structured decision metadata rather than allowing Jev to self-authorize an action.
+
+Jev is a decision signal, not a source of execution authority. The current TypeSafe documentation also recommends application-owned thresholds, fallbacks, and human review for uncertain or high-impact actions. citeturn2search0
+
 ## Requirements
 
 - **Node.js >= 18**
