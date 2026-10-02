@@ -544,7 +544,7 @@ class UniversalAgentAdapter implements EamilOSAgent {
   async run(request: AgentRequest): Promise<AgentResponse> {
     const platform = getUniversalAgentPlatform();
     const result = await platform.scheduler.execute({
-      request: { ...request, workingDir: request.workingDir || this.config?.workingDir || process.cwd(), timeoutMs: request.timeoutMs || this.config?.timeoutMs },
+      request: { ...request, workingDir: request.workingDir || this.config?.workingDir || process.cwd(), timeoutMs: request.timeoutMs || this.config?.timeoutMs || 180000 },
       preferredAgentId: this.agentId,
     });
     return result.response;
