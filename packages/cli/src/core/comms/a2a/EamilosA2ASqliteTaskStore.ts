@@ -108,16 +108,16 @@ export class EamilosA2ASqliteTaskStore implements EamilosA2ATaskStoreLike {
     const row = this.db.prepare('SELECT * FROM a2a_tasks WHERE execution_id = ?').get(executionId) as TaskRow | undefined;
     if (!row) throw new Error(`Unknown execution: ${executionId}`);
 
-    const latest = row.latest_json ? parseMessage(row.latest_json) : undefined;
-    if (latest && !isValidTransition(latest.kind, message.kind)) {
-      throw new Error(`INVALID_A2A_TRANSITION:${latest.kind}->${message.kind}`);
-    }
-
     const fingerprint = messageFingerprint(message);
     const duplicate = this.db.prepare(
       'SELECT id FROM a2a_messages WHERE execution_id = ? AND fingerprint = ?',
     ).get(executionId, fingerprint) as { id: number } | undefined;
     if (duplicate) return this.hydrate(row);
+
+    const latest = row.latest_json ? parseMessage(row.latest_json) : undefined;
+    if (latest && !isValidTransition(latest.kind, message.kind)) {
+      throw new Error(`INVALID_A2A_TRANSITION:${latest.kind}->${message.kind}`);
+    }
 
     const now = new Date().toISOString();
     this.db.prepare(`
