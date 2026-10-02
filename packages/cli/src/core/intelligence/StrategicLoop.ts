@@ -3,6 +3,8 @@ import type { DecisionRuntime } from './DecisionRuntime.js';
 import { DecisionStore } from './DecisionStore.js';
 import type { DecisionTrigger, IntelligenceConfig, StrategicLoopState } from './types.js';
 import type { DecisionApplier, AppliedDecision } from './DecisionApplier.js';
+import { DecisionOutcomeStore } from './DecisionOutcomeStore.js';
+import type { FusedDecision } from './DecisionFusionTypes.js';
 
 export interface StrategicLoopResult {
   status: 'COMPLETED' | 'BLOCKED' | 'ESCALATED' | 'ABORTED' | 'BUDGET_EXHAUSTED' | 'STAGNATED';
@@ -13,6 +15,8 @@ export interface StrategicLoopResult {
 }
 
 export class StrategicLoop {
+  private readonly outcomes = new DecisionOutcomeStore();
+
   constructor(
     private readonly contextBuilder: DecisionContextBuilder,
     private readonly runtime: DecisionRuntime,
@@ -70,6 +74,7 @@ export class StrategicLoop {
         record.status = applied.changed ? 'PARTIALLY_APPLIED' : 'ACCEPTED';
         record.appliedActions = applied.messages;
         this.store.saveDecision(record);
+        this.recordFusionOutcomes(missionId, evaluation.decision, applied.progress);
         messages.push(...applied.messages);
         loop.consecutiveNoProgress = applied.progress ? 0 : loop.consecutiveNoProgress + 1;
         const after = this.contextBuilder.build(missionId);
@@ -80,6 +85,7 @@ export class StrategicLoop {
         record.status = 'FAILED';
         record.rejectionReason = error instanceof Error ? error.message : String(error);
         this.store.saveDecision(record);
+        this.recordFusionOutcomes(missionId, evaluation.decision, false);
         messages.push(error instanceof Error ? error.message : String(error));
         loop.consecutiveNoProgress += 1;
         currentTrigger = 'EXECUTION_FAILED';
@@ -87,6 +93,15 @@ export class StrategicLoop {
       this.store.updateLoop(missionId, loop);
     }
     return this.result('BUDGET_EXHAUSTED', loop, messages);
+  }
+
+  private recordFusionOutcomes(missionId: string, decision: import('./types.js').JevDecision, success: boolean): void {
+    const fused = decision as FusedDecision;
+    if (!fused.fusion?.candidates) return;
+    for (const candidate of fused.fusion.candidates) {
+      if (candidate.decision.action !== fused.action) continue;
+      this.outcomes.recordDecisionResult(missionId, candidate.decision.action, success, candidate.source, candidate.confidence);
+    }
   }
 
   private nextTrigger(applied: AppliedDecision, context: ReturnType<DecisionContextBuilder['build']>): DecisionTrigger {
