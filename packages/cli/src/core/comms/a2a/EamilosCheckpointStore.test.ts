@@ -50,6 +50,22 @@ describe('EamilosSqliteCheckpointStore', () => {
     store.close();
   });
 
+  it('rejects a worker handoff unless the fencing token advances', () => {
+    const store = new EamilosSqliteCheckpointStore({ filename: ':memory:' });
+    store.save(input({ workerId: 'w1', fencingToken: 3 }));
+    expect(() => store.save(input({ workerId: 'w2', fencingToken: 3, state: { step: 2 } }))).toThrow(StaleCheckpointError);
+    expect(() => store.save(input({ workerId: 'w2', fencingToken: 4, state: { step: 2 } }))).not.toThrow();
+    store.close();
+  });
+
+  it('rejects context hash changes without a context version bump', () => {
+    const store = new EamilosSqliteCheckpointStore({ filename: ':memory:' });
+    store.save(input({ contextVersion: 2, contextHash: 'a'.repeat(64) }));
+    expect(() => store.save(input({ contextVersion: 2, contextHash: 'b'.repeat(64), fencingToken: 2 }))).toThrow(StaleCheckpointError);
+    expect(() => store.save(input({ contextVersion: 3, contextHash: 'b'.repeat(64), fencingToken: 2 }))).not.toThrow();
+    store.close();
+  });
+
   it('keeps independent checkpoint sequences per execution', () => {
     const store = new EamilosSqliteCheckpointStore({ filename: ':memory:' });
     expect(store.save(input()).sequence).toBe(1);
