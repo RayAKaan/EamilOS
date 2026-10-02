@@ -20,7 +20,9 @@ function run(command: string, args: string[] = [], timeoutMs = 120000): Promise<
 }
 
 async function prerequisiteAvailable(name: string, timeoutMs: number): Promise<boolean> {
-  const executable = process.platform === 'win32' && ['node', 'npm', 'python', 'uv'].includes(name) ? `${name}.exe` : name;
+  const executable = process.platform === 'win32'
+    ? name === 'npm' ? 'npm.cmd' : ['node', 'python', 'uv'].includes(name) ? `${name}.exe` : name
+    : name;
   try {
     const result = await run(executable, ['--version'], Math.min(timeoutMs, 5000));
     return result.code === 0;
