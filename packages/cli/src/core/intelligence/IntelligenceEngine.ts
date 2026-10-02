@@ -33,9 +33,9 @@ export class IntelligenceEngine {
     fleet?: FleetIntelligenceProvider,
     executions = new ExecutionStore(),
     registry = new HarnessRegistry(),
-    foundation = createIntelligenceFoundation({ jev, laya, layaTyped, layaCalibration }),
     layaTyped?: LayaDecisionAdapter,
     layaCalibration?: LayaCalibrationConfig,
+    foundation = createIntelligenceFoundation({ jev, laya, layaTyped, layaCalibration }),
   ) {
     this.foundation = foundation;
     this.context = new DecisionContextBuilder(missions, coordination, executions, decisions, registry, fleet);
