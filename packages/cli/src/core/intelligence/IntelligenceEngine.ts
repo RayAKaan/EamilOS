@@ -33,11 +33,11 @@ export class IntelligenceEngine {
     fleet?: FleetIntelligenceProvider,
     executions = new ExecutionStore(),
     registry = new HarnessRegistry(),
+    foundation?: IntelligenceFoundation,
     layaTyped?: LayaDecisionAdapter,
     layaCalibration?: LayaCalibrationConfig,
-    foundation = createIntelligenceFoundation({ jev, laya, layaTyped, layaCalibration }),
   ) {
-    this.foundation = foundation;
+    this.foundation = foundation ?? createIntelligenceFoundation({ jev, laya, layaTyped, layaCalibration });
     this.context = new DecisionContextBuilder(missions, coordination, executions, decisions, registry, fleet);
     this.decisions = decisions;
     this.runtime = new DecisionRuntime(jev, undefined, config.jev.maxRetries, new DeterministicJevProvider());
