@@ -43,7 +43,7 @@ export class LayaCalibration {
   apply(questionId: string, answer: LayaAnswer): LayaDecision {
     const temperature = answer.type === 'choice' ? this.config.choiceTemperature : answer.type === 'score' ? this.config.scoreTemperature : this.config.noulTemperature;
     const calibrated = this.config.enabled ? transform(answer, temperature) : answer;
-    const confidence = calibrated.answerConfidence ?? calibrated.confidence ?? (calibrated.type === 'noul' ? Math.max(calibrated.noul, 1 - calibrated.noul) : 0);
+    const confidence = calibrated.answerConfidence ?? calibrated.confidence ?? (calibrated.type === 'noul' ? Math.max(calibrated.noul, 1 - calibrated.noul) : entropyConfidence(calibrated.probabilities));
     const probability = calibrated.type === 'noul' ? Math.max(calibrated.noul, 1 - calibrated.noul) : Math.max(...Object.values(calibrated.probabilities), 0);
     return { questionId, type: calibrated.type, answer: calibrated, calibrated: this.config.enabled, temperature, accepted: confidence >= this.config.minimumConfidence && probability >= this.config.minimumProbability, threshold: this.config.minimumProbability };
   }
