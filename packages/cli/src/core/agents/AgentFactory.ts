@@ -508,6 +508,7 @@ class UniversalAgentAdapter implements EamilOSAgent {
   readonly kind: AgentKind;
   readonly capabilities: AgentCapabilities;
   private readonly agentId: string;
+  private activeExecutionId?: string;
   readonly name: string;
 
   constructor(agentId: string, private readonly config?: { workingDir?: string; timeoutMs?: number }) {
@@ -548,10 +549,12 @@ class UniversalAgentAdapter implements EamilOSAgent {
       request: { ...request, workingDir: request.workingDir || this.config?.workingDir || process.cwd(), timeoutMs: request.timeoutMs || this.config?.timeoutMs || 180000 },
       preferredAgentId: this.agentId, strictAgentId: true,
     });
+    this.activeExecutionId = result.id;
     return result.response;
   }
 
   async stop(): Promise<void> {
-    // Universal sessions are owned by the terminal manager/runtime; lifecycle shutdown is handled by the runtime.
+    if (this.activeExecutionId) await getUniversalAgentPlatform().scheduler.stop(this.activeExecutionId);
+    this.activeExecutionId = undefined;
   }
 }
