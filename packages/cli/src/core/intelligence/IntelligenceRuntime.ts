@@ -75,14 +75,14 @@ export class IntelligenceRuntime implements IntelligenceRuntimeContract {
       const started = Date.now();
       try {
         const response = await provider.evaluate(normalized);
-        const result: IntelligenceResponse<TResult> = {
+        const result = {
           ...response,
           requestId: normalized.requestId,
           providerId: provider.id,
           latencyMs: response.latencyMs || Date.now() - started,
           contextVersion: normalized.contextVersion,
           contextHash: normalized.contextHash,
-        };
+        } as IntelligenceResponse<TResult>;
         lastResponse = result as IntelligenceResponse<TResult>;
         if (result.status === 'SUCCESS' || result.status === 'DEGRADED') {
           const eventType = result.status === 'SUCCESS' ? 'intelligence.completed' : 'intelligence.degraded';
