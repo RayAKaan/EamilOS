@@ -22,7 +22,13 @@ export class DecisionRuntime {
         break;
       } catch (error) {
         lastError = error;
-        if (attempt === this.maxRetries) throw error;
+        const retryable = error && typeof error === 'object' && 'retryable' in error
+          ? (error as { retryable?: boolean }).retryable !== false
+          : true;
+        if (attempt === this.maxRetries || !retryable) {
+          if (this.fallback) break;
+          throw error;
+        }
       }
     }
     if (!response && this.fallback) {
