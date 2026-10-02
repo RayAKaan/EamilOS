@@ -1,7 +1,7 @@
 import type { LayaDecisionAdapter, LayaPredictRequest, LayaPredictResponse } from './LayaDecisionTypes.js';
 export interface LayaHttpDecisionOptions { endpoint: string; apiKey?: string; timeoutMs?: number; model?: string; }
 export class LayaHttpDecisionAdapter implements LayaDecisionAdapter {
-  readonly id = 'laya-http';
+  readonly id = 'laya-http-typed';
   constructor(private readonly options: LayaHttpDecisionOptions) {}
   async predict(request: LayaPredictRequest): Promise<LayaPredictResponse> {
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? 60_000);
