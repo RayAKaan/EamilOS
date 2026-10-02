@@ -3,6 +3,7 @@ import { A2AEnvelopeSchema, AgentCardSchema, TaskRequestSchema, assertTaskReques
 import { EamilosA2ATaskStore, type EamilosA2ATaskStoreLike } from './EamilosA2ATaskStore.js';
 import { EamilosA2ASqliteTaskStore } from './EamilosA2ASqliteTaskStore.js';
 import { EamilosSqliteResourceLeaseManager, ResourceConflictError, type ResourceLeaseManager } from './EamilosResourceLeaseManager.js';
+import { assertCheckpointFresh, checkpointResumeId, EamilosSqliteCheckpointStore, type CheckpointStore, type ExecutionCheckpoint, type SaveCheckpointInput } from './EamilosCheckpointStore.js';
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -21,6 +22,9 @@ export interface EamilosA2AServerOptions {
   resourceLeaseManager?: ResourceLeaseManager;
   resourceLeaseFilename?: string;
   resourceLeaseTtlMs?: number;
+  checkpointStore?: CheckpointStore;
+  checkpointStoreFilename?: string;
+  currentContextVersion?: () => number;
 }
 
 export class EamilosA2AServer {
@@ -29,6 +33,8 @@ export class EamilosA2AServer {
   private readonly ownsTaskStore: boolean;
   private readonly ownsResourceLeaseManager: boolean;
   private readonly leases?: ResourceLeaseManager;
+  private readonly ownsCheckpointStore: boolean;
+  private readonly checkpoints?: CheckpointStore;
 
   constructor(private readonly options: EamilosA2AServerOptions) {
     AgentCardSchema.parse(options.card);
@@ -39,6 +45,10 @@ export class EamilosA2AServer {
     this.ownsResourceLeaseManager = !options.resourceLeaseManager && Boolean(options.resourceLeaseFilename);
     this.leases = options.resourceLeaseManager
       ?? (options.resourceLeaseFilename ? new EamilosSqliteResourceLeaseManager({ filename: options.resourceLeaseFilename }) : undefined);
+    if (options.checkpointStore && options.checkpointStoreFilename) throw new Error('Specify checkpointStore or checkpointStoreFilename, not both');
+    this.ownsCheckpointStore = !options.checkpointStore && Boolean(options.checkpointStoreFilename);
+    this.checkpoints = options.checkpointStore
+      ?? (options.checkpointStoreFilename ? new EamilosSqliteCheckpointStore({ filename: options.checkpointStoreFilename }) : undefined);
     this.tasks = options.taskStore
       ?? (options.taskStoreFilename ? new EamilosA2ASqliteTaskStore({ filename: options.taskStoreFilename }) : new EamilosA2ATaskStore());
   }
@@ -62,6 +72,7 @@ export class EamilosA2AServer {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     if (this.ownsTaskStore) this.tasks.close?.();
     if (this.ownsResourceLeaseManager) this.leases?.close?.();
+    if (this.ownsCheckpointStore) this.checkpoints?.close?.();
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -114,6 +125,22 @@ export class EamilosA2AServer {
             assertTaskRequestFresh(request, this.options.currentGraphVersion(), this.options.currentContextHash?.());
           }
           await this.options.validateRequest?.(request);
+          let resumeCheckpoint: ExecutionCheckpoint | undefined;
+          const resumeId = checkpointResumeId(request.checkpoint);
+          if (resumeId) {
+            if (!this.checkpoints) throw new Error('CHECKPOINT_RESUME_DISABLED');
+            const checkpoint = this.checkpoints.get(resumeId);
+            if (!checkpoint) throw new Error('CHECKPOINT_NOT_FOUND');
+            assertCheckpointFresh(checkpoint, {
+              missionId: request.missionId,
+              taskId: request.taskId,
+              executionId: request.executionId,
+              graphVersion: request.graphVersion,
+              contextHash: request.contextHash,
+              minimumFencingToken: undefined,
+            });
+            resumeCheckpoint = checkpoint;
+          }
           if (this.leases && (request.resources.readSet.length > 0 || request.resources.writeSet.length > 0)) {
             const lease = this.leases.acquire({
               executionId: request.executionId,
@@ -127,7 +154,7 @@ export class EamilosA2AServer {
           this.tasks.put(request);
           const decision = this.options.onTaskRequest
             ? await this.options.onTaskRequest(request)
-            : acceptedFromRequest(request, this.options.workerId, leaseId, fencingToken);
+            : acceptedFromRequest(request, this.options.workerId, leaseId, fencingToken, resumeCheckpoint?.checkpointId);
           this.tasks.append(decision);
           if (decision.kind === 'task.rejected' && leaseId && fencingToken !== undefined) {
             this.leases?.release(leaseId, this.options.workerId, fencingToken);
@@ -160,6 +187,58 @@ export class EamilosA2AServer {
         return this.send(res, 200, lease);
       }
 
+      const checkpointRoute = path.match(/^\/eamilos\/a2a\/tasks\/([^/]+)\/checkpoints(?:\/([^/]+))?$/);
+      if (req.method === 'POST' && checkpointRoute) {
+        const executionId = decodeURIComponent(checkpointRoute[1]!);
+        const stored = this.tasks.get(executionId);
+        if (!stored) return this.send(res, 404, { error: 'EXECUTION_NOT_FOUND' });
+        if (!this.checkpoints) return this.send(res, 404, { error: 'CHECKPOINTING_DISABLED' });
+        const body = await this.parseBody(req) as Record<string, unknown>;
+        const input = {
+          missionId: stored.request.missionId,
+          taskId: stored.request.taskId,
+          executionId,
+          workerId: typeof body.workerId === 'string' ? body.workerId : this.options.workerId,
+          graphVersion: typeof body.graphVersion === 'number' ? body.graphVersion : stored.request.graphVersion,
+          contextVersion: typeof body.contextVersion === 'number' ? body.contextVersion : (this.options.currentContextVersion?.() ?? stored.request.contextVersion),
+          contextHash: typeof body.contextHash === 'string' ? body.contextHash : stored.request.contextHash,
+          leaseId: typeof body.leaseId === 'string' ? body.leaseId : undefined,
+          fencingToken: typeof body.fencingToken === 'number' ? body.fencingToken : undefined,
+          state: (body.state && typeof body.state === 'object' && !Array.isArray(body.state)) ? body.state as Record<string, unknown> : {},
+          checkpointId: typeof body.checkpointId === 'string' ? body.checkpointId : undefined,
+          expectedParentCheckpointId: typeof body.expectedParentCheckpointId === 'string' ? body.expectedParentCheckpointId : undefined,
+        } satisfies SaveCheckpointInput;
+        const lease = this.leases?.getByExecution(executionId);
+        if (lease && input.fencingToken !== undefined && input.fencingToken !== lease.fencingToken) return this.send(res, 409, { error: 'CHECKPOINT_FENCING_MISMATCH' });
+        if (lease && input.leaseId !== undefined && input.leaseId !== lease.leaseId) return this.send(res, 409, { error: 'CHECKPOINT_LEASE_MISMATCH' });
+        const checkpoint = this.checkpoints.save(input);
+        return this.send(res, 201, checkpoint);
+      }
+      if (req.method === 'GET' && checkpointRoute) {
+        const executionId = decodeURIComponent(checkpointRoute[1]!);
+        if (!this.checkpoints) return this.send(res, 404, { error: 'CHECKPOINTING_DISABLED' });
+        const checkpoint = checkpointRoute[2]
+          ? this.checkpoints.get(decodeURIComponent(checkpointRoute[2]!))
+          : this.checkpoints.latest(executionId);
+        if (!checkpoint || checkpoint.executionId !== executionId) return this.send(res, 404, { error: 'CHECKPOINT_NOT_FOUND' });
+        return this.send(res, 200, checkpoint);
+      }
+      const resumeRoute = path.match(/^\/eamilos\/a2a\/tasks\/([^/]+)\/resume$/);
+      if (req.method === 'POST' && resumeRoute) {
+        const executionId = decodeURIComponent(resumeRoute[1]!);
+        const stored = this.tasks.get(executionId);
+        if (!stored) return this.send(res, 404, { error: 'EXECUTION_NOT_FOUND' });
+        if (!this.checkpoints) return this.send(res, 404, { error: 'CHECKPOINTING_DISABLED' });
+        const checkpoint = this.checkpoints.latest(executionId);
+        if (!checkpoint) return this.send(res, 404, { error: 'CHECKPOINT_NOT_FOUND' });
+        const body = await this.parseBody(req).catch(() => ({})) as { graphVersion?: unknown; contextHash?: unknown; minimumFencingToken?: unknown };
+        const graphVersion = typeof body.graphVersion === 'number' ? body.graphVersion : (this.options.currentGraphVersion?.() ?? stored.request.graphVersion);
+        const contextHash = typeof body.contextHash === 'string' ? body.contextHash : (this.options.currentContextHash?.() ?? stored.request.contextHash);
+        const minimumFencingToken = typeof body.minimumFencingToken === 'number' ? body.minimumFencingToken : undefined;
+        assertCheckpointFresh(checkpoint, { missionId: stored.request.missionId, taskId: stored.request.taskId, executionId, graphVersion, contextHash, minimumFencingToken });
+        return this.send(res, 200, checkpoint);
+      }
+
       const lifecycle = path.match(/^\/eamilos\/a2a\/tasks\/([^/]+)\/messages$/);
       if (req.method === 'POST' && lifecycle) {
         const executionId = decodeURIComponent(lifecycle[1]!);
@@ -181,6 +260,22 @@ export class EamilosA2AServer {
           return this.send(res, 409, { error: 'LIFECYCLE_CORRELATION_MISMATCH' });
         }
         this.tasks.append(parsed);
+        if (('checkpoint' in parsed) && parsed.checkpoint && this.checkpoints && (parsed.kind === 'task.progress' || parsed.kind === 'task.failed')) {
+          const checkpoint = parsed.checkpoint;
+          const lease = this.leases?.getByExecution(executionId);
+          this.checkpoints.save({
+            missionId: stored.request.missionId,
+            taskId: stored.request.taskId,
+            executionId,
+            workerId: parsed.workerId,
+            graphVersion: parsed.graphVersion,
+            contextVersion: this.options.currentContextVersion?.() ?? stored.request.contextVersion,
+            contextHash: this.options.currentContextHash?.() ?? stored.request.contextHash,
+            leaseId: lease?.leaseId,
+            fencingToken: lease?.fencingToken,
+            state: checkpoint,
+          });
+        }
         if (parsed.kind === 'task.completed' || parsed.kind === 'task.failed' || parsed.kind === 'task.cancelled') {
           const leases = this.leases;
           const lease = leases?.getByExecution(executionId);
@@ -247,12 +342,13 @@ function correlation(request: TaskRequest) {
   };
 }
 
-function acceptedFromRequest(request: TaskRequest, workerId: string, leaseId?: string, fencingToken?: number): TaskAccepted {
+function acceptedFromRequest(request: TaskRequest, workerId: string, leaseId?: string, fencingToken?: number, checkpointId?: string): TaskAccepted {
   return {
     ...correlation(request),
     kind: 'task.accepted',
     workerId,
     ...(leaseId ? { leaseId } : {}),
     ...(fencingToken !== undefined ? { fencingToken } : {}),
+    ...(checkpointId ? { checkpointId } : {}),
   };
 }

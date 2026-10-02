@@ -1,4 +1,5 @@
 import { A2AEnvelopeSchema, AgentCardSchema, type AgentCard, type EamilosA2AMessage, type TaskRequest } from './EamilosA2AProtocol.js';
+import type { ExecutionCheckpoint } from './EamilosCheckpointStore.js';
 
 export interface EamilosA2AClientOptions {
   token?: string;
@@ -34,6 +35,25 @@ export class EamilosA2AClient {
   async heartbeat(endpoint: string): Promise<EamilosA2AMessage> {
     const response = await this.request(endpoint, '/eamilos/a2a/heartbeat', { method: 'GET' });
     return A2AEnvelopeSchema.parse(await response.json());
+  }
+
+  async saveCheckpoint(endpoint: string, executionId: string, checkpoint: Record<string, unknown>): Promise<ExecutionCheckpoint> {
+    const response = await this.request(endpoint, `/eamilos/a2a/tasks/${encodeURIComponent(executionId)}/checkpoints`, {
+      method: 'POST', body: JSON.stringify(checkpoint), headers: { 'content-type': 'application/json' },
+    });
+    return await response.json() as ExecutionCheckpoint;
+  }
+
+  async latestCheckpoint(endpoint: string, executionId: string): Promise<ExecutionCheckpoint> {
+    const response = await this.request(endpoint, `/eamilos/a2a/tasks/${encodeURIComponent(executionId)}/checkpoints`, { method: 'GET' });
+    return await response.json() as ExecutionCheckpoint;
+  }
+
+  async resume(endpoint: string, executionId: string, expected?: { graphVersion?: number; contextHash?: string; minimumFencingToken?: number }): Promise<ExecutionCheckpoint> {
+    const response = await this.request(endpoint, `/eamilos/a2a/tasks/${encodeURIComponent(executionId)}/resume`, {
+      method: 'POST', body: JSON.stringify(expected ?? {}), headers: { 'content-type': 'application/json' },
+    });
+    return await response.json() as ExecutionCheckpoint;
   }
 
   private async request(endpoint: string, path: string, init: RequestInit): Promise<Response> {

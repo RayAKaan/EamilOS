@@ -110,9 +110,11 @@ export class EamilosSqliteCheckpointStore implements CheckpointStore {
         if (latest.missionId !== input.missionId || latest.taskId !== input.taskId) throw new StaleCheckpointError('Checkpoint correlation changed');
         if (input.graphVersion < latest.graphVersion) throw new StaleCheckpointError('Graph version regressed');
         if (input.contextVersion < latest.contextVersion) throw new StaleCheckpointError('Context version regressed');
-        if (input.fencingToken !== undefined && latest.fencingToken !== undefined && input.fencingToken < latest.fencingToken) {
-          throw new StaleCheckpointError('Fencing token regressed');
+        if (input.contextVersion === latest.contextVersion && input.contextHash !== latest.contextHash) throw new StaleCheckpointError('Context hash changed without a context version change');
+        if (latest.fencingToken !== undefined) {
+          if (input.fencingToken === undefined || input.fencingToken < latest.fencingToken) throw new StaleCheckpointError('Fencing token regressed or missing');
         }
+        if (latest.workerId !== input.workerId && input.fencingToken === latest.fencingToken) throw new StaleCheckpointError('Worker changed without a new fencing token');
       }
       const stateJson = canonicalize(input.state);
       const checkpoint: ExecutionCheckpoint = {
@@ -191,6 +193,11 @@ export function assertCheckpointFresh(checkpoint: ExecutionCheckpoint, expected:
   if (checkpoint.graphVersion !== expected.graphVersion) throw new StaleCheckpointError('Checkpoint graph version is stale');
   if (checkpoint.contextHash !== expected.contextHash) throw new StaleCheckpointError('Checkpoint context hash is stale');
   if (expected.minimumFencingToken !== undefined && (checkpoint.fencingToken ?? 0) < expected.minimumFencingToken) throw new StaleCheckpointError('Checkpoint fencing token is stale');
+}
+
+export function checkpointResumeId(value: Record<string, unknown> | undefined): string | undefined {
+  const id = value?.checkpointId;
+  return typeof id === 'string' && id.length > 0 ? id : undefined;
 }
 
 function validateInput(input: SaveCheckpointInput): void {
