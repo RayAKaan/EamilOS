@@ -59,7 +59,9 @@ export class DecisionFusionEngine implements DecisionFusionEngineContract {
     const topConfidence = winner.normalizedScore;
     const selected = this.selectRepresentative(winner.action, valid);
     const humanReviewSignal = Math.max(...valid.map(candidate => candidate.humanReviewProbability ?? 0), 0);
-    const requiredByPolicy = this.policy.requireHumanReviewFor.includes(winner.action);
+    const missionApproval = context.mission.constraints['requireApprovalFor'];
+    const missionRequiresReview = Array.isArray(missionApproval) && missionApproval.includes(winner.action);
+    const requiredByPolicy = missionRequiresReview || this.policy.requireHumanReviewFor.includes(winner.action);
     const humanReviewRequired = requiredByPolicy || humanReviewSignal >= this.policy.humanReviewThreshold || topConfidence < this.policy.minimumConfidence;
     const abstained = topConfidence < this.policy.minimumConfidence;
 
