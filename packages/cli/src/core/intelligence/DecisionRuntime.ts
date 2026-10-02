@@ -50,6 +50,8 @@ export class DecisionRuntime {
       contextVersion: context.taskGraph.version,
       contextHash,
       provider: response.provider,
+      model: response.model,
+      usage: response.usage,
       decision: response.decision,
       status: evaluation.accepted ? 'ACCEPTED' : 'REJECTED',
       rejectionReason: evaluation.accepted ? undefined : evaluation.reasons.join('; '),
