@@ -8,6 +8,9 @@ import { JevHttpProvider } from './JevHttpProvider.js';
 import { LayaProcessAdapter } from './LayaProcessAdapter.js';
 import { MockJevProvider } from './providers/MockJevProvider.js';
 import { FallbackLayaAdapter } from './providers/FallbackLayaAdapter.js';
+import { LayaHttpDecisionAdapter } from './LayaHttpDecisionAdapter.js';
+import { LayaProcessDecisionAdapter } from './LayaProcessDecisionAdapter.js';
+import type { LayaCalibrationConfig } from './LayaDecisionTypes.js';
 import type { IntelligenceConfig, JevProvider, LayaModelAdapter } from './types.js';
 import { IntelligenceEngine, defaultIntelligenceConfig } from './IntelligenceEngine.js';
 
@@ -17,6 +20,8 @@ export interface IntelligenceRuntimeOptions {
   registry?: HarnessRegistry;
   jev?: JevProvider;
   laya?: LayaModelAdapter;
+  layaTyped?: import('./LayaDecisionTypes.js').LayaDecisionAdapter;
+  layaCalibration?: LayaCalibrationConfig;
   config?: IntelligenceConfig;
   executions?: ExecutionStore;
 }
@@ -29,7 +34,8 @@ export function createIntelligenceRuntime(options: IntelligenceRuntimeOptions = 
   const config = options.config ?? defaultIntelligenceConfig();
   const jev = options.jev ?? createJevFromEnvironment(config);
   const laya = options.laya ?? createLayaFromEnvironment(config);
-  return new IntelligenceEngine(missions, coordination, scheduler, jev, laya, config, undefined, undefined, options.executions, registry);
+  const layaTyped = options.layaTyped ?? createLayaTypedFromEnvironment(config);
+  return new IntelligenceEngine(missions, coordination, scheduler, jev, laya, config, undefined, undefined, options.executions, registry, undefined, layaTyped, options.layaCalibration ?? createLayaCalibrationFromEnvironment());
 }
 
 function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
@@ -50,4 +56,22 @@ function createLayaFromEnvironment(config: IntelligenceConfig): LayaModelAdapter
     args = parsed;
   }
   return new LayaProcessAdapter({ command, args, timeoutMs: config.laya.timeoutMs, cwd: process.cwd() });
+}
+function createLayaTypedFromEnvironment(config: IntelligenceConfig) {
+  const endpoint = process.env.EAMILOS_LAYA_URL;
+  if (endpoint) return new LayaHttpDecisionAdapter({ endpoint, apiKey: process.env.EAMILOS_LAYA_API_KEY, timeoutMs: config.laya.timeoutMs, model: process.env.EAMILOS_LAYA_MODEL || 'typed-decisions' });
+  const command = process.env.EAMILOS_LAYA_COMMAND;
+  if (command) return new LayaProcessDecisionAdapter({ command, args: process.env.EAMILOS_LAYA_ARGS ? JSON.parse(process.env.EAMILOS_LAYA_ARGS) : [], timeoutMs: config.laya.timeoutMs, cwd: process.cwd() });
+  return undefined;
+}
+
+function createLayaCalibrationFromEnvironment(): LayaCalibrationConfig {
+  return {
+    enabled: process.env.EAMILOS_LAYA_CALIBRATION === '1',
+    choiceTemperature: Number(process.env.EAMILOS_LAYA_CHOICE_TEMPERATURE || 1),
+    scoreTemperature: Number(process.env.EAMILOS_LAYA_SCORE_TEMPERATURE || 1),
+    noulTemperature: Number(process.env.EAMILOS_LAYA_NOUL_TEMPERATURE || 1),
+    minimumConfidence: Number(process.env.EAMILOS_LAYA_MIN_CONFIDENCE || 0.6),
+    minimumProbability: Number(process.env.EAMILOS_LAYA_MIN_PROBABILITY || 0.6),
+  };
 }

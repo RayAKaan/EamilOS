@@ -22,12 +22,12 @@ export class IntelligenceRouter {
     const preferred = request.preferredProviders ?? [];
     const defaultsByType: Record<IntelligenceRequestType, string[]> = {
       STRATEGIC_DECISION: ['jev-http', 'jev', 'deterministic'],
-      TASK_DECISION: ['deterministic', 'jev-http', 'jev'],
-      RECOVERY_DECISION: ['deterministic', 'jev-http', 'jev'],
-      PLANNING: ['laya', 'laya-local', 'deterministic'],
-      VALIDATION: ['deterministic', 'jev-http', 'jev'],
-      AGENT_SELECTION: ['deterministic'],
-      PARALLELIZATION: ['deterministic'],
+      TASK_DECISION: ['laya-local-typed', 'laya-http-typed', 'deterministic', 'jev-http', 'jev'],
+      RECOVERY_DECISION: ['laya-local-typed', 'laya-http-typed', 'deterministic', 'jev-http', 'jev'],
+      PLANNING: ['laya-local', 'laya-local-typed', 'deterministic'],
+      VALIDATION: ['laya-local-typed', 'laya-http-typed', 'deterministic', 'jev-http', 'jev'],
+      AGENT_SELECTION: ['laya-local-typed', 'laya-http-typed', 'deterministic'],
+      PARALLELIZATION: ['laya-local-typed', 'laya-http-typed', 'deterministic'],
     };
     const priority = [...preferred, ...defaultsByType[request.type]];
     const ordered = [
