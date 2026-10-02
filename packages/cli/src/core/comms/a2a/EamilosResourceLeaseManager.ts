@@ -266,8 +266,11 @@ export class EamilosSqliteResourceLeaseManager implements ResourceLeaseManager {
   }
 
   private nextFencingToken(): number {
+    this.db.prepare(
+      'UPDATE eamilos_resource_lease_meta SET next_fencing_token = next_fencing_token + 1 WHERE id = 1',
+    ).run();
     const row = this.db.prepare(
-      'UPDATE eamilos_resource_lease_meta SET next_fencing_token = next_fencing_token + 1 WHERE id = 1 RETURNING next_fencing_token',
+      'SELECT next_fencing_token FROM eamilos_resource_lease_meta WHERE id = 1',
     ).get() as { next_fencing_token: number };
     return row.next_fencing_token;
   }
