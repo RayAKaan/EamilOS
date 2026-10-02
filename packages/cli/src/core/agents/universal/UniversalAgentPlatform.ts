@@ -21,7 +21,7 @@ export class UniversalAgentPlatform {
     this.doctor = new AgentDoctor(this.registry);
     this.auth = new AuthenticationManager();
     this.events = new UniversalAgentEventBus();
-    this.scheduler = new UniversalAgentScheduler(this.registry);
+    this.scheduler = new UniversalAgentScheduler(this.registry, this.events);
     this.recovery = new AgentRecoveryCoordinator(this.registry);
   }
 }
