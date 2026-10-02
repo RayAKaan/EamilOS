@@ -47,6 +47,22 @@ describe('JevHttpProvider', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('rejects malformed typed responses without treating them as valid decisions', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ model: 'jev-1.13.0', answers: { action: { type: 'choice', choice: 'NOT_AN_ACTION', probabilities: { NOT_AN_ACTION: 1 } } } }), { status: 200 }));
+    const provider = new JevHttpProvider({ endpoint: 'https://api.typesafe.ai/v1/systemone', apiKey: 'secret', maxRetries: 0 });
+    await expect(provider.decide(context)).rejects.toThrow();
+  });
+
+  it('enforces total token budgets', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      model: 'jev-1.13.0',
+      answers: { action: { type: 'choice', choice: 'VERIFY', probabilities: { VERIFY: 1 } } },
+      usage: { input_tokens: 80, output_tokens: 30, total_tokens: 110 },
+    }), { status: 200 }));
+    const provider = new JevHttpProvider({ endpoint: 'https://api.typesafe.ai/v1/systemone', apiKey: 'secret', maxTokens: 100, maxRetries: 0 });
+    await expect(provider.decide(context)).rejects.toThrow('token budget exceeded');
+  });
+
   it('does not retry authentication failures', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('unauthorized', { status: 401 }));
     const provider = new JevHttpProvider({ endpoint: 'https://api.typesafe.ai/v1/systemone', apiKey: 'secret', maxRetries: 3 });
