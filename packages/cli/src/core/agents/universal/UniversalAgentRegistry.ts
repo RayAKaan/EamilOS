@@ -92,6 +92,6 @@ export class UniversalAgentRegistry {
   createRuntime(id: string, options: { workingDir: string; timeoutMs?: number; events?: UniversalAgentEventBus; store?: ExecutionStore }): UniversalAgentRuntime {
     const definition = this.get(id);
     if (!definition) throw new Error('Unknown agent: ' + id);
-    return new UniversalAgentRuntime(definition, options);
+    return new UniversalAgentRuntime(definition, { ...options, executable: this.detections.get(id)?.executable });
   }
 }
