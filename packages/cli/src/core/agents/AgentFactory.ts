@@ -1,3 +1,4 @@
+import { getUniversalAgentPlatform } from './universal/UniversalAgentPlatform.js';
 import { EamilOSAgent, AgentRequest, AgentResponse, AgentKind, AgentCapabilities, RegisteredAgent } from './EamilOSAgent.js';
 import { AgentRegistry } from './AgentRegistry.js';
 import { OpenCodeAgent } from '../../multi-agent/agents/OpenCodeAgent.js';
@@ -170,7 +171,7 @@ export class AgentFactory {
       case 'google-api':
         return new GoogleAgentAdapter();
       default:
-        return null;
+        return new UniversalAgentAdapter(agentId, config);
     }
   }
 
@@ -499,5 +500,57 @@ class DeepSeekHarnessAgentAdapter implements EamilOSAgent {
 
   async stop(): Promise<void> {
     await this.inner.terminate();
+  }
+}
+
+
+class UniversalAgentAdapter implements EamilOSAgent {
+  readonly kind: AgentKind = 'cli';
+  readonly capabilities: AgentCapabilities;
+  private readonly agentId: string;
+  readonly name: string;
+
+  constructor(agentId: string, private readonly config?: { workingDir?: string; timeoutMs?: number }) {
+    const definition = getUniversalAgentPlatform().registry.get(agentId);
+    if (!definition) throw new Error('Unknown universal agent: ' + agentId);
+    this.agentId = agentId;
+    this.name = definition.name;
+    this.capabilities = {
+      codeGeneration: definition.capabilities.codeGeneration,
+      fileEditing: definition.capabilities.fileEditing,
+      commandExecution: definition.capabilities.commandExecution,
+      webResearch: definition.capabilities.webResearch,
+      longContext: definition.capabilities.longContext,
+      local: definition.capabilities.local,
+      cloud: definition.capabilities.cloud,
+      multimodal: definition.capabilities.multimodal,
+    };
+  }
+
+  get id(): string { return this.agentId; }
+
+  async checkStatus(): Promise<RegisteredAgent> {
+    const platform = getUniversalAgentPlatform();
+    const health = await platform.registry.health(this.agentId);
+    const definition = platform.registry.get(this.agentId)!;
+    return {
+      id: this.agentId, name: this.name, kind: this.kind, provider: definition.provider,
+      status: !health.installed ? 'not_installed' : health.authenticated === false ? 'auth_missing' : health.ready ? 'available' : 'unavailable',
+      version: health.version, capabilities: this.capabilities, supportedModes: ['communication', 'execution'],
+      priority: 10, error: health.checks.find((check) => !check.ok)?.detail,
+    };
+  }
+
+  async run(request: AgentRequest): Promise<AgentResponse> {
+    const platform = getUniversalAgentPlatform();
+    const result = await platform.scheduler.execute({
+      request: { ...request, workingDir: request.workingDir || this.config?.workingDir || process.cwd(), timeoutMs: request.timeoutMs || this.config?.timeoutMs || 180000 },
+      preferredAgentId: this.agentId,
+    });
+    return result.response;
+  }
+
+  async stop(): Promise<void> {
+    // Universal sessions are owned by the terminal manager/runtime; lifecycle shutdown is handled by the runtime.
   }
 }
