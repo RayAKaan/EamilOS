@@ -8,6 +8,7 @@ import { IntelligenceRouter } from './IntelligenceRouter.js';
 import { IntelligenceLifecycleManager } from './IntelligenceLifecycleManager.js';
 import type { JevProvider, LayaModelAdapter } from './types.js';
 import { LegacyJevProviderAdapter, LegacyLayaProviderAdapter } from './providers/LegacyProviderAdapters.js';
+import { DeterministicIntelligenceProvider } from './DeterministicIntelligenceProvider.js';
 
 export interface IntelligenceFoundation {
   runtime: IntelligenceRuntimeContract;
@@ -26,6 +27,7 @@ export function createIntelligenceFoundation(options: IntelligenceFoundationOpti
   const registry = new IntelligenceProviderRegistry();
   if (options.jev) registry.register(new LegacyJevProviderAdapter(options.jev));
   if (options.laya) registry.register(new LegacyLayaProviderAdapter(options.laya));
+  registry.register(new DeterministicIntelligenceProvider());
   const lifecycle = new IntelligenceLifecycleManager(registry);
   const runtime = new IntelligenceRuntime(registry, new IntelligenceRouter(registry), lifecycle, undefined, options.events);
   return { runtime, registry, compiler: new ContextCompiler(), lifecycle };
