@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import { A2AEnvelopeSchema, AgentCardSchema, TaskRequestSchema, assertTaskRequestFresh, type AgentCard, type TaskRequest, type EamilosA2AMessage, type TaskAccepted, type TaskRejected, type Heartbeat } from './EamilosA2AProtocol.js';
 import { EamilosA2ATaskStore, type EamilosA2ATaskStoreLike } from './EamilosA2ATaskStore.js';
 import { EamilosA2ASqliteTaskStore } from './EamilosA2ASqliteTaskStore.js';
+import { EamilosSqliteResourceLeaseManager, ResourceConflictError, type ResourceLeaseManager } from './EamilosResourceLeaseManager.js';
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -17,17 +18,27 @@ export interface EamilosA2AServerOptions {
   capacity?: () => number;
   currentGraphVersion?: () => number;
   currentContextHash?: () => string | undefined;
+  resourceLeaseManager?: ResourceLeaseManager;
+  resourceLeaseFilename?: string;
+  resourceLeaseTtlMs?: number;
 }
 
 export class EamilosA2AServer {
   readonly tasks: EamilosA2ATaskStoreLike;
   private server: Server | null = null;
   private readonly ownsTaskStore: boolean;
+  private readonly ownsResourceLeaseManager: boolean;
+  private readonly leases?: ResourceLeaseManager;
 
   constructor(private readonly options: EamilosA2AServerOptions) {
     AgentCardSchema.parse(options.card);
     if (options.taskStore && options.taskStoreFilename) throw new Error('Specify taskStore or taskStoreFilename, not both');
     this.ownsTaskStore = !options.taskStore && Boolean(options.taskStoreFilename);
+    if (options.resourceLeaseManager && options.resourceLeaseFilename) throw new Error('Specify resourceLeaseManager or resourceLeaseFilename, not both');
+    if (options.resourceLeaseManager && options.resourceLeaseTtlMs !== undefined && options.resourceLeaseTtlMs <= 0) throw new Error('Invalid resourceLeaseTtlMs');
+    this.ownsResourceLeaseManager = !options.resourceLeaseManager && Boolean(options.resourceLeaseFilename);
+    this.leases = options.resourceLeaseManager
+      ?? (options.resourceLeaseFilename ? new EamilosSqliteResourceLeaseManager({ filename: options.resourceLeaseFilename }) : undefined);
     this.tasks = options.taskStore
       ?? (options.taskStoreFilename ? new EamilosA2ASqliteTaskStore({ filename: options.taskStoreFilename }) : new EamilosA2ATaskStore());
   }
@@ -50,6 +61,7 @@ export class EamilosA2AServer {
     this.server = null;
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     if (this.ownsTaskStore) this.tasks.close?.();
+    if (this.ownsResourceLeaseManager) this.leases?.close?.();
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -95,23 +107,41 @@ export class EamilosA2AServer {
           return this.send(res, 200, existing.latest ?? acceptedFromRequest(request, this.options.workerId));
         }
 
+        let leaseId: string | undefined;
+        let fencingToken: number | undefined;
         try {
           if (this.options.currentGraphVersion) {
             assertTaskRequestFresh(request, this.options.currentGraphVersion(), this.options.currentContextHash?.());
           }
           await this.options.validateRequest?.(request);
+          if (this.leases && (request.resources.readSet.length > 0 || request.resources.writeSet.length > 0)) {
+            const lease = this.leases.acquire({
+              executionId: request.executionId,
+              ownerId: request.missionId + ':' + this.options.workerId,
+              resources: request.resources,
+              ttlMs: this.options.resourceLeaseTtlMs ?? Math.max(request.timeoutMs, 30_000),
+            });
+            leaseId = lease.leaseId;
+            fencingToken = lease.fencingToken;
+          }
           this.tasks.put(request);
           const decision = this.options.onTaskRequest
             ? await this.options.onTaskRequest(request)
-            : acceptedFromRequest(request, this.options.workerId);
+            : acceptedFromRequest(request, this.options.workerId, leaseId);
           this.tasks.append(decision);
+          if (decision.kind === 'task.rejected' && leaseId && fencingToken !== undefined) {
+            this.leases?.release(leaseId, request.missionId + ':' + this.options.workerId, fencingToken);
+          }
           return this.send(res, decision.kind === 'task.accepted' ? 202 : 409, decision);
         } catch (error) {
+          if (leaseId && fencingToken !== undefined) {
+            try { this.leases?.release(leaseId, request.missionId + ':' + this.options.workerId, fencingToken); } catch { /* preserve original error */ }
+          }
           const rejection: TaskRejected = {
             ...correlation(request),
             kind: 'task.rejected',
             workerId: this.options.workerId,
-            reason: 'invalid_request',
+            reason: error instanceof ResourceConflictError ? 'resource_conflict' : 'invalid_request',
             details: error instanceof Error ? error.message : String(error),
           };
           if (!this.tasks.get(request.executionId)) this.tasks.put(request);
@@ -119,6 +149,17 @@ export class EamilosA2AServer {
           return this.send(res, 409, rejection);
         }
       }
+      if (req.method === 'POST' && path.match(/^\/eamilos\/a2a\/leases\/([^/]+)\/renew$/)) {
+        const match = path.match(/^\/eamilos\/a2a\/leases\/([^/]+)\/renew$/)!;
+        if (!this.leases) return this.send(res, 404, { error: 'RESOURCE_LEASING_DISABLED' });
+        const body = await this.parseBody(req) as { ownerId?: unknown; fencingToken?: unknown; ttlMs?: unknown };
+        if (typeof body.ownerId !== 'string' || !Number.isInteger(body.fencingToken) || !Number.isInteger(body.ttlMs)) {
+          return this.send(res, 400, { error: 'INVALID_LEASE_RENEWAL' });
+        }
+        const lease = this.leases.renew(decodeURIComponent(match[1]!), body.ownerId, body.fencingToken, body.ttlMs);
+        return this.send(res, 200, lease);
+      }
+
       const cancel = path.match(/^\/eamilos\/a2a\/tasks\/([^/]+)\/cancel$/);
       if (req.method === 'POST' && cancel) {
         const executionId = decodeURIComponent(cancel[1]!);
@@ -133,6 +174,8 @@ export class EamilosA2AServer {
           reason: typeof body.reason === 'string' ? body.reason : undefined,
         };
         this.tasks.append(message);
+        const lease = this.leases?.getByExecution(executionId);
+        if (lease) this.leases?.release(lease.leaseId, lease.ownerId, lease.fencingToken);
         return this.send(res, 200, message);
       }
       return this.send(res, 404, { error: 'NOT_FOUND' });
@@ -175,6 +218,6 @@ function correlation(request: TaskRequest) {
   };
 }
 
-function acceptedFromRequest(request: TaskRequest, workerId: string): TaskAccepted {
-  return { ...correlation(request), kind: 'task.accepted', workerId };
+function acceptedFromRequest(request: TaskRequest, workerId: string, leaseId?: string): TaskAccepted {
+  return { ...correlation(request), kind: 'task.accepted', workerId, ...(leaseId ? { leaseId } : {}) };
 }
