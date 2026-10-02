@@ -1,5 +1,5 @@
 import { UniversalAgentRegistry } from '../agents/universal/UniversalAgentRegistry.js';
-import { ExecutionStore } from './ExecutionStore.js';
+import { ExecutionStore as UniversalExecutionStore } from '../agents/universal/ExecutionStore.js';
 import { createUniversalHarnessAdapters } from './UniversalHarnessAdapter.js';
 import type { HarnessAdapter } from './HarnessAdapter.js';
 import type {
@@ -15,7 +15,7 @@ export class HarnessRegistry {
   private readonly descriptors = new Map<string, HarnessDescriptor>();
   private readonly healthState = new Map<string, HarnessHealth>();
 
-  constructor(autoRegisterCli = true, universalRegistry = new UniversalAgentRegistry(), store = new ExecutionStore()) {
+  constructor(autoRegisterCli = true, universalRegistry = new UniversalAgentRegistry(), store = new UniversalExecutionStore()) {
     if (autoRegisterCli) {
       for (const adapter of createUniversalHarnessAdapters(universalRegistry, store)) {
         this.register(adapter);
