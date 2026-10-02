@@ -1,4 +1,4 @@
-import type { LayaAnswer, LayaCalibrationConfig, LayaDecision } from './LayaDecisionTypes.js';
+import { DEFAULT_LAYA_CALIBRATION, type LayaAnswer, type LayaCalibrationConfig, type LayaDecision } from './LayaDecisionTypes.js';
 
 function clamp(value: number) { return Math.min(1, Math.max(0, value)); }
 function normalize(probabilities: Record<string, number>) {
@@ -39,7 +39,7 @@ function transform(answer: LayaAnswer, temperature: number): LayaAnswer {
   return { ...answer, noul: scaled, confidence: Math.max(scaled, 1 - scaled), answerConfidence: Math.max(scaled, 1 - scaled) };
 }
 export class LayaCalibration {
-  constructor(private readonly config: LayaCalibrationConfig) {}
+  constructor(private readonly config: LayaCalibrationConfig = DEFAULT_LAYA_CALIBRATION) {}
   apply(questionId: string, answer: LayaAnswer): LayaDecision {
     const temperature = answer.type === 'choice' ? this.config.choiceTemperature : answer.type === 'score' ? this.config.scoreTemperature : this.config.noulTemperature;
     const calibrated = this.config.enabled ? transform(answer, temperature) : answer;
