@@ -9,7 +9,7 @@ export class EamilosA2AClient {
   constructor(private readonly options: EamilosA2AClientOptions = {}) {}
 
   async discover(endpoint: string): Promise<AgentCard> {
-    const response = await this.request(endpoint, '/.well-known/eamilos-agent.json', { method: 'GET' });
+    const response = await this.request(endpoint, '/.well-known/agent-card.json', { method: 'GET' });
     return AgentCardSchema.parse(await response.json());
   }
 
@@ -50,10 +50,4 @@ export class EamilosA2AClient {
       clearTimeout(timer);
     }
   }
-}
-
-function requestEndpoint(request: TaskRequest): string {
-  const endpoint = request.input.endpoint;
-  if (typeof endpoint !== 'string') throw new Error('TaskRequest input.endpoint is required by the HTTP client');
-  return endpoint;
 }
