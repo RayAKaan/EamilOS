@@ -77,7 +77,9 @@ export class DeterministicPlanner {
 
   private decompose(objective: string, context: DecisionContext, parentTaskId?: string): Array<{title: string; objective: string; priority: 'CRITICAL'|'HIGH'|'MEDIUM'|'LOW'; acceptanceCriteria: string[]}> {
     const parent = parentTaskId ? context.taskGraph.tasks.find(task => task.id === parentTaskId) : undefined;
-    const explicit = objective.split(/\r?\n/).map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').trim()).filter(Boolean);
+    const lines = objective.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const bulletLines = lines.filter(line => /^[-*•]|^\d+[.)]\s+/.test(line));
+    const explicit = (bulletLines.length > 0 ? bulletLines : lines).map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').trim()).filter(Boolean);
     const criteria = parent?.acceptanceCriteria ?? [];
     const units = explicit.length > 1 ? explicit : criteria.length > 1 ? criteria.map(item => item.trim()).filter(Boolean) : [objective.trim()];
     return units.filter(Boolean).map((unit, index) => ({
