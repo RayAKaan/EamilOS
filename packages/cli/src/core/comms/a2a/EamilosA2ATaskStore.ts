@@ -62,7 +62,7 @@ function isValidTransition(
   from: EamilosA2AMessage['kind'],
   to: EamilosA2AMessage['kind'],
 ): boolean {
-  if (isTerminalMessage({ kind: from } as EamilosA2AMessage)) return false;
+  if (from === 'task.completed' || from === 'task.failed' || from === 'task.cancelled' || from === 'task.rejected') return false;
   if (from === 'task.request') return to === 'task.accepted' || to === 'task.rejected' || to === 'task.cancelled';
   if (from === 'task.accepted') return to === 'task.progress' || to === 'task.completed' || to === 'task.failed' || to === 'task.cancelled';
   if (from === 'task.progress') return to === 'task.progress' || to === 'task.completed' || to === 'task.failed' || to === 'task.cancelled';

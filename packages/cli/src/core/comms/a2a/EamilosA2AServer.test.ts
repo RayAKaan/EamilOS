@@ -18,7 +18,7 @@ describe('EamilOS A2A server', () => {
         kind: 'agent.card', protocolVersion: 1, workerId: 'worker-1', agentId: 'agent-1',
         harnessId: 'harness-1', name: 'worker', description: 'test worker',
         endpoint: 'http://127.0.0.1:1', capabilities: ['code.execution'], maxConcurrency: 2,
-        streaming: true, checkpointResume: true, authentication: [],
+        streaming: true, checkpointResume: true, authentication: [], metadata: {},
         advertisedAt: new Date().toISOString(),
       },
       currentGraphVersion: () => 1,

@@ -22,7 +22,7 @@ export class EamilosA2AClient {
     return A2AEnvelopeSchema.parse(await response.json());
   }
 
-  async cancel(endpoint: string, request: TaskRequest, reason?: string): Promise<EamilosAAMessage> {
+  async cancel(endpoint: string, request: TaskRequest, reason?: string): Promise<EamilosA2AMessage> {
     const response = await this.request(endpoint, `/eamilos/a2a/tasks/${encodeURIComponent(request.executionId)}/cancel`, {
       method: 'POST',
       body: JSON.stringify({ ...request, reason }),
@@ -31,7 +31,7 @@ export class EamilosA2AClient {
     return A2AEnvelopeSchema.parse(await response.json());
   }
 
-  async heartbeat(endpoint: string): Promise<EamilosAAMessage> {
+  async heartbeat(endpoint: string): Promise<EamilosA2AMessage> {
     const response = await this.request(endpoint, '/eamilos/a2a/heartbeat', { method: 'GET' });
     return A2AEnvelopeSchema.parse(await response.json());
   }
