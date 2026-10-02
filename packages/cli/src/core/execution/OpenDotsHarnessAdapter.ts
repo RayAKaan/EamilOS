@@ -134,6 +134,7 @@ export class OpenDotsHarnessAdapter implements HarnessAdapter {
   private readonly config: OpenDotsConfig;
   private readonly controllers = new Map<string, AbortController>();
   private readonly threads = new Map<string, string>();
+  private readonly requests = new Map<string, HarnessExecutionRequest>();
 
   constructor(config: OpenDotsConfig) {
     this.config = {
@@ -215,6 +216,7 @@ export class OpenDotsHarnessAdapter implements HarnessAdapter {
     onOutput?: (chunk: string) => void,
   ): Promise<HarnessExecutionResult> {
     const startedAt = Date.now();
+    this.requests.set(request.executionId, request);
     const threadId = this.threads.get(request.executionId) ?? `eamilos-${request.missionId}-${request.taskId}`;
     const runId = request.executionId;
     const controller = new AbortController();
@@ -340,10 +342,13 @@ export class OpenDotsHarnessAdapter implements HarnessAdapter {
     const threadId = this.threads.get(executionId);
     if (!threadId) throw new Error(`No OpenDots thread exists for execution '${executionId}'.`);
 
+    const request = this.requests.get(executionId);
+    if (!request) throw new Error(`Execution '${executionId}' is not known to OpenDots adapter.`);
+
     return {
       id: `checkpoint_${executionId}`,
-      missionId: 'unknown',
-      taskId: 'unknown',
+      missionId: request.missionId,
+      taskId: request.taskId,
       executionId,
       harnessId: this.descriptor.id,
       nodeId: 'opendots',
