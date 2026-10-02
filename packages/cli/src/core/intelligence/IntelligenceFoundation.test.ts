@@ -25,7 +25,7 @@ function provider(id: string, ready = true): IntelligenceProvider {
     initialize: vi.fn(async () => {}),
     health: vi.fn(async () => ({
       providerId: id,
-      status: ready ? 'READY' : 'UNAVAILABLE',
+      status: (ready ? 'READY' : 'UNAVAILABLE') as const,
       checkedAt: new Date().toISOString(),
       capabilities: {
         strategicDecision: true, taskDecision: true, recoveryDecision: true,
