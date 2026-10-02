@@ -61,8 +61,8 @@ function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
 }
 
 function normalizeJevEndpoint(value: string): string {
-  const trimmed = value.replace(/\\/$/, '');
-  return /\\/v1\\/systemone$/.test(trimmed) ? trimmed : trimmed + '/v1/systemone';
+  const trimmed = value.replace(/\/$/, '');
+  return /\/v1\/systemone$/.test(trimmed) ? trimmed : trimmed + '/v1/systemone';
 }
 function parseNonNegativeInt(value: string | undefined, fallback: number): number {
   const parsed = value === undefined ? NaN : Number(value);
