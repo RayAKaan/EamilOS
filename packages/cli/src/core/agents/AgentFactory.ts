@@ -508,7 +508,7 @@ class UniversalAgentAdapter implements EamilOSAgent {
   readonly kind: AgentKind = 'cli';
   readonly capabilities: AgentCapabilities;
   private readonly agentId: string;
-  private readonly name: string;
+  readonly name: string;
 
   constructor(agentId: string, private readonly config?: { workingDir?: string; timeoutMs?: number }) {
     const definition = getUniversalAgentPlatform().registry.get(agentId);
