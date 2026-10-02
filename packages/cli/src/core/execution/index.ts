@@ -11,3 +11,5 @@ export * from './ExecutionSupervisor.js';
 export * from './HarnessScheduler.js';
 
 export * from './UniversalHarnessAdapter.js';
+
+export * from './OpenDotsHarnessAdapter.js';
