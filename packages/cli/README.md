@@ -419,6 +419,18 @@ Keys remain server-side and are never included in the model state or decision ev
 
 Jev is a decision signal, not a source of execution authority. The current TypeSafe documentation also recommends application-owned thresholds, fallbacks, and human review for uncertain or high-impact actions. citeturn2search0
 
+## Decision Fusion (Phase 2E)
+
+EamilOS now arbitrates strategic intelligence through a constraint-first fusion layer. Deterministic intelligence supplies the hard operational baseline; Jev and typed Laya provide additional decision signals. The fusion engine validates every candidate against the current mission/task graph before weighting it, preserves provider provenance, incorporates bounded historical outcomes, and can abstain or require human review when uncertainty is too high.
+
+Fusion is enabled by default. For isolated Jev debugging, set:
+
+```bash
+export EAMILOS_INTELLIGENCE_FUSION=0
+```
+
+Decision outcomes are persisted under `.eamilos/intelligence/<mission>.outcomes.json` with a bounded history. Historical outcomes influence future weighting but never override graph, validation, resource, or approval constraints.
+
 ## Requirements
 
 - **Node.js >= 18**
