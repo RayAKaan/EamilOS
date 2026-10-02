@@ -36,7 +36,7 @@ function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
   if (process.env.EAMILOS_INTELLIGENCE_MOCK === '1') return new MockJevProvider();
   const endpoint = process.env.EAMILOS_JEV_URL;
   const apiKey = process.env.EAMILOS_JEV_API_KEY;
-  if (!endpoint || !apiKey) return new MockJevProvider();
+  if (!endpoint || !apiKey) return new DeterministicJevProvider();
   return new JevHttpProvider({ endpoint, apiKey, timeoutMs: config.jev.timeoutMs, healthEndpoint: process.env.EAMILOS_JEV_HEALTH_URL });
 }
 
