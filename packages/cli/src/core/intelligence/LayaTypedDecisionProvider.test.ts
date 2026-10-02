@@ -48,7 +48,8 @@ describe('Laya typed decisions', () => {
     const calibration = new LayaCalibration({ enabled: true, choiceTemperature: 0.5, scoreTemperature: 1, noulTemperature: 1, minimumConfidence: 0.5, minimumProbability: 0.5 });
     const answer = calibration.apply('action', { type: 'choice', choice: 'A', probabilities: { A: 0.6, B: 0.4 } });
     expect(answer.calibrated).toBe(true);
-    expect(answer.answer.probabilities.A).toBeGreaterThan(0.6);
+    expect(answer.answer.type).toBe('choice');
+    if (answer.answer.type === 'choice') expect(answer.answer.probabilities.A).toBeGreaterThan(0.6);
   });
   it('validates malformed wire responses', () => {
     expect(() => LayaPredictResponseSchema.parse({ model: 'typed-decisions', answers: { action: { type: 'choice', choice: 'A' } } })).toThrow();
