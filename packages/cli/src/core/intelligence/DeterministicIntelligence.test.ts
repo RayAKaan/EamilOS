@@ -23,6 +23,7 @@ function context(overrides: Partial<DecisionContext> = {}): DecisionContext {
     agents: [
       { id: 'agent-a', harness: 'opencode', capabilities: ['backend', 'testing', 'debugging'], status: 'AVAILABLE', health: 'HEALTHY' },
       { id: 'agent-b', harness: 'claude-code', capabilities: ['frontend', 'testing'], status: 'AVAILABLE', health: 'HEALTHY' },
+      { id: 'agent-c', harness: 'aider', capabilities: ['backend', 'testing', 'debugging'], status: 'AVAILABLE', health: 'HEALTHY' },
     ],
     taskGraph: {
       version: 4,
@@ -91,7 +92,7 @@ describe('Phase 2B deterministic intelligence', () => {
       }],
     }), 'WORKER_LOST');
     expect(decision.action).toBe('REASSIGN');
-    expect(decision.assignments?.[0]?.agentId).toBe('agent-a');
+    expect(decision.assignments?.[0]?.agentId).toBe('agent-c');
   });
 
   it('parallelizes independent ready work within capacity', () => {
