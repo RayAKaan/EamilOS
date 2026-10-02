@@ -2,6 +2,7 @@ import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { ExecutionStore } from '../execution/ExecutionStore.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
+import { DeterministicJevProvider } from './DeterministicJevProvider.js';
 import { HarnessScheduler } from '../execution/HarnessScheduler.js';
 import { JevHttpProvider } from './JevHttpProvider.js';
 import { LayaProcessAdapter } from './LayaProcessAdapter.js';
