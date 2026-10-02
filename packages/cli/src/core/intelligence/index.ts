@@ -32,3 +32,5 @@ export { DeterministicRecoveryEngine } from './DeterministicRecoveryEngine.js';
 export { DeterministicParallelizationEngine } from './DeterministicParallelizationEngine.js';
 export { DeterministicStrategicEngine } from './DeterministicStrategicEngine.js';
 export { DeterministicIntelligenceProvider } from './DeterministicIntelligenceProvider.js';
+
+export { DeterministicJevProvider } from './DeterministicJevProvider.js';
