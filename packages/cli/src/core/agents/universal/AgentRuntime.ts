@@ -14,9 +14,9 @@ export interface UniversalRuntimeOptions {
   executable?: string;
 }
 
-const PERMISSION_PATTERNS = [/allow .*\\?/i, /approve .*\\?/i, /permission/i, /do you want me to/i, /yes\\/no/i];
+const PERMISSION_PATTERNS = [/allow .*\?/i, /approve .*\?/i, /permission/i, /do you want me to/i, /yes\/no/i];
 const AUTH_PATTERNS = [/api[_ -]?key/i, /authentication required/i, /log(?:in|in required)/i, /sign in/i, /unauthorized/i];
-const QUESTION_PATTERNS = [/choose one/i, /select an option/i, /enter .*:/i, /\\?\\s*$/m];
+const QUESTION_PATTERNS = [/choose one/i, /select an option/i, /enter .*:/i, /\?\s*$/m];
 
 export class UniversalAgentRuntime {
   private sessions = new Map<string, UniversalAgentSession>();
