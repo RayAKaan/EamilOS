@@ -80,6 +80,7 @@ export const TaskAcceptedSchema = CorrelatedSchema.extend({
   kind: z.literal('task.accepted'),
   workerId: z.string().min(1),
   leaseId: z.string().min(1).optional(),
+  fencingToken: z.number().int().positive().optional(),
 }).strict();
 export type TaskAccepted = z.infer<typeof TaskAcceptedSchema>;
 
