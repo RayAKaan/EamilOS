@@ -35,6 +35,7 @@ export class JevDecisionMapper {
       expectedOutcome: 'Advance the mission while EamilOS deterministic validation and policy checks remain authoritative.',
       contextVersion: context.taskGraph.version,
       contextHash,
+      conditions: [{ type: 'human_review_signal', probability: humanReviewProbability }],
     };
     return { decision, confidence, humanReviewProbability, model: response.model };
   }
