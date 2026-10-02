@@ -10,6 +10,7 @@ import { DecisionStore } from './DecisionStore.js';
 import { DecisionApplier } from './DecisionApplier.js';
 import { StrategicLoop, type StrategicLoopResult } from './StrategicLoop.js';
 import type { IntelligenceConfig, JevProvider, LayaModelAdapter } from './types.js';
+import type { LayaDecisionAdapter, LayaCalibrationConfig } from './LayaDecisionTypes.js';
 import type { FleetIntelligenceProvider } from './FleetIntelligence.js';
 import { DeterministicJevProvider } from './DeterministicJevProvider.js';
 
@@ -32,7 +33,9 @@ export class IntelligenceEngine {
     fleet?: FleetIntelligenceProvider,
     executions = new ExecutionStore(),
     registry = new HarnessRegistry(),
-    foundation = createIntelligenceFoundation({ jev, laya }),
+    foundation = createIntelligenceFoundation({ jev, laya, layaTyped, layaCalibration }),
+    layaTyped?: LayaDecisionAdapter,
+    layaCalibration?: LayaCalibrationConfig,
   ) {
     this.foundation = foundation;
     this.context = new DecisionContextBuilder(missions, coordination, executions, decisions, registry, fleet);
