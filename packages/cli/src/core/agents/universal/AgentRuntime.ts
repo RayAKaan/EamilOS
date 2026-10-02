@@ -216,6 +216,8 @@ export class UniversalAgentRuntime {
     errorType: AgentResponse['errorType'],
     output: string,
   ): Promise<AgentResponse> {
+    await getTerminalSessionManager().stopSession(session.terminalId);
+    session.status = 'failed';
     const response = this.failure(error, errorType, startedAt, output);
     await this.store.upsert({
       id: executionId,
