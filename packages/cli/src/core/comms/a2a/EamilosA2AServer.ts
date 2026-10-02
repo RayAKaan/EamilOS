@@ -4,6 +4,7 @@ import { EamilosA2ATaskStore, type EamilosA2ATaskStoreLike } from './EamilosA2AT
 import { EamilosA2ASqliteTaskStore } from './EamilosA2ASqliteTaskStore.js';
 import { EamilosSqliteResourceLeaseManager, ResourceConflictError, type ResourceLeaseManager } from './EamilosResourceLeaseManager.js';
 import { assertCheckpointFresh, checkpointResumeId, EamilosSqliteCheckpointStore, type CheckpointStore, type ExecutionCheckpoint, type SaveCheckpointInput } from './EamilosCheckpointStore.js';
+import { EamilosSqliteDistributedEventLog, type DistributedEventLog } from './EamilosDistributedEventLog.js';
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -25,6 +26,8 @@ export interface EamilosA2AServerOptions {
   checkpointStore?: CheckpointStore;
   checkpointStoreFilename?: string;
   currentContextVersion?: () => number;
+  eventLog?: DistributedEventLog;
+  eventLogFilename?: string;
 }
 
 export class EamilosA2AServer {
@@ -35,6 +38,8 @@ export class EamilosA2AServer {
   private readonly leases?: ResourceLeaseManager;
   private readonly ownsCheckpointStore: boolean;
   private readonly checkpoints?: CheckpointStore;
+  private readonly ownsEventLog: boolean;
+  private readonly eventLog?: DistributedEventLog;
 
   constructor(private readonly options: EamilosA2AServerOptions) {
     AgentCardSchema.parse(options.card);
@@ -49,6 +54,9 @@ export class EamilosA2AServer {
     this.ownsCheckpointStore = !options.checkpointStore && Boolean(options.checkpointStoreFilename);
     this.checkpoints = options.checkpointStore
       ?? (options.checkpointStoreFilename ? new EamilosSqliteCheckpointStore({ filename: options.checkpointStoreFilename }) : undefined);
+    if (options.eventLog && options.eventLogFilename) throw new Error('Specify eventLog or eventLogFilename, not both');
+    this.ownsEventLog = !options.eventLog && Boolean(options.eventLogFilename);
+    this.eventLog = options.eventLog ?? (options.eventLogFilename ? new EamilosSqliteDistributedEventLog({ filename: options.eventLogFilename }) : undefined);
     this.tasks = options.taskStore
       ?? (options.taskStoreFilename ? new EamilosA2ASqliteTaskStore({ filename: options.taskStoreFilename }) : new EamilosA2ATaskStore());
   }
@@ -73,6 +81,7 @@ export class EamilosA2AServer {
     if (this.ownsTaskStore) this.tasks.close?.();
     if (this.ownsResourceLeaseManager) this.leases?.close?.();
     if (this.ownsCheckpointStore) this.checkpoints?.close?.();
+    if (this.ownsEventLog) this.eventLog?.close?.();
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -156,6 +165,7 @@ export class EamilosA2AServer {
             ? await this.options.onTaskRequest(request)
             : acceptedFromRequest(request, this.options.workerId, leaseId, fencingToken, resumeCheckpoint?.checkpointId);
           this.tasks.append(decision);
+          this.emitEvent(decision.kind, decision);
           if (decision.kind === 'task.rejected' && leaseId && fencingToken !== undefined) {
             this.leases?.release(leaseId, this.options.workerId, fencingToken);
           }
@@ -260,6 +270,7 @@ export class EamilosA2AServer {
           return this.send(res, 409, { error: 'LIFECYCLE_CORRELATION_MISMATCH' });
         }
         this.tasks.append(parsed);
+        this.emitEvent(parsed.kind, parsed);
         if (('checkpoint' in parsed) && parsed.checkpoint && this.checkpoints && (parsed.kind === 'task.progress' || parsed.kind === 'task.failed')) {
           const checkpoint = parsed.checkpoint;
           const lease = this.leases?.getByExecution(executionId);
@@ -298,6 +309,7 @@ export class EamilosA2AServer {
           reason: typeof body.reason === 'string' ? body.reason : undefined,
         };
         this.tasks.append(message);
+        this.emitEvent(message.kind, message);
         const lease = this.leases?.getByExecution(executionId);
         if (lease) this.leases?.release(lease.leaseId, lease.ownerId, lease.fencingToken);
         return this.send(res, 200, message);
@@ -306,6 +318,11 @@ export class EamilosA2AServer {
     } catch (error) {
       return this.send(res, 400, { error: error instanceof Error ? error.message : String(error) });
     }
+  }
+
+  private emitEvent(eventType: string, message: EamilosA2AMessage): void {
+    if (!this.eventLog || !('executionId' in message)) return;
+    this.eventLog.append({ eventId: `${message.requestId}:${eventType}:${message.timestamp}`, eventType, missionId: message.missionId, taskId: message.taskId, executionId: message.executionId, requestId: message.requestId, workerId: 'workerId' in message ? message.workerId : undefined, payload: message as unknown as Record<string, unknown> });
   }
 
   private async parseBody(req: IncomingMessage): Promise<unknown> {
