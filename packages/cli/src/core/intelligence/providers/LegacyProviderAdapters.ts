@@ -9,7 +9,7 @@ import type {
 
 export class LegacyJevProviderAdapter implements IntelligenceProvider {
   readonly id: string;
-  constructor(private readonly provider: JevProvider, id = provider.id) { this.id = id; }
+  constructor(private readonly provider: JevProvider, id = provider.id === 'deterministic' ? 'jev' : provider.id) { this.id = id; }
 
   capabilities(): IntelligenceCapabilities {
     return {

@@ -20,9 +20,19 @@ export class IntelligenceRouter {
   async route(request: IntelligenceRequest): Promise<IntelligenceRoute> {
     const candidates = this.registry.list().filter(provider => supports(provider, request.type));
     const preferred = request.preferredProviders ?? [];
+    const defaultsByType: Record<IntelligenceRequestType, string[]> = {
+      STRATEGIC_DECISION: ['jev-http', 'jev', 'deterministic'],
+      TASK_DECISION: ['laya-local-typed', 'laya-http-typed', 'deterministic', 'jev-http', 'jev'],
+      RECOVERY_DECISION: ['laya-local-typed', 'laya-http-typed', 'deterministic', 'jev-http', 'jev'],
+      PLANNING: ['laya-local', 'laya-local-typed', 'deterministic'],
+      VALIDATION: ['laya-local-typed', 'laya-http-typed', 'deterministic', 'jev-http', 'jev'],
+      AGENT_SELECTION: ['laya-local-typed', 'laya-http-typed', 'deterministic'],
+      PARALLELIZATION: ['laya-local-typed', 'laya-http-typed', 'deterministic'],
+    };
+    const priority = [...preferred, ...defaultsByType[request.type]];
     const ordered = [
-      ...preferred.map(id => candidates.find(provider => provider.id === id)).filter((provider): provider is typeof candidates[number] => provider !== undefined),
-      ...candidates.filter(provider => !preferred.includes(provider.id)),
+      ...priority.map(id => candidates.find(provider => provider.id === id)).filter((provider): provider is typeof candidates[number] => provider !== undefined),
+      ...candidates.filter(provider => !priority.includes(provider.id)),
     ];
 
     const healthy: string[] = [];

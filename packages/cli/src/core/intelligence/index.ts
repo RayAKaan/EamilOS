@@ -25,3 +25,27 @@ export { IntelligenceLifecycleManager } from './IntelligenceLifecycleManager.js'
 export { IntelligenceRuntime } from './IntelligenceRuntime.js';
 export { createIntelligenceFoundation } from './IntelligenceFoundation.js';
 export { LegacyJevProviderAdapter, LegacyLayaProviderAdapter } from './providers/LegacyProviderAdapters.js';
+
+export { DeterministicAgentSelector } from './DeterministicAgentSelector.js';
+export { DeterministicPlanner } from './DeterministicPlanner.js';
+export { DeterministicRecoveryEngine } from './DeterministicRecoveryEngine.js';
+export { DeterministicParallelizationEngine } from './DeterministicParallelizationEngine.js';
+export { DeterministicStrategicEngine } from './DeterministicStrategicEngine.js';
+export { DeterministicIntelligenceProvider } from './DeterministicIntelligenceProvider.js';
+
+export { DeterministicJevProvider } from './DeterministicJevProvider.js';
+
+export * from './LayaDecisionTypes.js';
+export { LayaCalibration } from './LayaCalibration.js';
+export { LayaQuestionBuilder } from './LayaQuestionBuilder.js';
+export { LayaHttpDecisionAdapter } from './LayaHttpDecisionAdapter.js';
+export { LayaProcessDecisionAdapter } from './LayaProcessDecisionAdapter.js';
+export { LayaTypedDecisionProvider } from './LayaTypedDecisionProvider.js';
+
+export * from './JevSystemOneTypes.js';
+export { JevQuestionBuilder } from './JevQuestionBuilder.js';
+export { JevDecisionMapper } from './JevDecisionMapper.js';
+export { FusedJevProvider } from './FusedJevProvider.js';
+export * from './DecisionFusionTypes.js';
+export { DecisionFusionEngine } from './DecisionFusionEngine.js';
+export { DecisionOutcomeStore } from './DecisionOutcomeStore.js';
