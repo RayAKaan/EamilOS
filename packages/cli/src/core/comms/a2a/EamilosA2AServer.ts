@@ -117,7 +117,7 @@ export class EamilosA2AServer {
           if (this.leases && (request.resources.readSet.length > 0 || request.resources.writeSet.length > 0)) {
             const lease = this.leases.acquire({
               executionId: request.executionId,
-              ownerId: request.missionId + ':' + this.options.workerId,
+              ownerId: this.options.workerId,
               resources: request.resources,
               ttlMs: this.options.resourceLeaseTtlMs ?? Math.max(request.timeoutMs, 30_000),
             });
@@ -127,15 +127,15 @@ export class EamilosA2AServer {
           this.tasks.put(request);
           const decision = this.options.onTaskRequest
             ? await this.options.onTaskRequest(request)
-            : acceptedFromRequest(request, this.options.workerId, leaseId);
+            : acceptedFromRequest(request, this.options.workerId, leaseId, fencingToken);
           this.tasks.append(decision);
           if (decision.kind === 'task.rejected' && leaseId && fencingToken !== undefined) {
-            this.leases?.release(leaseId, request.missionId + ':' + this.options.workerId, fencingToken);
+            this.leases?.release(leaseId, this.options.workerId, fencingToken);
           }
           return this.send(res, decision.kind === 'task.accepted' ? 202 : 409, decision);
         } catch (error) {
           if (leaseId && fencingToken !== undefined) {
-            try { this.leases?.release(leaseId, request.missionId + ':' + this.options.workerId, fencingToken); } catch { /* preserve original error */ }
+            try { this.leases?.release(leaseId, this.options.workerId, fencingToken); } catch { /* preserve original error */ }
           }
           const rejection: TaskRejected = {
             ...correlation(request),
@@ -158,6 +158,34 @@ export class EamilosA2AServer {
         }
         const lease = this.leases.renew(decodeURIComponent(match[1]!), body.ownerId, body.fencingToken, body.ttlMs);
         return this.send(res, 200, lease);
+      }
+
+      const lifecycle = path.match(/^\\/eamilos\\/a2a\\/tasks\\/([^/]+)\\/messages$/);
+      if (req.method === 'POST' && lifecycle) {
+        const executionId = decodeURIComponent(lifecycle[1]!);
+        const stored = this.tasks.get(executionId);
+        if (!stored) return this.send(res, 404, { error: 'EXECUTION_NOT_FOUND' });
+        const parsed = A2AEnvelopeSchema.parse(await this.parseBody(req));
+        if (!['task.progress', 'task.completed', 'task.failed', 'task.cancelled'].includes(parsed.kind)) {
+          return this.send(res, 400, { error: 'INVALID_LIFECYCLE_MESSAGE' });
+        }
+        if (
+          !('executionId' in parsed) ||
+          parsed.executionId !== stored.request.executionId ||
+          parsed.taskId !== stored.request.taskId ||
+          parsed.missionId !== stored.request.missionId ||
+          parsed.requestId !== stored.request.requestId ||
+          parsed.idempotencyKey !== stored.request.idempotencyKey ||
+          ('workerId' in parsed && parsed.workerId !== this.options.workerId)
+        ) {
+          return this.send(res, 409, { error: 'LIFECYCLE_CORRELATION_MISMATCH' });
+        }
+        this.tasks.append(parsed);
+        if (parsed.kind === 'task.completed' || parsed.kind === 'task.failed' || parsed.kind === 'task.cancelled') {
+          const lease = this.leases?.getByExecution(executionId);
+          if (lease) this.leases.release(lease.leaseId, lease.ownerId, lease.fencingToken);
+        }
+        return this.send(res, 200, parsed);
       }
 
       const cancel = path.match(/^\/eamilos\/a2a\/tasks\/([^/]+)\/cancel$/);
@@ -218,6 +246,12 @@ function correlation(request: TaskRequest) {
   };
 }
 
-function acceptedFromRequest(request: TaskRequest, workerId: string, leaseId?: string): TaskAccepted {
-  return { ...correlation(request), kind: 'task.accepted', workerId, ...(leaseId ? { leaseId } : {}) };
+function acceptedFromRequest(request: TaskRequest, workerId: string, leaseId?: string, fencingToken?: number): TaskAccepted {
+  return {
+    ...correlation(request),
+    kind: 'task.accepted',
+    workerId,
+    ...(leaseId ? { leaseId } : {}),
+    ...(fencingToken !== undefined ? { fencingToken } : {}),
+  };
 }
