@@ -4,6 +4,7 @@ import { CapabilityMatcher, type AgentCapabilityRequirements, type AgentMatch } 
 import { UniversalAgentRegistry } from './UniversalAgentRegistry.js';
 import type { UniversalAgentEventBus } from './AgentEventBus.js';
 import { ExecutionStore } from './ExecutionStore.js';
+import type { UniversalAgentRuntime } from './AgentRuntime.js';
 
 export interface UniversalAgentTask {
   id?: string; request: AgentRequest; requirements?: AgentCapabilityRequirements; preferredAgentId?: string;
@@ -17,6 +18,7 @@ export class UniversalAgentScheduler {
   private readonly matcher = new CapabilityMatcher();
   private readonly active = new Map<string, Promise<UniversalAgentExecution>>();
   private readonly perAgent = new Map<string, number>();
+  private readonly runtimes = new Map<string, UniversalAgentRuntime>();
   private readonly maxConcurrent: number;
 
   constructor(
@@ -50,6 +52,7 @@ export class UniversalAgentScheduler {
         const runtime = this.registry.createRuntime(match.agent.id, {
           workingDir: task.request.workingDir, timeoutMs: task.request.timeoutMs, events: this.events, store: this.options.store,
         });
+        this.runtimes.set(executionId, runtime);
         const response = await runtime.execute(task.request);
         return { id: executionId, taskId, agentId: match.agent.id, startedAt, finishedAt: Date.now(), response, match };
       })();
@@ -58,6 +61,7 @@ export class UniversalAgentScheduler {
       catch (error) { lastError = error instanceof Error ? error.message : String(error); throw error; }
       finally {
         this.active.delete(executionId);
+        this.runtimes.delete(executionId);
         this.perAgent.set(match.agent.id, Math.max(0, (this.perAgent.get(match.agent.id) ?? 1) - 1));
       }
     }
@@ -66,4 +70,5 @@ export class UniversalAgentScheduler {
 
   getActiveExecutionCount(): number { return this.active.size; }
   getAgentConcurrency(agentId: string): number { return this.perAgent.get(agentId) ?? 0; }
+  async stop(executionId: string): Promise<void> { const runtime = this.runtimes.get(executionId); if (!runtime) return; const session = runtime.getSessions().find(item => item.status === 'running'); if (session) await runtime.stop(session.id); }
 }
