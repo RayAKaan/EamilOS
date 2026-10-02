@@ -92,6 +92,25 @@ describe('Phase 2A intelligence foundation', () => {
     expect(route.providerIds).toEqual(['online']);
   });
 
+  it('falls back to the next healthy provider when the first provider fails', async () => {
+    const registry = new IntelligenceProviderRegistry();
+    const first = provider('first');
+    first.evaluate = vi.fn(async () => ({
+      requestId: 'r', providerId: 'first', status: 'FAILED' as const, latencyMs: 1,
+      contextVersion: 1, contextHash: 'hash',
+      error: { code: 'TEST_FAILURE', message: 'first failed', retryable: true },
+    }));
+    registry.register(first);
+    registry.register(provider('second'));
+    const runtime = new IntelligenceRuntime(registry);
+    const result = await runtime.request({
+      requestId: 'r', missionId: 'm', type: 'STRATEGIC_DECISION', priority: 'NORMAL',
+      contextVersion: 1, contextHash: 'hash', context: {},
+    });
+    expect(result.providerId).toBe('second');
+    expect(result.status).toBe('SUCCESS');
+  });
+
   it('returns structured unavailability instead of throwing', async () => {
     const registry = new IntelligenceProviderRegistry();
     registry.register(provider('offline', false));
