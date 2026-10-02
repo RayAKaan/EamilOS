@@ -18,7 +18,7 @@ const cli = (
   id, name, provider, kind: 'cli', integrationStatus: 'supported',
   protocols: ['pty', 'stdio'], platforms: ['darwin', 'linux', 'win32'],
   capabilities: base(capabilities), installation, executableCandidates: [executable],
-  versionArgs: ['--version'], authentication: { methods: ['environment', 'api-key', 'oauth'] },
+  versionArgs: ['--version'], authentication: { methods: ['environment', 'api-key', 'oauth'], environmentVariables: provider === 'openai' ? ['OPENAI_API_KEY'] : provider === 'anthropic' ? ['ANTHROPIC_API_KEY'] : provider === 'google' ? ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] : provider === 'mistral' ? ['MISTRAL_API_KEY'] : provider === 'moonshot' ? ['MOONSHOT_API_KEY'] : provider === 'deepseek' ? ['DEEPSEEK_API_KEY'] : [] },
   ...extra,
 });
 
