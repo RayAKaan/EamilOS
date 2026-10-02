@@ -61,5 +61,5 @@ export interface AgentRemovalResult { id: string; success: boolean; changed: boo
 
 export interface UniversalAgentSession {
   id: string; agentId: string; terminalId: string; startedAt: number;
-  status: 'starting' | 'running' | 'completed' | 'failed' | 'stopped';
+  status: 'starting' | 'running' | 'completed' | 'failed' | 'stopped' | 'recovering';
 }
