@@ -32,13 +32,13 @@ export class TerminalSessionManager extends EventEmitter {
   on<K extends keyof TerminalEventMap>(event: K, listener: (data: TerminalEventMap[K]) => void): this { return super.on(event, listener); }
   emit<K extends keyof TerminalEventMap>(event: K, data: TerminalEventMap[K]): boolean { return super.emit(event, data); }
 
-  async createSession(agentId: string, command: string, args: string[], cwd: string, mode: AgentMode): Promise<TerminalSession> {
+  async createSession(agentId: string, command: string, args: string[], cwd: string, mode: AgentMode, extraEnv: Record<string, string> = {}): Promise<TerminalSession> {
     const id = 'term_' + agentId + '_' + Date.now();
     const session: TerminalSession = { id, agentId, command, args, cwd, mode, status: 'starting', stdout: '', stderr: '' };
     this.sessions.set(id, session);
     this.emit('session:started', { sessionId: id, agentId });
     try {
-      const env = buildAgentEnv(agentId, { EAMILOS_TERMINAL_SESSION: id });
+      const env = buildAgentEnv(agentId, { EAMILOS_TERMINAL_SESSION: id, ...extraEnv });
       const proc = spawn(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env, shell: process.platform === 'win32' });
       session.status = 'running';
       session.pid = proc.pid;

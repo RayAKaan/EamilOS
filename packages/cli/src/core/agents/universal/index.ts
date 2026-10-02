@@ -15,3 +15,4 @@ export * from './InstallationPlanner.js';
 export * from './InstallationVerifier.js';
 export * from './GitHubReleaseInstaller.js';
 export * from './ExecutionStore.js';
+export * from './AgentIntegrationValidator.js';

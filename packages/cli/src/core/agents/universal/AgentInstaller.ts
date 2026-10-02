@@ -19,6 +19,18 @@ function run(command: string, args: string[] = [], timeoutMs = 120000): Promise<
   });
 }
 
+async function prerequisiteAvailable(name: string, timeoutMs: number): Promise<boolean> {
+  const executable = process.platform === 'win32'
+    ? name === 'npm' ? 'npm.cmd' : ['node', 'python', 'uv'].includes(name) ? `${name}.exe` : name
+    : name;
+  try {
+    const result = await run(executable, ['--version'], Math.min(timeoutMs, 5000));
+    return result.code === 0;
+  } catch {
+    return false;
+  }
+}
+
 export class AgentInstaller {
   readonly planner = new InstallationPlanner();
   readonly verifier = new InstallationVerifier();
@@ -34,6 +46,14 @@ export class AgentInstaller {
     const plan = this.planner.plan(definition, options);
     if (options.dryRun) return { id: definition.id, success: plan.supported || plan.manualAction !== undefined, changed: false, skipped: true, message: this.plan(definition), reason: 'dry-run' };
     if (!plan.platformSupported) return { id: definition.id, success: false, changed: false, message: plan.manualAction ?? 'Unsupported platform' };
+
+    if (plan.supported && plan.prerequisites.length) {
+      const missing: string[] = [];
+      for (const prerequisite of plan.prerequisites) {
+        if (!(await prerequisiteAvailable(prerequisite, options.timeoutMs ?? 5000))) missing.push(prerequisite);
+      }
+      if (missing.length) return { id: definition.id, success: false, changed: false, message: `Missing prerequisite(s): ${missing.join(', ')}` };
+    }
 
     if (definition.installation.strategy === 'existing') {
       const verification = await this.verifier.verify(definition, definition.installation.executable, options.timeoutMs ?? 5000);

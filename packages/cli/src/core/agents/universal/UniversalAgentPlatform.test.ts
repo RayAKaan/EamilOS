@@ -3,6 +3,8 @@ import { CapabilityMatcher } from './CapabilityMatcher.js';
 import { UNIVERSAL_AGENT_CATALOG } from './catalog.js';
 import { UniversalAgentRegistry } from './UniversalAgentRegistry.js';
 import { AuthenticationManager } from './AuthenticationManager.js';
+import { validateAgentCatalog } from './AgentIntegrationValidator.js';
+import { createLaunchContract } from './AgentLaunchContract.js';
 
 describe('Universal agent platform', () => {
   it('contains exactly 35 worker definitions', () => {
@@ -22,6 +24,19 @@ describe('Universal agent platform', () => {
     const result = manager.inspect(UNIVERSAL_AGENT_CATALOG.find((agent) => agent.id === 'opencode')!);
     expect(result.detail).not.toContain(process.env.OPENCODE_API_KEY ?? '__missing__');
     expect(result.checkedEnvironmentVariables).toEqual([]);
+  });
+
+  it('has a complete launch and installation contract for every worker', () => {
+    expect(validateAgentCatalog(UNIVERSAL_AGENT_CATALOG)).toEqual([]);
+    for (const agent of UNIVERSAL_AGENT_CATALOG) {
+      const contract = createLaunchContract(agent, {
+        id: 'contract-test', sessionId: 'contract-test', prompt: 'hello', systemPrompt: '',
+        mode: 'execution', workingDir: process.cwd(), timeoutMs: 1000,
+      });
+      expect(contract.executable).toBe(agent.executableCandidates[0]);
+      expect(contract.promptDelivery).toBeDefined();
+      expect(contract.headless || contract.interactive).toBe(true);
+    }
   });
 
   it('can inspect every catalog definition without executing it', async () => {
