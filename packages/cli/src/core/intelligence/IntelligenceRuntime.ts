@@ -83,7 +83,7 @@ export class IntelligenceRuntime implements IntelligenceRuntimeContract {
           contextVersion: normalized.contextVersion,
           contextHash: normalized.contextHash,
         };
-        lastResponse = result;
+        lastResponse = result as IntelligenceResponse<TResult>;
         if (result.status === 'SUCCESS' || result.status === 'DEGRADED') {
           const eventType = result.status === 'SUCCESS' ? 'intelligence.completed' : 'intelligence.degraded';
           await this.emit(eventType, normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id, { status: result.status });
