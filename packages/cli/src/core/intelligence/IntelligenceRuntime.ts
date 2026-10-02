@@ -47,7 +47,7 @@ export class IntelligenceRuntime implements IntelligenceRuntimeContract {
     await this.emit('intelligence.requested', normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, undefined, { type: normalized.type });
 
     const route = await this.router.route(normalized);
-    if (!route.selectedProviderId) {
+    if (!route.providerIds.length) {
       const response = this.failure(normalized, 'UNAVAILABLE', {
         code: 'NO_PROVIDER',
         message: route.reason,
@@ -57,40 +57,59 @@ export class IntelligenceRuntime implements IntelligenceRuntimeContract {
       return response as IntelligenceResponse<TResult>;
     }
 
-    const provider = this.registry.get(route.selectedProviderId);
-    if (!provider) {
-      return this.failure(normalized, 'UNAVAILABLE', {
-        code: 'PROVIDER_NOT_FOUND',
-        message: `Provider ${route.selectedProviderId} disappeared during routing.`,
-        retryable: true,
-      }) as IntelligenceResponse<TResult>;
+    let lastResponse: IntelligenceResponse<TResult> | undefined;
+    for (let index = 0; index < route.providerIds.length; index += 1) {
+      const providerId = route.providerIds[index];
+      const provider = this.registry.get(providerId);
+      if (!provider) continue;
+
+      if (index > 0) {
+        await this.emit('intelligence.fallback', normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id, {
+          fromProvider: route.providerIds[index - 1],
+          toProvider: provider.id,
+        });
+      }
+
+      await this.emit('intelligence.started', normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id);
+
+      const started = Date.now();
+      try {
+        const response = await provider.evaluate(normalized);
+        const result: IntelligenceResponse<TResult> = {
+          ...response,
+          requestId: normalized.requestId,
+          providerId: provider.id,
+          latencyMs: response.latencyMs || Date.now() - started,
+          contextVersion: normalized.contextVersion,
+          contextHash: normalized.contextHash,
+        };
+        lastResponse = result;
+        if (result.status === 'SUCCESS' || result.status === 'DEGRADED') {
+          const eventType = result.status === 'SUCCESS' ? 'intelligence.completed' : 'intelligence.degraded';
+          await this.emit(eventType, normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id, { status: result.status });
+          return result;
+        }
+        await this.emit('intelligence.failed', normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id, {
+          status: result.status,
+          error: result.error?.message,
+        });
+      } catch (error) {
+        lastResponse = this.failure(normalized, 'FAILED', {
+          code: 'PROVIDER_ERROR',
+          message: error instanceof Error ? error.message : String(error),
+          retryable: true,
+        }) as IntelligenceResponse<TResult>;
+        await this.emit('intelligence.failed', normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id, {
+          error: lastResponse.error?.message,
+        });
+      }
     }
 
-    await this.emit('intelligence.started', normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id);
-
-    const started = Date.now();
-    try {
-      const response = await provider.evaluate(normalized);
-      const result: IntelligenceResponse<TResult> = {
-        ...response,
-        requestId: normalized.requestId,
-        providerId: provider.id,
-        latencyMs: response.latencyMs || Date.now() - started,
-        contextVersion: normalized.contextVersion,
-        contextHash: normalized.contextHash,
-      };
-      const eventType = result.status === 'SUCCESS' ? 'intelligence.completed' : result.status === 'DEGRADED' ? 'intelligence.degraded' : 'intelligence.failed';
-      await this.emit(eventType, normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id, { status: result.status });
-      return result;
-    } catch (error) {
-      const response = this.failure(normalized, 'FAILED' as IntelligenceResponseStatus, {
-        code: 'PROVIDER_ERROR',
-        message: error instanceof Error ? error.message : String(error),
-        retryable: true,
-      });
-      await this.emit('intelligence.failed', normalized.requestId, normalized.missionId, normalized.contextVersion, normalized.contextHash, provider.id, { error: response.error?.message });
-      return response as IntelligenceResponse<TResult>;
-    }
+    return lastResponse ?? this.failure(normalized, 'UNAVAILABLE', {
+      code: 'NO_PROVIDER',
+      message: 'No routed provider produced a usable response.',
+      retryable: false,
+    }) as IntelligenceResponse<TResult>;
   }
 
   async health(): Promise<IntelligenceRuntimeHealth> {
