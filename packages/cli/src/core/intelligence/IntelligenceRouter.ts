@@ -20,9 +20,19 @@ export class IntelligenceRouter {
   async route(request: IntelligenceRequest): Promise<IntelligenceRoute> {
     const candidates = this.registry.list().filter(provider => supports(provider, request.type));
     const preferred = request.preferredProviders ?? [];
+    const defaultsByType: Record<IntelligenceRequestType, string[]> = {
+      STRATEGIC_DECISION: ['jev-http', 'jev', 'deterministic'],
+      TASK_DECISION: ['deterministic', 'jev-http', 'jev'],
+      RECOVERY_DECISION: ['deterministic', 'jev-http', 'jev'],
+      PLANNING: ['laya', 'laya-local', 'deterministic'],
+      VALIDATION: ['deterministic', 'jev-http', 'jev'],
+      AGENT_SELECTION: ['deterministic'],
+      PARALLELIZATION: ['deterministic'],
+    };
+    const priority = [...preferred, ...defaultsByType[request.type]];
     const ordered = [
-      ...preferred.map(id => candidates.find(provider => provider.id === id)).filter((provider): provider is typeof candidates[number] => provider !== undefined),
-      ...candidates.filter(provider => !preferred.includes(provider.id)),
+      ...priority.map(id => candidates.find(provider => provider.id === id)).filter((provider): provider is typeof candidates[number] => provider !== undefined),
+      ...candidates.filter(provider => !priority.includes(provider.id)),
     ];
 
     const healthy: string[] = [];
