@@ -24,13 +24,15 @@ export class DeterministicPlanner {
     const planId = 'det-plan-' + createHash('sha256').update(base).digest('hex').slice(0, 16);
     const now = new Date().toISOString();
 
-    const tasks: TaskProposal[] = units.map((unit, index) => {
+    const tasks: TaskProposal[] = [];
+    let previousGlobalTaskId: string | undefined;
+    for (const [index, unit] of units.entries()) {
       const requiredCapabilities = this.selector.inferCapabilities(unit.title + ' ' + unit.objective);
       const selected = this.selector.select(context, { requiredCapabilities, priority: unit.priority });
-      const idBase = createHash('sha256').update(`${planId}:${index}:${unit.title}`).digest('hex').slice(0, 16);
-      const globalTaskId = `det-task-${idBase}`;
-      return {
-        proposalId: `det-proposal-${idBase}`,
+      const idBase = createHash('sha256').update(planId + ':' + index + ':' + unit.title).digest('hex').slice(0, 16);
+      const globalTaskId = 'det-task-' + idBase;
+      const task: TaskProposal = {
+        proposalId: 'det-proposal-' + idBase,
         missionId: context.mission.id,
         agentId: selected.agentId ?? 'eamilos-deterministic',
         baseGraphVersion: context.taskGraph.version,
@@ -38,22 +40,20 @@ export class DeterministicPlanner {
         parentTaskId,
         title: unit.title,
         objective: unit.objective,
-        dependencies: index === 0 ? (parentTaskId ? [parentTaskId] : []) : [tasks[index - 1].globalTaskId!],
+        dependencies: index === 0 ? (parentTaskId ? [parentTaskId] : []) : [previousGlobalTaskId!],
         priority: unit.priority,
         requiredCapabilities,
         acceptanceCriteria: unit.acceptanceCriteria,
         readSet: [],
         writeSet: [],
-        idempotencyKey: `det:${context.mission.id}:${globalTaskId}`,
+        idempotencyKey: 'det:' + context.mission.id + ':' + globalTaskId,
         orderingAfter: [],
         createdAt: now,
-        metadata: {
-          planner: 'deterministic',
-          planId,
-          deterministic: true,
-        },
+        metadata: { planner: 'deterministic', planId, deterministic: true },
       };
-    });
+      tasks.push(task);
+      previousGlobalTaskId = globalTaskId;
+    }
 
     if (tasks.length > limits.maxDependencyEdges + 1) {
       throw new Error('Deterministic planner exceeds maxDependencyEdges.');
