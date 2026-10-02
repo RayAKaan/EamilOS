@@ -1,5 +1,6 @@
 import { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import { MissionEngine } from '../mission/MissionEngine.js';
+import { ExecutionStore } from '../execution/ExecutionStore.js';
 import { HarnessRegistry } from '../execution/HarnessRegistry.js';
 import { HarnessScheduler } from '../execution/HarnessScheduler.js';
 import { JevHttpProvider } from './JevHttpProvider.js';
@@ -16,6 +17,7 @@ export interface IntelligenceRuntimeOptions {
   jev?: JevProvider;
   laya?: LayaModelAdapter;
   config?: IntelligenceConfig;
+  executions?: ExecutionStore;
 }
 
 export function createIntelligenceRuntime(options: IntelligenceRuntimeOptions = {}): IntelligenceEngine {
@@ -26,7 +28,7 @@ export function createIntelligenceRuntime(options: IntelligenceRuntimeOptions = 
   const config = options.config ?? defaultIntelligenceConfig();
   const jev = options.jev ?? createJevFromEnvironment(config);
   const laya = options.laya ?? createLayaFromEnvironment(config);
-  return new IntelligenceEngine(missions, coordination, scheduler, jev, laya, config);
+  return new IntelligenceEngine(missions, coordination, scheduler, jev, laya, config, undefined, undefined, options.executions);
 }
 
 function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
