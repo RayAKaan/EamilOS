@@ -33,7 +33,7 @@ export function createIntelligenceRuntime(options: IntelligenceRuntimeOptions = 
   const jev = options.jev ?? createJevFromEnvironment(config);
   const laya = options.laya ?? createLayaFromEnvironment(config);
   const layaTyped = createLayaTypedFromEnvironment(config);
-  return new IntelligenceEngine(missions, coordination, scheduler, jev, laya, config, undefined, undefined, options.executions, registry, undefined, layaTyped);
+  return new IntelligenceEngine(missions, coordination, scheduler, jev, laya, config, undefined, undefined, options.executions, registry, layaTyped, createLayaCalibrationFromEnvironment(config));
 }
 
 function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
