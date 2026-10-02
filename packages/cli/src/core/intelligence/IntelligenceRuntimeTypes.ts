@@ -15,7 +15,8 @@ export type IntelligenceResponseStatus =
   | 'UNAVAILABLE'
   | 'TIMEOUT'
   | 'INVALID'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'FAILED';
 
 export type IntelligenceHealthStatus =
   | 'READY'
