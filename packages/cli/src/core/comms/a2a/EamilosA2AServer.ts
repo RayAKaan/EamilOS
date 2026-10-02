@@ -160,7 +160,7 @@ export class EamilosA2AServer {
         return this.send(res, 200, lease);
       }
 
-      const lifecycle = path.match(/^\\/eamilos\\/a2a\\/tasks\\/([^/]+)\\/messages$/);
+      const lifecycle = path.match(/^\/eamilos\/a2a\/tasks\/([^/]+)\/messages$/);
       if (req.method === 'POST' && lifecycle) {
         const executionId = decodeURIComponent(lifecycle[1]!);
         const stored = this.tasks.get(executionId);
