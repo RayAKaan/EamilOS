@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
 import type { DecisionContext, DecisionEvaluation, DecisionRecord, DecisionTrigger, JevDecision, JevProvider, JevProviderResponse } from './types.js';
 import { DecisionValidator } from './DecisionValidator.js';
+import { ContextHasher } from './ContextHasher.js';
 
 export class DecisionRuntime {
   constructor(
     private readonly provider: JevProvider,
     private readonly validator = new DecisionValidator(),
     private readonly maxRetries = 2,
+    private readonly fallback?: JevProvider,
   ) {}
 
   async evaluate(context: DecisionContext, trigger: DecisionTrigger): Promise<{
@@ -24,11 +26,17 @@ export class DecisionRuntime {
         if (attempt === this.maxRetries) throw error;
       }
     }
+    if (!response && this.fallback) {
+      response = await this.fallback.decide(context);
+    }
     if (!response) throw (lastError instanceof Error ? lastError : new Error('Jev provider returned no response'));
-    const evaluation = this.validator.validate(response.decision, context);
-    const contextHash = createHash('sha256')
-      .update(JSON.stringify(context))
-      .digest('hex');
+    let evaluation = this.validator.validate(response.decision, context);
+    if (!evaluation.accepted && this.fallback && response.provider !== this.fallback.id) {
+      const fallbackResponse = await this.fallback.decide(context);
+      response = fallbackResponse;
+      evaluation = this.validator.validate(response.decision, context);
+    }
+    const contextHash = ContextHasher.hash(context);
 
     const record: DecisionRecord = {
       decisionId: response.decision.decisionId,
