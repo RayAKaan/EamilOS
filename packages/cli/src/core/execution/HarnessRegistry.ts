@@ -9,6 +9,7 @@ import type {
   HarnessStatus,
 } from './types.js';
 import { HarnessDescriptorSchema } from './types.js';
+import { OpenDotsHarnessAdapter } from './OpenDotsHarnessAdapter.js';
 
 export class HarnessRegistry {
   private readonly adapters = new Map<string, HarnessAdapter>();
@@ -20,6 +21,15 @@ export class HarnessRegistry {
       for (const adapter of createUniversalHarnessAdapters(universalRegistry, store)) {
         this.register(adapter);
       }
+    }
+
+    const openDotsUrl = process.env.EAMILOS_OPENDOTS_URL?.trim();
+    if (openDotsUrl) {
+      this.register(new OpenDotsHarnessAdapter({
+        baseUrl: openDotsUrl,
+        agentId: process.env.EAMILOS_OPENDOTS_AGENT_ID?.trim() || 'default',
+        token: process.env.EAMILOS_OPENDOTS_TOKEN,
+      }));
     }
   }
 
