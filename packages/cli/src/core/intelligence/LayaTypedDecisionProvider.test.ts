@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LayaCalibration } from './LayaCalibration.js';
 import { LayaQuestionBuilder } from './LayaQuestionBuilder.js';
 import { LayaTypedDecisionProvider } from './LayaTypedDecisionProvider.js';
+import { LayaPredictResponseSchema } from './LayaDecisionTypes.js';
 import type { LayaDecisionAdapter } from './LayaDecisionTypes.js';
 import type { DecisionContext } from './types.js';
 
@@ -35,6 +36,15 @@ describe('Laya typed decisions', () => {
   it('degrades low-confidence decisions', () => {
     const calibration = new LayaCalibration({ enabled: false, choiceTemperature: 1, scoreTemperature: 1, noulTemperature: 1, minimumConfidence: 0.9, minimumProbability: 0.9 });
     expect(calibration.apply('action', { type: 'choice', choice: 'EXECUTE', probabilities: { EXECUTE: 0.6, RETRY: 0.4 }, confidence: 0.2 }).accepted).toBe(false);
+  });
+  it('applies temperature calibration when explicitly enabled', () => {
+    const calibration = new LayaCalibration({ enabled: true, choiceTemperature: 0.5, scoreTemperature: 1, noulTemperature: 1, minimumConfidence: 0.5, minimumProbability: 0.5 });
+    const answer = calibration.apply('action', { type: 'choice', choice: 'A', probabilities: { A: 0.6, B: 0.4 } });
+    expect(answer.calibrated).toBe(true);
+    expect(answer.answer.probabilities.A).toBeGreaterThan(0.6);
+  });
+  it('validates malformed wire responses', () => {
+    expect(() => LayaPredictResponseSchema.parse({ model: 'typed-decisions', answers: { action: { type: 'choice', choice: 'A' } } })).toThrow();
   });
   it('preserves noul probability as a signal', () => { expect(new LayaCalibration(DEFAULT_LAYA_CALIBRATION).apply('safe', { type: 'noul', noul: 0.82 }).answer.noul).toBeCloseTo(0.82); });
 });
