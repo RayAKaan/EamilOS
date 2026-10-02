@@ -13,6 +13,7 @@ const context = {
   timestamp: new Date().toISOString(),
 };
 
+// Phase 2D CI integration coverage.
 describe('JevHttpProvider', () => {
   afterEach(() => vi.restoreAllMocks());
 
