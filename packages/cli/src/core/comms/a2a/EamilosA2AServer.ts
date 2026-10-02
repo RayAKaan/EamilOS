@@ -184,7 +184,7 @@ export class EamilosA2AServer {
         if (parsed.kind === 'task.completed' || parsed.kind === 'task.failed' || parsed.kind === 'task.cancelled') {
           const leases = this.leases;
           const lease = leases?.getByExecution(executionId);
-          if (lease) leases.release(lease.leaseId, lease.ownerId, lease.fencingToken);
+          if (leases && lease) leases.release(lease.leaseId, lease.ownerId, lease.fencingToken);
         }
         return this.send(res, 200, parsed);
       }
