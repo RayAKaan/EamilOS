@@ -6,6 +6,7 @@ import { DeterministicParallelizationEngine } from './DeterministicParallelizati
 import { DeterministicStrategicEngine } from './DeterministicStrategicEngine.js';
 import { DeterministicIntelligenceProvider } from './DeterministicIntelligenceProvider.js';
 import { DecisionRuntime } from './DecisionRuntime.js';
+import { DeterministicJevProvider } from './DeterministicJevProvider.js';
 import type { JevProvider } from './types.js';
 import type { DecisionContext } from './types.js';
 
