@@ -34,3 +34,10 @@ export { DeterministicStrategicEngine } from './DeterministicStrategicEngine.js'
 export { DeterministicIntelligenceProvider } from './DeterministicIntelligenceProvider.js';
 
 export { DeterministicJevProvider } from './DeterministicJevProvider.js';
+
+export * from './LayaDecisionTypes.js';
+export { LayaCalibration } from './LayaCalibration.js';
+export { LayaQuestionBuilder } from './LayaQuestionBuilder.js';
+export { LayaHttpDecisionAdapter } from './LayaHttpDecisionAdapter.js';
+export { LayaProcessDecisionAdapter } from './LayaProcessDecisionAdapter.js';
+export { LayaTypedDecisionProvider } from './LayaTypedDecisionProvider.js';
