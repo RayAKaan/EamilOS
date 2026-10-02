@@ -1,6 +1,6 @@
 import type { DecisionContext, TaskSummary } from './types.js';
 import type { IntelligenceRequest } from './IntelligenceRuntimeTypes.js';
-import type { LayaPredictRequest, LayaQuestion } from './LayaDecisionTypes.js';
+import { LayaQuestionSchema, type LayaPredictRequest, type LayaQuestion } from './LayaDecisionTypes.js';
 
 const ACTIONS = ['EXECUTE', 'RETRY', 'REASSIGN', 'REPLAN', 'VERIFY', 'ESCALATE', 'CONTINUE'];
 const RECOVERY_ACTIONS = ['RETRY', 'REASSIGN', 'REPLAN', 'SEQUENCE', 'ESCALATE'];
@@ -19,6 +19,10 @@ export class LayaQuestionBuilder {
     else if (request.type === 'VALIDATION') questions.evidence_sufficient = { type: 'noul', instructions: 'Is the recorded execution evidence sufficient to support completion without relying on an agent self-declaration?', criteria: { true: 'authoritative validation evidence supports completion', false: 'evidence is missing, failed, stale, or insufficient' } };
     else if (request.type === 'TASK_DECISION' || request.type === 'STRATEGIC_DECISION') questions.action = { type: 'choice', instructions: task ? 'Which next action is most appropriate for this task given its state, dependencies, failures, evidence, and available workers?' : 'Which next action is most appropriate for this mission given its state, constraints, progress, failures, evidence, and available workers?', criteria: Object.fromEntries(ACTIONS.map(action => [action, action.toLowerCase()])) };
     else questions.action = { type: 'choice', instructions: 'Which safe next action best advances the supplied EamilOS state?', criteria: Object.fromEntries(ACTIONS.map(action => [action, action.toLowerCase()])) };
+    const customQuestions = request.metadata?.layaQuestions;
+    if (customQuestions && typeof customQuestions === 'object' && !Array.isArray(customQuestions)) {
+      for (const [id, value] of Object.entries(customQuestions as Record<string, unknown>)) questions[id] = LayaQuestionSchema.parse(value);
+    }
     return { request: { state: this.state(context, request, task), questions, model: typeof request.metadata?.layaModel === 'string' ? request.metadata.layaModel : process.env.EAMILOS_LAYA_MODEL || 'typed-decisions', lang: typeof request.metadata?.layaLanguage === 'string' ? request.metadata.layaLanguage : undefined, maxLen: typeof request.metadata?.layaMaxLen === 'number' ? request.metadata.layaMaxLen : undefined, headMaxLen: typeof request.metadata?.layaHeadMaxLen === 'number' ? request.metadata.layaHeadMaxLen : undefined }, questionIds: Object.keys(questions), candidateAgentIds };
   }
   private task(context: DecisionContext, taskId?: string): TaskSummary | undefined { return taskId ? context.taskGraph.tasks.find(task => task.id === taskId) : context.taskGraph.tasks.find(task => task.state === 'READY' || task.state === 'FAILED'); }
