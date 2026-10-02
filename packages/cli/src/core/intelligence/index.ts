@@ -14,3 +14,14 @@ export { IntelligenceEngine, defaultIntelligenceConfig } from './IntelligenceEng
 export { createIntelligenceRuntime } from './IntelligenceFactory.js';
 
 export * from './FleetIntelligence.js';
+
+export * from './IntelligenceRuntimeTypes.js';
+export { ContextCompiler } from './ContextCompiler.js';
+export { ContextHasher } from './ContextHasher.js';
+export { ContextSanitizer } from './ContextSanitizer.js';
+export { IntelligenceProviderRegistry } from './ProviderRegistry.js';
+export { IntelligenceRouter } from './IntelligenceRouter.js';
+export { IntelligenceLifecycleManager } from './IntelligenceLifecycleManager.js';
+export { IntelligenceRuntime } from './IntelligenceRuntime.js';
+export { createIntelligenceFoundation } from './IntelligenceFoundation.js';
+export { LegacyJevProviderAdapter, LegacyLayaProviderAdapter } from './providers/LegacyProviderAdapters.js';
