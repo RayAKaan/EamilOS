@@ -54,5 +54,7 @@ describe('Laya typed decisions', () => {
   it('validates malformed wire responses', () => {
     expect(() => LayaPredictResponseSchema.parse({ model: 'typed-decisions', answers: { action: { type: 'choice', choice: 'A' } } })).toThrow();
   });
-  it('preserves noul probability as a signal', () => { expect(new LayaCalibration(DEFAULT_LAYA_CALIBRATION).apply('safe', { type: 'noul', noul: 0.82 }).answer.noul).toBeCloseTo(0.82); });
+  it('preserves noul probability as a signal', () => { const noulAnswer = new LayaCalibration(DEFAULT_LAYA_CALIBRATION).apply('safe', { type: 'noul', noul: 0.82 }).answer;
+    expect(noulAnswer.type).toBe('noul');
+    if (noulAnswer.type === 'noul') expect(noulAnswer.noul).toBeCloseTo(0.82); });
 });
