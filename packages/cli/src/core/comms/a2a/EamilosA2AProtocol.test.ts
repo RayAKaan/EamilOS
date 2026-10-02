@@ -62,7 +62,6 @@ describe('EamilOS A2A Phase 3B protocol', () => {
       kind: 'task.progress', protocolVersion: 1, missionId: request.missionId, taskId: request.taskId,
       executionId: request.executionId, requestId: request.requestId, idempotencyKey: request.idempotencyKey,
       graphVersion: request.graphVersion, timestamp: new Date().toISOString(), workerId: 'worker-1',
-      evidenceIds: [], artifactIds: [], output: {},
     })).toThrow('INVALID_A2A_TRANSITION');
   });
 
@@ -104,6 +103,7 @@ describe('EamilOS A2A lifecycle edge cases', () => {
       kind: 'task.completed', protocolVersion: 1, missionId: request.missionId, taskId: request.taskId,
       executionId: request.executionId, requestId: request.requestId, idempotencyKey: request.idempotencyKey,
       graphVersion: request.graphVersion, timestamp: new Date().toISOString(), workerId: 'worker-1',
+      evidenceIds: [], artifactIds: [], output: {},
     })).toThrow('INVALID_A2A_TRANSITION');
   });
 });
