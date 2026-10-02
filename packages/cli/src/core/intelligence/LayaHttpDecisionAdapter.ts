@@ -14,5 +14,5 @@ export class LayaHttpDecisionAdapter implements LayaDecisionAdapter {
     try { const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 5000); const response = await fetch(this.url('/health'), { signal: controller.signal }); clearTimeout(timer); return response.ok ? { healthy: true } : { healthy: false, error: 'HTTP ' + response.status }; }
     catch (error) { return { healthy: false, error: error instanceof Error ? error.message : String(error) }; }
   }
-  private url(path: string) { return this.options.endpoint.replace(/\\/$/, '') + path; }
+  private url(path: string) { return this.options.endpoint.replace(/\/$/, '') + path; }
 }

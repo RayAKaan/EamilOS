@@ -15,6 +15,7 @@ export class DeterministicRecoveryEngine {
     }
 
     const attempts = task.attempt;
+    const maxAttempts = task.maxAttempts ?? 3;
     const candidates = context.agents.filter(agent =>
       agent.id !== failure?.workerId &&
       (agent.status === 'AVAILABLE' || agent.health === 'HEALTHY' || agent.health === 'healthy'),
@@ -36,8 +37,8 @@ export class DeterministicRecoveryEngine {
     }
 
     const retryable = new Set(['TIMEOUT', 'CRASH', 'INVALID_OUTPUT', 'VALIDATION_FAILED', 'RATE_LIMIT', 'CONTEXT_LIMIT', 'WORKER_UNAVAILABLE', 'WORKER_LOST', 'UNKNOWN']);
-    if (retryable.has(failure?.type ?? 'UNKNOWN') && attempts < task.maxAttempts) {
-      return this.decision(context, trigger, 'RETRY', [task.id], `Retry is allowed: attempt ${attempts} is below maxAttempts ${task.maxAttempts}.`, 0.96);
+    if (retryable.has(failure?.type ?? 'UNKNOWN') && attempts < maxAttempts) {
+      return this.decision(context, trigger, 'RETRY', [task.id], `Retry is allowed: attempt ${attempts} is below maxAttempts ${maxAttempts}.`, 0.96);
     }
 
     if (alternative) {

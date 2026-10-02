@@ -22,7 +22,13 @@ export class DecisionRuntime {
         break;
       } catch (error) {
         lastError = error;
-        if (attempt === this.maxRetries) throw error;
+        const retryable = error && typeof error === 'object' && 'retryable' in error
+          ? (error as { retryable?: boolean }).retryable !== false
+          : true;
+        if (attempt === this.maxRetries || !retryable) {
+          if (this.fallback) break;
+          throw error;
+        }
       }
     }
     if (!response && this.fallback) {
@@ -44,6 +50,8 @@ export class DecisionRuntime {
       contextVersion: context.taskGraph.version,
       contextHash,
       provider: response.provider,
+      model: response.model,
+      usage: response.usage,
       decision: response.decision,
       status: evaluation.accepted ? 'ACCEPTED' : 'REJECTED',
       rejectionReason: evaluation.accepted ? undefined : evaluation.reasons.join('; '),

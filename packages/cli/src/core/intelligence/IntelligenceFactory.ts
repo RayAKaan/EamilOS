@@ -40,10 +40,38 @@ export function createIntelligenceRuntime(options: IntelligenceRuntimeOptions = 
 
 function createJevFromEnvironment(config: IntelligenceConfig): JevProvider {
   if (process.env.EAMILOS_INTELLIGENCE_MOCK === '1') return new MockJevProvider();
-  const endpoint = process.env.EAMILOS_JEV_URL;
-  const apiKey = process.env.EAMILOS_JEV_API_KEY;
-  if (!endpoint || !apiKey) return new DeterministicJevProvider();
-  return new JevHttpProvider({ endpoint, apiKey, timeoutMs: config.jev.timeoutMs, healthEndpoint: process.env.EAMILOS_JEV_HEALTH_URL });
+  const apiKey = process.env.EAMILOS_JEV_API_KEY ?? process.env.TYPESAFE_API_KEY;
+  if (!apiKey) return new DeterministicJevProvider();
+  const endpoint = normalizeJevEndpoint(process.env.EAMILOS_JEV_URL ?? 'https://api.typesafe.ai/v1/systemone');
+  const maxRetries = parseNonNegativeInt(process.env.EAMILOS_JEV_MAX_RETRIES, config.jev.maxRetries);
+  const maxTokens = parseOptionalNumber(process.env.EAMILOS_JEV_MAX_TOKENS);
+  const maxCostUsd = parseOptionalNumber(process.env.EAMILOS_JEV_MAX_COST_USD);
+  return new JevHttpProvider({
+    endpoint,
+    apiKey,
+    model: process.env.EAMILOS_JEV_MODEL ?? 'jev-latest',
+    timeoutMs: config.jev.timeoutMs,
+    maxRetries,
+    baseBackoffMs: parseNonNegativeInt(process.env.EAMILOS_JEV_BASE_BACKOFF_MS, 250),
+    maxBackoffMs: parseNonNegativeInt(process.env.EAMILOS_JEV_MAX_BACKOFF_MS, 5000),
+    maxTokens,
+    maxCostUsd,
+    healthEndpoint: process.env.EAMILOS_JEV_HEALTH_URL,
+  });
+}
+
+function normalizeJevEndpoint(value: string): string {
+  const trimmed = value.replace(/\/$/, '');
+  return /\/v1\/systemone$/.test(trimmed) ? trimmed : trimmed + '/v1/systemone';
+}
+function parseNonNegativeInt(value: string | undefined, fallback: number): number {
+  const parsed = value === undefined ? NaN : Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+function parseOptionalNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function createLayaFromEnvironment(config: IntelligenceConfig): LayaModelAdapter {

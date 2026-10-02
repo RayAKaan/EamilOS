@@ -44,6 +44,7 @@ export const TaskSummarySchema = z.object({
   acceptanceCriteria: z.array(z.string()),
   owner: z.string().optional(),
   attempt: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive().optional(),
 });
 export type TaskSummary = z.infer<typeof TaskSummarySchema>;
 
@@ -202,7 +203,7 @@ export interface JevProviderResponse {
   decision: JevDecision;
   provider: string;
   model?: string;
-  usage?: { inputTokens?: number; outputTokens?: number; costUsd?: number };
+  usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; costUsd?: number };
   latencyMs: number;
 }
 
@@ -308,6 +309,8 @@ export interface DecisionRecord {
   contextVersion: number;
   contextHash: string;
   provider: string;
+  model?: string;
+  usage?: JevProviderResponse['usage'];
   decision: JevDecision;
   status: DecisionRecordSummary['status'];
   rejectionReason?: string;

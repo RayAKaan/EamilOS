@@ -2,7 +2,8 @@ import type { DecisionContext, JevDecision } from './types.js';
 
 export class DeterministicParallelizationEngine {
   decide(context: DecisionContext): JevDecision {
-    const capacity = Math.max(0, context.mission.constraints.maxConcurrentTasks - context.taskGraph.runningTasks.length);
+    const maxConcurrentTasks = Number(context.mission.constraints.maxConcurrentTasks ?? 1);
+    const capacity = Math.max(0, (Number.isFinite(maxConcurrentTasks) ? maxConcurrentTasks : 1) - context.taskGraph.runningTasks.length);
     const ready = context.taskGraph.readyTasks
       .map(id => context.taskGraph.tasks.find(task => task.id === id))
       .filter((task): task is NonNullable<typeof task> => Boolean(task));

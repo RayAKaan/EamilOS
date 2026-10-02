@@ -3,7 +3,7 @@ import { LayaCalibration } from './LayaCalibration.js';
 import { LayaQuestionBuilder } from './LayaQuestionBuilder.js';
 import { LayaTypedDecisionProvider } from './LayaTypedDecisionProvider.js';
 import { LayaPredictResponseSchema } from './LayaDecisionTypes.js';
-import type { LayaDecisionAdapter } from './LayaDecisionTypes.js';
+import { DEFAULT_LAYA_CALIBRATION, type LayaDecisionAdapter } from './LayaDecisionTypes.js';
 import type { DecisionContext } from './types.js';
 
 const context = (): DecisionContext => ({
@@ -35,7 +35,10 @@ describe('Laya typed decisions', () => {
   });
   it('accepts a high-confidence typed decision', async () => {
     const result = await new LayaTypedDecisionProvider(new FakeAdapter()).evaluate({ requestId: 'r2', missionId: 'mission_laya', type: 'TASK_DECISION', priority: 'NORMAL', contextVersion: 3, contextHash: 'hash', context: context() });
-    expect(result.status).toBe('SUCCESS'); expect(result.result?.decisions[0].answer.choice).toBe('EXECUTE');
+    expect(result.status).toBe('SUCCESS');
+    const answer = result.result?.decisions[0].answer;
+    expect(answer?.type).toBe('choice');
+    if (answer?.type === 'choice') expect(answer.choice).toBe('EXECUTE');
   });
   it('degrades low-confidence decisions', () => {
     const calibration = new LayaCalibration({ enabled: false, choiceTemperature: 1, scoreTemperature: 1, noulTemperature: 1, minimumConfidence: 0.9, minimumProbability: 0.9 });
@@ -45,10 +48,13 @@ describe('Laya typed decisions', () => {
     const calibration = new LayaCalibration({ enabled: true, choiceTemperature: 0.5, scoreTemperature: 1, noulTemperature: 1, minimumConfidence: 0.5, minimumProbability: 0.5 });
     const answer = calibration.apply('action', { type: 'choice', choice: 'A', probabilities: { A: 0.6, B: 0.4 } });
     expect(answer.calibrated).toBe(true);
-    expect(answer.answer.probabilities.A).toBeGreaterThan(0.6);
+    expect(answer.answer.type).toBe('choice');
+    if (answer.answer.type === 'choice') expect(answer.answer.probabilities.A).toBeGreaterThan(0.6);
   });
   it('validates malformed wire responses', () => {
     expect(() => LayaPredictResponseSchema.parse({ model: 'typed-decisions', answers: { action: { type: 'choice', choice: 'A' } } })).toThrow();
   });
-  it('preserves noul probability as a signal', () => { expect(new LayaCalibration(DEFAULT_LAYA_CALIBRATION).apply('safe', { type: 'noul', noul: 0.82 }).answer.noul).toBeCloseTo(0.82); });
+  it('preserves noul probability as a signal', () => { const noulAnswer = new LayaCalibration(DEFAULT_LAYA_CALIBRATION).apply('safe', { type: 'noul', noul: 0.82 }).answer;
+    expect(noulAnswer.type).toBe('noul');
+    if (noulAnswer.type === 'noul') expect(noulAnswer.noul).toBeCloseTo(0.82); });
 });
