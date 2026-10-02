@@ -106,7 +106,7 @@ export function registerAgentsCommand(program: Command): void {
         request: {
           id: nanoid(12), sessionId: nanoid(12), prompt: prompt.join(' '), systemPrompt: '',
           mode: 'execution', workingDir: options.cwd, timeoutMs: Number(options.timeout),
-          onOutput: (chunk) => process.stdout.write(chunk),
+          onOutput: (chunk: string) => process.stdout.write(chunk),
         },
         preferredAgentId: agentId,
       });
