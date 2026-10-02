@@ -17,6 +17,7 @@ export interface AutonomousLoopRuntimeOptions {
   coordination?: CoordinationEngine;
   registry?: HarnessRegistry;
   decisions?: DecisionStore;
+  executions?: ExecutionStore;
   intelligence?: ReturnType<typeof createIntelligenceRuntime>;
   config?: IntelligenceConfig;
   policy?: Partial<AutonomousLoopPolicy>;
@@ -29,9 +30,10 @@ export function createAutonomousLoopRuntime(options: AutonomousLoopRuntimeOption
   const registry = options.registry ?? new HarnessRegistry();
   const scheduler = new HarnessScheduler(missions, coordination, registry);
   const decisions = options.decisions ?? new DecisionStore();
+  const executions = options.executions ?? new ExecutionStore();
   const config = options.config ?? defaultConfig();
-  const intelligence = options.intelligence ?? createIntelligenceRuntime({ missions, coordination, registry, config });
-  const contextBuilder = new DecisionContextBuilder(missions, coordination, new ExecutionStore(), decisions, registry);
+  const intelligence = options.intelligence ?? createIntelligenceRuntime({ missions, coordination, registry, config, executions });
+  const contextBuilder = new DecisionContextBuilder(missions, coordination, executions, decisions, registry);
   const selfModifyingGraph = new SelfModifyingGraphEngine(missions, {
     allowTaskCreation: config.policies.allowTaskCreation,
     allowDependencyChanges: true,

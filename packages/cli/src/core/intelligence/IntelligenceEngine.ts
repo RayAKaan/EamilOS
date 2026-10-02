@@ -1,4 +1,7 @@
 import type { MissionEngine } from '../mission/MissionEngine.js';
+import { ExecutionStore } from '../execution/ExecutionStore.js';
+import { HarnessRegistry } from '../execution/HarnessRegistry.js';
+import { createIntelligenceFoundation, type IntelligenceFoundation } from './IntelligenceFoundation.js';
 import type { CoordinationEngine } from '../coordination/CoordinationEngine.js';
 import type { HarnessScheduler } from '../execution/HarnessScheduler.js';
 import { DecisionContextBuilder } from './DecisionContextBuilder.js';
@@ -15,6 +18,7 @@ export class IntelligenceEngine {
   readonly runtime: DecisionRuntime;
   readonly applier: DecisionApplier;
   readonly loop: StrategicLoop;
+  readonly foundation: IntelligenceFoundation;
 
   constructor(
     missions: MissionEngine,
@@ -25,11 +29,15 @@ export class IntelligenceEngine {
     config: IntelligenceConfig,
     decisions = new DecisionStore(),
     fleet?: FleetIntelligenceProvider,
+    executions = new ExecutionStore(),
+    registry = new HarnessRegistry(),
+    foundation = createIntelligenceFoundation({ jev, laya }),
   ) {
-    this.context = new DecisionContextBuilder(missions, coordination, undefined, decisions, undefined, fleet);
+    this.foundation = foundation;
+    this.context = new DecisionContextBuilder(missions, coordination, executions, decisions, registry, fleet);
     this.decisions = decisions;
     this.runtime = new DecisionRuntime(jev, undefined, config.jev.maxRetries);
-    this.applier = new DecisionApplier(missions, coordination, scheduler, laya);
+    this.applier = new DecisionApplier(missions, coordination, scheduler, laya, executions);
     this.loop = new StrategicLoop(this.context, this.runtime, this.applier, decisions, config);
   }
 
