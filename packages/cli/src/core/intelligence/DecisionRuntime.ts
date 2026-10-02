@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { DecisionContext, DecisionEvaluation, DecisionRecord, DecisionTrigger, JevDecision, JevProvider, JevProviderResponse } from './types.js';
 import { DecisionValidator } from './DecisionValidator.js';
 import { ContextHasher } from './ContextHasher.js';
