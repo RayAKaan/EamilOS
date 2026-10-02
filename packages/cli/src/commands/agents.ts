@@ -124,7 +124,7 @@ export function registerAgentsCommand(program: Command): void {
       for (const agent of registry.list()) {
         const result = await installer.install(agent, { dryRun: options.dryRun });
         console.log((result.success ? chalk.green('✓') : chalk.yellow('⚠')) + ' ' + agent.name + ': ' + result.message);
-        if (!result.success && !result.skipped && ['npm', 'pip', 'uv', 'brew'].includes(agent.installation.strategy)) failed++;
+        if (!result.success && !result.skipped && ['npm', 'pip', 'uv', 'brew', 'binary', 'github-release'].includes(agent.installation.strategy)) failed++;
       }
       if (failed) process.exitCode = 1;
     });
