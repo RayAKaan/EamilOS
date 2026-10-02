@@ -22,10 +22,12 @@ export interface EamilosA2AServerOptions {
 export class EamilosA2AServer {
   readonly tasks: EamilosA2ATaskStoreLike;
   private server: Server | null = null;
+  private readonly ownsTaskStore: boolean;
 
   constructor(private readonly options: EamilosA2AServerOptions) {
     AgentCardSchema.parse(options.card);
     if (options.taskStore && options.taskStoreFilename) throw new Error('Specify taskStore or taskStoreFilename, not both');
+    this.ownsTaskStore = !options.taskStore && Boolean(options.taskStoreFilename);
     this.tasks = options.taskStore
       ?? (options.taskStoreFilename ? new EamilosA2ASqliteTaskStore({ filename: options.taskStoreFilename }) : new EamilosA2ATaskStore());
   }
@@ -47,6 +49,7 @@ export class EamilosA2AServer {
     const server = this.server;
     this.server = null;
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    if (this.ownsTaskStore) this.tasks.close?.();
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
