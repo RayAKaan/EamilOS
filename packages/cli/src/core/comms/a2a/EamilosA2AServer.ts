@@ -112,7 +112,7 @@ export class EamilosA2AServer {
         const executionId = decodeURIComponent(cancel[1]!);
         const stored = this.tasks.get(executionId);
         if (!stored) return this.send(res, 404, { error: 'EXECUTION_NOT_FOUND' });
-        const body = await this.parseBody(req).catch(() => ({}));
+        const body = await this.parseBody(req).catch(() => ({})) as { reason?: unknown };
         await this.options.onCancel?.(stored.request, typeof body.reason === 'string' ? body.reason : undefined);
         const message: EamilosA2AMessage = {
           ...correlation(stored.request),
