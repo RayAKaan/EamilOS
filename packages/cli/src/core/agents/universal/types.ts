@@ -27,7 +27,8 @@ export interface UniversalAgentDefinition {
   integrationStatus: IntegrationStatus; protocols: AgentProtocol[]; platforms: NodeJS.Platform[];
   capabilities: UniversalCapabilities; installation: InstallationDefinition;
   authentication: AuthenticationDefinition; executableCandidates: string[];
-  versionArgs: string[]; runArgs?: (prompt: string) => string[]; promptDelivery?: 'interactive-stdin' | 'argv' | 'env' | 'none'; promptEnv?: string;\n  notes?: string; upstreamUrl?: string;
+  versionArgs: string[]; runArgs?: (prompt: string) => string[]; promptDelivery?: 'interactive-stdin' | 'argv' | 'env' | 'none'; promptEnv?: string;
+  notes?: string; upstreamUrl?: string;
 }
 
 export interface AgentDetectionResult {
