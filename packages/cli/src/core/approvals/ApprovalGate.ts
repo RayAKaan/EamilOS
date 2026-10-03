@@ -75,7 +75,7 @@ export class ApprovalGate {
     const matching = existing.find(
       (approval) =>
         approval.approvalId === approvalId &&
-        approval.policyId === this.matchingPolicyId(policy),
+        approval.policyId === this.matchingPolicy(policy),
     );
 
     if (matching) {
