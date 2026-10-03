@@ -43,7 +43,8 @@ export type FabricMessageType =
   | 'cluster:hello' | 'cluster:welcome' | 'cluster:heartbeat'
   | 'cluster:capabilities' | 'cluster:leave' | 'cluster:state'
   | 'task:offer' | 'task:assignment' | 'task:progress'
-  | 'task:result' | 'checkpoint:available' | 'mission:events';
+  | 'task:result' | 'checkpoint:available' | 'mission:events'
+  | 'mission:events:ack' | 'mission:events:replay-request' | 'mission:events:snapshot';
 
 export interface FabricMessage<T = unknown> {
   protocolVersion: 1;
