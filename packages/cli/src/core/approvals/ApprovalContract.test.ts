@@ -91,7 +91,7 @@ describe('approval contract', () => {
         status: 'rejected',
         decisionBy: 'human-2',
         decisionAt: '2026-10-03T12:15:00.000Z',
-      })).toThrow('already terminal');
+      })).toThrow('cannot transition');
     }
   });
 
