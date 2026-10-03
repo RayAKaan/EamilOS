@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { allowAllPtyExecutionPolicy, type PtyExecutionPolicy } from './PtyExecutionPolicy.js';
 import { InMemoryPtySessionStore, isActivePtyState, type PtySessionStore } from './PtySessionStore.js';
 import {
   assertPtyDimensions,
@@ -19,6 +20,7 @@ interface ManagedSession {
   backend?: PtyBackendSession;
   disposers: Array<() => void>;
   terminationRequested: boolean;
+  terminalized: boolean;
 }
 
 function now(): string {
@@ -47,6 +49,7 @@ export class EamilosPtyManager implements PtyManagerContract {
   constructor(
     private readonly backend: PtyBackend,
     private readonly store: PtySessionStore = new InMemoryPtySessionStore(),
+    private readonly executionPolicy: PtyExecutionPolicy = allowAllPtyExecutionPolicy,
   ) {
     for (const persisted of this.store.list()) {
       const session = isActivePtyState(persisted.state)
@@ -56,6 +59,7 @@ export class EamilosPtyManager implements PtyManagerContract {
         session,
         disposers: [],
         terminationRequested: false,
+        terminalized: false,
       });
       if (session.state !== persisted.state) {
         this.store.save(session);
@@ -67,6 +71,7 @@ export class EamilosPtyManager implements PtyManagerContract {
   async create(request: PtySessionRequest): Promise<PtySession> {
     this.assertOpen();
     assertPtySessionRequest(request);
+    this.executionPolicy.authorize({ request });
 
     if (this.sessions.has(request.sessionId)) {
       throw new Error(`PTY session already exists: ${request.sessionId}`);
@@ -95,6 +100,7 @@ export class EamilosPtyManager implements PtyManagerContract {
       backend,
       disposers: [],
       terminationRequested: false,
+      terminalized: false,
     };
     this.sessions.set(request.sessionId, managed);
     this.store.save(managed.session);
@@ -209,6 +215,16 @@ export class EamilosPtyManager implements PtyManagerContract {
     return () => this.events.off(event, listener);
   }
 
+  shutdown(signal = 'SIGTERM'): void {
+    if (this.closed) return;
+    for (const managed of this.sessions.values()) {
+      if (!isActivePtyState(managed.session.state) || !managed.backend) continue;
+      managed.terminationRequested = true;
+      managed.backend.terminate(signal);
+    }
+    this.close();
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
@@ -246,7 +262,8 @@ export class EamilosPtyManager implements PtyManagerContract {
     managed.disposers.push(
       managed.backend!.onExit((exitCode, signal) => {
         const current = this.sessions.get(sessionId);
-        if (!current) return;
+        if (!current || current.terminalized) return;
+        current.terminalized = true;
 
         const terminalState: PtySessionState = managed.terminationRequested
           ? 'terminated'

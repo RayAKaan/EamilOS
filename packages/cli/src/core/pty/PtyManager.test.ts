@@ -126,6 +126,45 @@ describe('EamilosPtyManager', () => {
     manager.close();
     expect(manager.list()).toEqual([]);
   });
+  it('applies an execution policy before creating a backend process', async () => {
+    const backend = new InMemoryPtyBackend();
+    const policy = new (await import('./PtyExecutionPolicy.js')).DefaultPtyExecutionPolicy({
+      allowedCommands: ['approved-agent'],
+    });
+    const manager = new EamilosPtyManager(backend, new InMemoryPtySessionStore(), policy);
+
+    await expect(manager.create(request({ command: 'blocked-agent' })))
+      .rejects.toThrow('PTY command is not allowed by execution policy');
+    expect(manager.list()).toEqual([]);
+    manager.close();
+  });
+
+  it('provides an explicit shutdown path without pretending orphaned sessions completed', async () => {
+    const backend = new InMemoryPtyBackend();
+    const manager = new EamilosPtyManager(backend);
+
+    await manager.create(request({ sessionId: 'shutdown-1' }));
+    manager.shutdown('SIGTERM');
+
+    expect(backend.get('shutdown-1')?.terminationSignals).toEqual(['SIGTERM']);
+    expect(manager.list()).toEqual([]);
+  });
+
+  it('suppresses duplicate terminal events from a misbehaving backend', async () => {
+    const backend = new InMemoryPtyBackend();
+    const manager = new EamilosPtyManager(backend);
+    let completed = 0;
+
+    manager.on('completed', () => completed++);
+    await manager.create(request({ sessionId: 'duplicate-exit-1' }));
+    backend.exit('duplicate-exit-1', 0);
+    backend.exit('duplicate-exit-1', 0);
+
+    expect(completed).toBe(1);
+    expect(manager.get('duplicate-exit-1')?.state).toBe('completed');
+    manager.close();
+  });
+
 });
 
 
