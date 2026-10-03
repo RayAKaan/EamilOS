@@ -270,7 +270,7 @@ export class InMemoryPtyBackend implements PtyBackend {
     session.emitData(stream, data);
   }
 
-  exit(sessionId: string, exitCode = 0, signal: string | null = null): void {
+  exit(sessionId: string, exitCode: number | null = 0, signal: string | null = null): void {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`PTY backend session not found: ${sessionId}`);
     session.emitExit(exitCode, signal);
