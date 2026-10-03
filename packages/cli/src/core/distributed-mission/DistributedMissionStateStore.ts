@@ -35,6 +35,7 @@ export class SqliteDistributedMissionStateStore {
   ) => DistributedMissionEvent;
 
   constructor(options: DistributedMissionStateStoreOptions) {
+    if (options.filename !== ':memory:') mkdirSync(dirname(options.filename), { recursive: true });
     this.db = new Database(options.filename);
     this.db.pragma(`busy_timeout = ${Math.max(0, Math.floor(options.busyTimeoutMs ?? 5000))}`);
     this.db.pragma('foreign_keys = ON');
