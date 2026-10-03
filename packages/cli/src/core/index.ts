@@ -435,4 +435,4 @@ export { PhaseFDifferentiationRuntime } from './differentiation/PhaseFDifferenti
 export * from './mission-control/index.js';
 export * from './pty/index.js';
 
-export * from './approvals/index.js';
+export * as Approvals from './approvals/index.js';
