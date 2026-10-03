@@ -172,6 +172,81 @@ describe('ApprovalGate', () => {
     expect(dispatched).toBe(1);
   });
 
+  it('authorizes an approved request only when the execution context is exactly bound', () => {
+    const store = new InMemoryApprovalStore();
+    const gate = new ApprovalGate({
+      approvalStore: store,
+      policyEngine: new DeterministicPolicyEngine({
+        policies: [{
+          policyId: 'publish',
+          effect: 'approval_required',
+          reason: 'human authorization required',
+          protectedResources: ['registry'],
+        }],
+      }),
+    });
+
+    const first = gate.evaluate(context());
+    if (first.decision !== 'approval_required') throw new Error('expected approval_required');
+    const record = store.get(first.approval.approvalId);
+    if (!record) throw new Error('missing approval');
+
+    store.transition(record.approvalId, {
+      status: 'approved',
+      decisionBy: 'human-1',
+      decisionAt: '2026-10-03T17:01:00.000Z',
+      decisionReason: 'approved',
+    }, record.revision);
+
+    const approved = gate.evaluate(context());
+    expect(approved.decision).toBe('allow');
+    if (approved.decision !== 'allow') throw new Error('expected allow');
+    expect(approved.approval?.approvalId).toBe(record.approvalId);
+
+    expect(() => gate.evaluate(context('dangerous-command'))).toThrow(
+      'APPROVAL_BINDING_MISMATCH:command',
+    );
+  });
+
+  it('consumes an approved authorization before dispatch and prevents replay', () => {
+    const store = new InMemoryApprovalStore();
+    const gate = new ApprovalGate({
+      approvalStore: store,
+      policyEngine: new DeterministicPolicyEngine({
+        policies: [{
+          policyId: 'publish',
+          effect: 'approval_required',
+          reason: 'human authorization required',
+          protectedResources: ['registry'],
+        }],
+      }),
+    });
+
+    const first = gate.evaluate(context());
+    if (first.decision !== 'approval_required') throw new Error('expected approval_required');
+    const record = store.get(first.approval.approvalId);
+    if (!record) throw new Error('missing approval');
+    store.transition(record.approvalId, {
+      status: 'approved',
+      decisionBy: 'human-1',
+      decisionAt: '2026-10-03T17:01:00.000Z',
+      decisionReason: 'approved',
+    }, record.revision);
+
+    let dispatched = 0;
+    const dispatcher = new ApprovalGateDispatcher({
+      gate,
+      dispatch: () => { dispatched += 1; },
+    });
+
+    expect(dispatcher.dispatchIfAuthorized(context()).decision).toBe('allow');
+    expect(dispatched).toBe(1);
+    expect(store.get(record.approvalId)?.status).toBe('consumed');
+
+    expect(dispatcher.dispatchIfAuthorized(context()).decision).toBe('approval_required');
+    expect(dispatched).toBe(1);
+  });
+
   it('does not resurrect an expired approval', () => {
     const store = new InMemoryApprovalStore();
     const gate = new ApprovalGate({

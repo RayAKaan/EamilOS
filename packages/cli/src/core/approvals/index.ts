@@ -10,3 +10,4 @@ export * from './ApprovalProjection.js';
 export * from './ApprovalAudit.js';
 export * from './ApprovalExpiryService.js';
 export * from './ApprovalAuditReconciliationService.js';
+export * from './ApprovalBinding.js';
