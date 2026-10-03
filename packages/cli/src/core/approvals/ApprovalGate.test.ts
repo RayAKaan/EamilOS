@@ -247,6 +247,40 @@ describe('ApprovalGate', () => {
     expect(dispatched).toBe(1);
   });
 
+  it('rejects an approved authorization at the exact expiry boundary', () => {
+    const store = new InMemoryApprovalStore();
+    const gate = new ApprovalGate({
+      approvalStore: store,
+      policyEngine: new DeterministicPolicyEngine({
+        policies: [{
+          policyId: 'publish',
+          effect: 'approval_required',
+          reason: 'human authorization required',
+          protectedResources: ['registry'],
+        }],
+      }),
+      approvalExpiresAt: () => '2026-10-03T17:00:00.000Z',
+    });
+
+    const first = gate.evaluate(context('npm'));
+    if (first.decision !== 'approval_required') throw new Error('expected approval_required');
+    const record = store.get(first.approval.approvalId);
+    if (!record) throw new Error('missing approval');
+
+    store.transition(record.approvalId, {
+      status: 'approved',
+      decisionBy: 'human-1',
+      decisionAt: '2026-10-03T16:59:00.000Z',
+    }, record.revision);
+
+    const result = gate.evaluate(context('npm'));
+    expect(result.decision).toBe('approval_required');
+    if (result.decision !== 'approval_required') throw new Error('expected approval_required');
+    expect(result.approval.status).toBe('expired');
+    expect(store.get(record.approvalId)?.status).toBe('expired');
+    expect(store.get(record.approvalId)?.revision).toBe(3);
+  });
+
   it('does not resurrect an expired approval', () => {
     const store = new InMemoryApprovalStore();
     const gate = new ApprovalGate({
