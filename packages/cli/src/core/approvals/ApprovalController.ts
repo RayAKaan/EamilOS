@@ -38,7 +38,7 @@ export class ApprovalController {
     expectedRevision?: number,
   ): ApprovalDecisionResult {
     this.assertActor(actor);
-    const current = this.requireExpirable(approvalId);
+    const current = this.requirePending(approvalId);
     const approval = this.store.transition(
       approvalId,
       {
@@ -58,7 +58,7 @@ export class ApprovalController {
     reason = 'APPROVAL_EXPIRED',
     expectedRevision?: number,
   ): ApprovalDecisionResult {
-    const current = this.requirePending(approvalId);
+    const current = this.requireExpirable(approvalId);
     const approval = this.store.transition(
       approvalId,
       {
