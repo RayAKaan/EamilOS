@@ -1,12 +1,14 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
 import {
   ApprovalStoreConflictError,
   InMemoryApprovalStore,
   SqliteApprovalStore,
-  type ApprovalRequest,
 } from './ApprovalStore.js';
+c
+import type { ApprovalRequest } from './ApprovalTypes.js';
 
 function request(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
   return {
