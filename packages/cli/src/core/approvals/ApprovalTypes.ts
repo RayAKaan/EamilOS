@@ -136,14 +136,6 @@ export function assertApprovalTransition(
     );
   }
 
-  if (
-    transition.status !== 'approved' &&
-    transition.status !== 'rejected' &&
-    transition.status !== 'expired' &&
-    transition.status !== 'cancelled'
-  ) {
-    throw new Error(`Invalid approval transition: ${transition.status}`);
-  }
 }
 
 function assertTimestamp(value: string, field: string): void {
