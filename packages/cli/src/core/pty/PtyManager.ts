@@ -106,7 +106,7 @@ export class EamilosPtyManager implements PtyManagerContract {
     managed.session = withState(
       managed.session,
       'running',
-      { pid: managed.backend.pid, startedAt: now() },
+      { pid: managed.backend!.pid, startedAt: now() },
     );
     this.store.save(managed.session);
     this.emit('started', managed.session);
