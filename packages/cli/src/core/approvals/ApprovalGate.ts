@@ -54,6 +54,10 @@ export class ApprovalGate {
       new ApprovalController({ store: options.approvalStore, audit: options.audit });
   }
 
+  consumeApproved(approvalId: string, expectedRevision: number): ApprovalRequest {
+    return this.controller.consume(approvalId, expectedRevision).approval;
+  }
+
   evaluate(context: ApprovalGateContext): ApprovalGateDecision {
     const policy = this.options.policyEngine.evaluate(context.policyContext);
 
@@ -165,9 +169,6 @@ export class ApprovalGate {
     return record;
   }
 
-  private gateController(): ApprovalController {
-    return (this.gate as unknown as { controller: ApprovalController }).controller;
-  }
 }
 
 export interface ApprovalGateDispatcherOptions {
@@ -195,7 +196,7 @@ export class ApprovalGateDispatcher {
 
     if (result.decision === 'allow') {
       if (result.approval) {
-        this.gateController().consume(
+        this.gate.consumeApproved(
           result.approval.approvalId,
           result.approval.revision,
         );
