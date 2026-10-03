@@ -6,8 +6,7 @@ import {
   ApprovalStoreConflictError,
   InMemoryApprovalStore,
   SqliteApprovalStore,
-} from './ApprovalStore.js';
-c
+} from './ApprovalStore.js';;
 import type { ApprovalRequest } from './ApprovalTypes.js';
 
 function request(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
