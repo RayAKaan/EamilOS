@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { A2AEnvelopeSchema, AgentCardSchema, TaskRequestSchema, assertTaskRequestFresh, type AgentCard, type TaskRequest, type EamilosA2AMessage, type TaskAccepted, type TaskRejected, type Heartbeat } from './EamilosA2AProtocol.js';
 import { EamilosA2ATaskStore, type EamilosA2ATaskStoreLike } from './EamilosA2ATaskStore.js';
