@@ -15,7 +15,6 @@ export interface MissionControlSummary extends MissionControlRecord {
   runningTaskCount:number;
   failedTaskCount:number;
 }
-const ACTIVE:new Set<MissionStatus>=new Set(['active','paused','blocked']);
 const RUNNING=new Set(['CLAIMED','RUNNING','CHECKPOINTED','VALIDATING']);
 
 export class MissionControl {
