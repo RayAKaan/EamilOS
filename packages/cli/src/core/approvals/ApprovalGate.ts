@@ -5,6 +5,7 @@ import type {
   PolicyEngine,
 } from './PolicyEngine.js';
 import type { ApprovalStore } from './ApprovalStore.js';
+import type { ApprovalAuditRecorder } from './ApprovalAudit.js';
 import type { ScheduleDecision } from '../scheduler/GlobalSchedulerTypes.js';
 import type { SchedulingCandidate } from '../scheduler/GlobalSchedulerTypes.js';
 import type { FleetWorker } from '../comms/a2a/EamilosFleetRegistry.js';
@@ -36,6 +37,7 @@ export interface ApprovalGateOptions {
   readonly requestedBy?: string;
   readonly approvalScope?: ApprovalRequest['scope'];
   readonly approvalExpiresAt?: (now: string) => string | undefined;
+  readonly audit?: ApprovalAuditRecorder;
 }
 
 export class ApprovalGate {
@@ -124,6 +126,7 @@ export class ApprovalGate {
     };
 
     const record = this.options.approvalStore.create(request);
+    this.options.audit?.recordRequested(record);
 
     return { decision: 'approval_required', policy, approval: this.toRequest(record) };
   }
