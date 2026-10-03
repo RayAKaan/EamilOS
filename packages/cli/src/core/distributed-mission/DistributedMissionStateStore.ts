@@ -21,8 +21,6 @@ export interface DistributedMissionStateStoreOptions {
   busyTimeoutMs?: number;
 }
 
-const SCHEMA_VERSION = 1;
-
 export class DistributedMissionStateIntegrityError extends Error {
   readonly code = 'DISTRIBUTED_MISSION_STATE_INTEGRITY_ERROR' as const;
 }
@@ -32,7 +30,7 @@ export class SqliteDistributedMissionStateStore {
   private readonly commitTransaction: (
     state: DistributedMissionLedgerState,
     event: DistributedMissionEvent,
-  ) => void;
+  ) => DistributedMissionEvent;
 
   constructor(options: DistributedMissionStateStoreOptions) {
     this.db = new Database(options.filename);
@@ -51,15 +49,13 @@ export class SqliteDistributedMissionStateStore {
           `EVENT_SEQUENCE_MISMATCH:${event.sequence}:${expectedSequence}`,
         );
       }
-      if (event.previousHash !== expectedPreviousHash) {
-        throw new DistributedMissionStateIntegrityError('EVENT_PREVIOUS_HASH_MISMATCH');
-      }
 
-      const hydrated = normalizeEvent(event);
-      const hash = hashEvent(hydrated);
-      if (hash !== event.hash) {
-        throw new DistributedMissionStateIntegrityError('EVENT_HASH_MISMATCH');
-      }
+      const persistedEvent: DistributedMissionEvent = {
+        ...event,
+        previousHash: expectedPreviousHash ?? undefined,
+      };
+      const hash = hashEvent(persistedEvent);
+      persistedEvent.hash = hash;
 
       const stateJson = JSON.stringify(normalizeState(state));
       const stateHash = createHash('sha256').update(stateJson).digest('hex');
@@ -69,17 +65,20 @@ export class SqliteDistributedMissionStateStore {
           (mission_id, sequence, event_id, type, task_id, node_id, graph_version, timestamp, data_json, previous_hash, hash)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
-        event.missionId,
-        event.sequence,
-        event.eventId,
-        event.type,
-        event.taskId ?? null,
-        event.nodeId ?? null,
-        event.graphVersion,
-        event.timestamp,
-        JSON.stringify(event.data),
-        event.previousHash ?? null,
-        event.hash,
+        persistedEvent.missionId,
+        persistedEvent.sequence,
+        persistedEvent.eventId,
+        persistedEvent.type,
+        persistedEvent.taskId ?? null,
+        persistedEvent.nodeId ?? null,
+        persistedEvent.graphVersion,
+        persistedEvent.timestamp,
+        JSON.stringify({
+          ...persistedEvent.data,
+          state: normalizeState(state),
+        }),
+        persistedEvent.previousHash ?? null,
+        persistedEvent.hash,
       );
 
       this.db.prepare(
@@ -100,14 +99,16 @@ export class SqliteDistributedMissionStateStore {
         stateHash,
         event.timestamp,
       );
+
+      return persistedEvent;
     });
   }
 
-  commit(state: DistributedMissionLedgerState, event: DistributedMissionEvent): void {
+  commit(state: DistributedMissionLedgerState, event: DistributedMissionEvent): DistributedMissionEvent {
     if (state.missionId !== event.missionId) {
       throw new DistributedMissionStateIntegrityError('MISSION_ID_MISMATCH');
     }
-    this.commitTransaction(state, event);
+    return this.commitTransaction(state, event);
   }
 
   load(missionId: string): DistributedMissionPersistenceSnapshot | undefined {
@@ -123,16 +124,20 @@ export class SqliteDistributedMissionStateStore {
     }
 
     const snapshot = this.db.prepare(
-      'SELECT state_json, state_hash FROM eamilos_distributed_mission_snapshots WHERE mission_id = ?',
-    ).get(missionId) as { state_json: string; state_hash: string } | undefined;
+      'SELECT state_json, state_hash, sequence, graph_version FROM eamilos_distributed_mission_snapshots WHERE mission_id = ?',
+    ).get(missionId) as {
+      state_json: string;
+      state_hash: string;
+      sequence: number;
+      graph_version: number;
+    } | undefined;
 
     if (snapshot) {
       const expectedHash = createHash('sha256').update(snapshot.state_json).digest('hex');
       if (expectedHash !== snapshot.state_hash) {
         throw new DistributedMissionStateIntegrityError('SNAPSHOT_HASH_MISMATCH');
       }
-      const materialized = JSON.parse(snapshot.state_json) as DistributedMissionLedgerState;
-      if (materialized.sequence !== latest.sequence || materialized.graphVersion !== latest.graphVersion) {
+      if (snapshot.sequence !== latest.sequence || snapshot.graph_version !== latest.graphVersion) {
         throw new DistributedMissionStateIntegrityError('SNAPSHOT_SEQUENCE_MISMATCH');
       }
     }
@@ -188,7 +193,7 @@ export class SqliteDistributedMissionStateStore {
       if (hashEvent(event) !== event.hash) {
         throw new DistributedMissionStateIntegrityError(`EVENT_HASH_MISMATCH:${event.eventId}`);
       }
-      previousHash = event.hash;
+      previousHash = event.hash ?? null;
     }
   }
 
@@ -271,17 +276,15 @@ function hydrateEvent(row: EventRow): DistributedMissionEvent {
     graphVersion: row.graph_version,
     timestamp: row.timestamp,
     data: JSON.parse(row.data_json) as Record<string, unknown>,
+    previousHash: row.previous_hash ?? undefined,
+    hash: row.hash,
   };
 }
 
-function normalizeEvent(event: DistributedMissionEvent): Omit<DistributedMissionEvent, 'hash'> {
-  const { hash: _hash, ...rest } = event as DistributedMissionEvent & { hash?: string };
-  void _hash;
-  return rest;
-}
-
 function hashEvent(event: DistributedMissionEvent): string {
-  return createHash('sha256').update(canonical(normalizeEvent(event))).digest('hex');
+  const { hash: _hash, ...hashable } = event;
+  void _hash;
+  return createHash('sha256').update(canonical(hashable)).digest('hex');
 }
 
 function normalizeState(state: DistributedMissionLedgerState): DistributedMissionLedgerState {
