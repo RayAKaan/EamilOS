@@ -85,8 +85,8 @@ describe('Phase 7 distributed mission fabric', () => {
     const { graph, ledger, nodes, first } = setup();
     const coordinator = new DistributedMissionCoordinator(ledger, graph, () => nodes);
     const [assignmentId] = coordinator.scheduleReady();
-    coordinator.claim(assignmentId, 'lease-1', new Date(Date.now() - 1).toISOString());
-    expect(coordinator.expireLeases()).toEqual([first.id]);
+    coordinator.claim(assignmentId, 'lease-1', new Date(Date.now() + 60_000).toISOString());
+    expect(coordinator.expireLeases(Date.now() + 61_000)).toEqual([first.id]);
     expect(ledger.getAssignment(assignmentId)?.state).toBe('REQUEUED');
   });
 
