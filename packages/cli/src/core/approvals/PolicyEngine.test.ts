@@ -33,9 +33,7 @@ function engine(...policies: PolicyRule[]) {
 
 describe('DeterministicPolicyEngine', () => {
   it('allows when no policy matches', () => {
-    const result = engine({
-      policyId: undefined,
-    } as never).evaluate(context);
+    const result = engine().evaluate(context);
 
     expect(result.decision).toBe('allow');
     expect(result.matchedPolicies).toEqual([]);
@@ -44,14 +42,12 @@ describe('DeterministicPolicyEngine', () => {
 
   it('requires approval for a protected production resource', () => {
     const result = engine({
-      {
         policyId: 'production-publish',
         effect: 'approval_required',
         reason: 'protected registry write',
         commands: ['npm'],
         protectedResources: ['registry'],
-      },
-    } as never).evaluate(context);
+      }).evaluate(context);
 
     expect(result.decision).toBe('approval_required');
     expect(result.matchedPolicies.map((match) => match.policyId)).toEqual([
@@ -61,7 +57,6 @@ describe('DeterministicPolicyEngine', () => {
 
   it('denies when a deny policy matches', () => {
     const result = engine({
-      {
         policyId: 'blocked-publish',
         effect: 'deny',
         reason: 'publishing is disabled',
