@@ -81,6 +81,9 @@ export class ApprovalGate {
     );
 
     if (matching) {
+      // Terminal approvals are never resurrected. In particular, an expired
+      // approval remains non-authorizing until a future explicit re-request
+      // policy creates a new approval identity.
       return {
         decision: 'approval_required',
         policy,

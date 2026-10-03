@@ -53,6 +53,25 @@ export class ApprovalController {
     return { approval };
   }
 
+  expire(
+    approvalId: string,
+    reason = 'APPROVAL_EXPIRED',
+    expectedRevision?: number,
+  ): ApprovalDecisionResult {
+    const current = this.requirePending(approvalId);
+    const approval = this.store.transition(
+      approvalId,
+      {
+        status: 'expired',
+        decisionAt: this.now(),
+        decisionReason: reason,
+      },
+      expectedRevision ?? current.revision,
+    );
+    this.audit?.recordTransition(current, approval);
+    return { approval };
+  }
+
   reject(
     approvalId: string,
     actor: string,
