@@ -32,9 +32,9 @@ export interface DistributedAssignment {
   createdAt: string;
   updatedAt: string;
   /** Monotonically increasing ownership generation for stale-worker fencing. */
-  assignmentVersion: number;
+  assignmentVersion?: number;
   /** Mission-local fencing token; newer ownership generations supersede older ones. */
-  fencingToken: number;
+  fencingToken?: number;
 }
 
 export interface DistributedMissionEvent {
