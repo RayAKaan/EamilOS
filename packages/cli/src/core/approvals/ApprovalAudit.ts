@@ -1,1 +1,91 @@
-import type { DistributedEventLog, EamilosEvent } from '../comms/a2a/EamilosDistributedEventLog.js';\nimport type { ApprovalRecord } from './ApprovalTypes.js';\n\nexport type ApprovalAuditEventType =\n  | 'approval.requested'\n  | 'approval.approved'\n  | 'approval.rejected'\n  | 'approval.expired'\n  | 'approval.cancelled'\n  | 'approval.consumed';\n\nexport interface ApprovalAuditRecorderOptions {\n  readonly eventLog: DistributedEventLog;\n  readonly maxReasonLength?: number;\n}\n\nexport class ApprovalAuditRecorder {\n  private readonly eventLog: DistributedEventLog;\n  private readonly maxReasonLength: number;\n\n  constructor(options: ApprovalAuditRecorderOptions) {\n    this.eventLog = options.eventLog;\n    this.maxReasonLength = Math.max(1, Math.floor(options.maxReasonLength ?? 2048));\n  }\n\n  recordRequested(approval: ApprovalRecord): EamilosEvent {\n    if (approval.status !== 'pending') throw new Error('APPROVAL_AUDIT_REQUESTED_REQUIRES_PENDING');\n    return this.append('approval.requested', approval, {\n      requestedBy: approval.requestedBy,\n      reason: this.sanitize(approval.reason),\n      evidence: this.evidenceSummary(approval),\n    });\n  }\n\n  recordTransition(previous: ApprovalRecord, next: ApprovalRecord): EamilosEvent {\n    this.assertTransition(previous, next);\n    const eventType = this.eventTypeFor(next.status);\n    return this.append(eventType, next, {\n      decisionBy: next.decisionBy,\n      decisionReason: next.decisionReason ? this.sanitize(next.decisionReason) : undefined,\n      consumedAt: next.consumedAt,\n    });\n  }\n\n  private append(eventType: ApprovalAuditEventType, approval: ApprovalRecord, payload: Record<string, unknown>): EamilosEvent {\n    return this.eventLog.append({\n      eventId: 'approval:' + approval.approvalId + ':' + approval.revision + ':' + eventType,\n      eventType,\n      missionId: approval.missionId,\n      taskId: approval.taskId,\n      executionId: approval.executionId,\n      requestId: approval.requestId,\n      payload: {\n        approvalId: approval.approvalId,\n        policyId: approval.policyId,\n        scope: approval.scope,\n        status: approval.status,\n        revision: approval.revision,\n        ...payload,\n      },\n    });\n  }\n\n  private assertTransition(previous: ApprovalRecord, next: ApprovalRecord): void {\n    if (previous.approvalId !== next.approvalId) throw new Error('APPROVAL_AUDIT_CORRELATION_MISMATCH:approvalId');\n    if (previous.missionId !== next.missionId || previous.taskId !== next.taskId || previous.executionId !== next.executionId || previous.requestId !== next.requestId || previous.policyId !== next.policyId) {\n      throw new Error('APPROVAL_AUDIT_CORRELATION_MISMATCH');\n    }\n    if (next.revision !== previous.revision + 1) throw new Error('APPROVAL_AUDIT_REVISION_MISMATCH:' + previous.revision + ':' + next.revision);\n    if (next.status === previous.status || next.status === 'pending') throw new Error('APPROVAL_AUDIT_INVALID_TRANSITION');\n  }\n\n  private eventTypeFor(status: ApprovalRecord['status']): ApprovalAuditEventType {\n    switch (status) {\n      case 'approved': return 'approval.approved';\n      case 'rejected': return 'approval.rejected';\n      case 'expired': return 'approval.expired';\n      case 'cancelled': return 'approval.cancelled';\n      case 'consumed': return 'approval.consumed';\n      case 'pending': throw new Error('APPROVAL_AUDIT_PENDING_TRANSITION');\n    }\n  }\n\n  private evidenceSummary(approval: ApprovalRecord): readonly Record<string, unknown>[] {\n    return approval.evidence.map((item) => ({ kind: item.kind, name: item.name, sensitive: item.sensitive === true }));\n  }\n\n  private sanitize(value: string): string {\n    return value.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, this.maxReasonLength);\n  }\n}\n
+import type { DistributedEventLog, EamilosEvent } from '../comms/a2a/EamilosDistributedEventLog.js';
+import type { ApprovalRecord } from './ApprovalTypes.js';
+
+export type ApprovalAuditEventType =
+  | 'approval.requested'
+  | 'approval.approved'
+  | 'approval.rejected'
+  | 'approval.expired'
+  | 'approval.cancelled'
+  | 'approval.consumed';
+
+export interface ApprovalAuditRecorderOptions {
+  readonly eventLog: DistributedEventLog;
+  readonly maxReasonLength?: number;
+}
+
+export class ApprovalAuditRecorder {
+  private readonly eventLog: DistributedEventLog;
+  private readonly maxReasonLength: number;
+
+  constructor(options: ApprovalAuditRecorderOptions) {
+    this.eventLog = options.eventLog;
+    this.maxReasonLength = Math.max(1, Math.floor(options.maxReasonLength ?? 2048));
+  }
+
+  recordRequested(approval: ApprovalRecord): EamilosEvent {
+    if (approval.status !== 'pending') throw new Error('APPROVAL_AUDIT_REQUESTED_REQUIRES_PENDING');
+    return this.append('approval.requested', approval, {
+      requestedBy: approval.requestedBy,
+      reason: this.sanitize(approval.reason),
+      evidence: this.evidenceSummary(approval),
+    });
+  }
+
+  recordTransition(previous: ApprovalRecord, next: ApprovalRecord): EamilosEvent {
+    this.assertTransition(previous, next);
+    const eventType = this.eventTypeFor(next.status);
+    return this.append(eventType, next, {
+      decisionBy: next.decisionBy,
+      decisionReason: next.decisionReason ? this.sanitize(next.decisionReason) : undefined,
+      consumedAt: next.consumedAt,
+    });
+  }
+
+  private append(eventType: ApprovalAuditEventType, approval: ApprovalRecord, payload: Record<string, unknown>): EamilosEvent {
+    return this.eventLog.append({
+      eventId: 'approval:' + approval.approvalId + ':' + approval.revision + ':' + eventType,
+      eventType,
+      missionId: approval.missionId,
+      taskId: approval.taskId,
+      executionId: approval.executionId,
+      requestId: approval.requestId,
+      payload: {
+        approvalId: approval.approvalId,
+        policyId: approval.policyId,
+        scope: approval.scope,
+        status: approval.status,
+        revision: approval.revision,
+        ...payload,
+      },
+    });
+  }
+
+  private assertTransition(previous: ApprovalRecord, next: ApprovalRecord): void {
+    if (previous.approvalId !== next.approvalId) throw new Error('APPROVAL_AUDIT_CORRELATION_MISMATCH:approvalId');
+    if (previous.missionId !== next.missionId || previous.taskId !== next.taskId || previous.executionId !== next.executionId || previous.requestId !== next.requestId || previous.policyId !== next.policyId) {
+      throw new Error('APPROVAL_AUDIT_CORRELATION_MISMATCH');
+    }
+    if (next.revision !== previous.revision + 1) throw new Error('APPROVAL_AUDIT_REVISION_MISMATCH:' + previous.revision + ':' + next.revision);
+    if (next.status === previous.status || next.status === 'pending') throw new Error('APPROVAL_AUDIT_INVALID_TRANSITION');
+  }
+
+  private eventTypeFor(status: ApprovalRecord['status']): ApprovalAuditEventType {
+    switch (status) {
+      case 'approved': return 'approval.approved';
+      case 'rejected': return 'approval.rejected';
+      case 'expired': return 'approval.expired';
+      case 'cancelled': return 'approval.cancelled';
+      case 'consumed': return 'approval.consumed';
+      case 'pending': throw new Error('APPROVAL_AUDIT_PENDING_TRANSITION');
+    }
+  }
+
+  private evidenceSummary(approval: ApprovalRecord): readonly Record<string, unknown>[] {
+    return approval.evidence.map((item) => ({ kind: item.kind, name: item.name, sensitive: item.sensitive === true }));
+  }
+
+  private sanitize(value: string): string {
+    return value.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, this.maxReasonLength);
+  }
+}
