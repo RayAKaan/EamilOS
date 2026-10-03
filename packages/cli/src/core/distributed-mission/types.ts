@@ -41,6 +41,7 @@ export interface DistributedMissionEvent {
     | 'MISSION_SYNCED'
     | 'TASK_OFFERED'
     | 'TASK_ASSIGNED'
+    | 'ASSIGNMENT_UPDATED'
     | 'TASK_REQUEUED'
     | 'TASK_CHECKPOINTED'
     | 'TASK_COMPLETED'
