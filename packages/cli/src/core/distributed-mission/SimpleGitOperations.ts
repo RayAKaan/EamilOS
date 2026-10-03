@@ -8,7 +8,7 @@ export class SimpleGitOperations implements GitOperations {
     this.git = simpleGit(repoPath);
   }
 
-  async inspectCommit(commit: string): Promise<{ branch: string; files: string[]; parent?: string }> {
+  async inspectCommit(commit: string): Promise<{ commit: string; branch: string; files: string[]; parent?: string }> {
     const meta = (await this.git.raw(['show', '-s', '--format=%H %P', commit])).trim();
     const [resolved, parent, ...rest] = meta.split(/\s+/);
     if (!resolved) throw new Error('GIT_COMMIT_NOT_FOUND:' + commit);
