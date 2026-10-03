@@ -1,11 +1,13 @@
 import { ApprovalStoreConflictError, type ApprovalStore } from './ApprovalStore.js';
 import { ApprovalController, type ApprovalDecisionResult } from './ApprovalController.js';
+import type { ApprovalAuditRecorder } from './ApprovalAudit.js';
 
 export interface ApprovalExpiryServiceOptions {
   readonly store: ApprovalStore;
   readonly controller?: ApprovalController;
   readonly now?: () => string;
   readonly expirationReason?: string;
+  readonly audit?: ApprovalAuditRecorder;
 }
 
 export interface ApprovalExpiryConflict {
@@ -33,6 +35,7 @@ export class ApprovalExpiryService {
       new ApprovalController({
         store: options.store,
         now: options.now,
+        audit: options.audit,
       });
     this.now = options.now ?? (() => new Date().toISOString());
     this.expirationReason = options.expirationReason ?? 'APPROVAL_EXPIRED';
