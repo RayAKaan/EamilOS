@@ -5,12 +5,12 @@ import type { ResourceLeaseManager } from '../comms/a2a/EamilosResourceLeaseMana
 import type { MissionControlPlane } from '../mission-control/MissionControl.js';
 import type { TaskNode, TaskPriority } from '../mission/types.js';
 import { InMemorySchedulerStore } from './GlobalSchedulerStore.js';
-import type { GlobalSchedulerOptions, ScheduleDecision, SchedulingCandidate, SchedulerDispatcher } from './GlobalSchedulerTypes.js';
+import type { GlobalSchedulerOptions, ScheduleDecision, SchedulingCandidate, SchedulerDispatcher, SchedulerStore } from './GlobalSchedulerTypes.js';
 
 const PRIORITY:Record<TaskPriority,number>={CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3};
 
 export class GlobalScheduler {
-  readonly store:GlobalSchedulerOptions['store'];
+  readonly store:SchedulerStore;
   private readonly missionControl:MissionControlPlane; private readonly fleet:FleetRegistry; private readonly leases:ResourceLeaseManager;
   private readonly eventLog?:DistributedEventLog; private readonly dispatcher?:SchedulerDispatcher;
   private readonly constraints:Required<Pick<NonNullable<GlobalSchedulerOptions['constraints']>,'maxGlobalExecutions'|'maxPerWorker'|'allowStaleWorkers'>>;
