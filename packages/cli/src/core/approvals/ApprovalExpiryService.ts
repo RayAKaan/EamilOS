@@ -43,11 +43,11 @@ export class ApprovalExpiryService {
 
   expireDue(): ApprovalExpiryResult {
     const now = this.now();
-    const pending = this.store.list({ status: 'pending' });
+    const expirable = this.store.list({ status: ['pending', 'approved'] });
     const expired: ApprovalExpiryResult['expired'] = [];
     const conflicts: ApprovalExpiryConflict[] = [];
 
-    for (const approval of pending) {
+    for (const approval of expirable) {
       if (approval.expiresAt === undefined || Date.parse(approval.expiresAt) > Date.parse(now)) {
         continue;
       }
@@ -77,7 +77,7 @@ export class ApprovalExpiryService {
 
     return {
       now,
-      scanned: pending.length,
+      scanned: expirable.length,
       expired,
       conflicts,
     };
