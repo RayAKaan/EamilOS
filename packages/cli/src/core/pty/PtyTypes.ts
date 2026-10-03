@@ -111,7 +111,10 @@ export interface PtyManager {
     event: K,
     listener: (payload: PtyManagerEvents[K]) => void,
   ): () => void;
+  /** Persist active sessions as orphaned without assuming process identity. */
   close(): void;
+  /** Explicitly terminate active sessions before closing the manager. */
+  shutdown(signal?: string): void;
 }
 
 export const DEFAULT_PTY_DIMENSIONS: PtyDimensions = {
