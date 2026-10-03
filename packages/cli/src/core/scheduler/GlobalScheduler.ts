@@ -54,9 +54,31 @@ export class GlobalScheduler {
 
   complete(executionId:string,state:'completed'|'failed'|'cancelled'='completed'):ScheduleDecision{
     const decision=this.store.snapshot().decisions.find(d=>d.executionId===executionId);if(!decision)throw new Error('SCHEDULER_EXECUTION_NOT_FOUND');
-    if(['completed','failed','cancelled','rejected'].includes(decision.state))return decision;
+    if(['completed','failed','cancelled','rejected','rescheduled'].includes(decision.state))return decision;
     try{this.leases.release(decision.leaseId,`scheduler:${executionId}`,decision.fencingToken);}catch(error){if(this.leases.get(decision.leaseId))throw error;}
     const updated=this.store.updateDecision(decision.decisionId,{state});this.emit(`scheduler.execution.${state}`,this.candidate(decision.missionId,decision.taskId),{decision:updated});return updated;
+  }
+
+  reconcile():ScheduleDecision[]{
+    this.fleet.refreshStatuses();
+    const recovered:ScheduleDecision[]=[];
+    for(const decision of this.store.listActive()){
+      const worker=this.fleet.get(decision.workerId);
+      const lease=this.leases.get(decision.leaseId);
+      if(!lease){
+        const recoveryKey=`${decision.idempotencyKey}:recovery:${this.store.nextRevision()}`;
+        const updated=this.store.updateDecision(decision.decisionId,{state:'rescheduled',idempotencyKey:recoveryKey,reason:'SCHEDULER_LEASE_MISSING'});
+        recovered.push(updated);this.emit('scheduler.execution.rescheduled',this.candidate(decision.missionId,decision.taskId),{decision:updated});continue;
+      }
+      const unavailable=!worker || worker.status==='offline' || (!this.constraints.allowStaleWorkers && worker.status==='stale');
+      if(unavailable){
+        try{this.leases.release(decision.leaseId,`scheduler:${decision.executionId}`,decision.fencingToken);}catch{/* cleanup */}
+        const recoveryKey=`${decision.idempotencyKey}:recovery:${this.store.nextRevision()}`;
+        const updated=this.store.updateDecision(decision.decisionId,{state:'rescheduled',idempotencyKey:recoveryKey,reason:'SCHEDULER_WORKER_LOST'});
+        recovered.push(updated);this.emit('scheduler.execution.rescheduled',this.candidate(decision.missionId,decision.taskId),{decision:updated});
+      }
+    }
+    return recovered;
   }
 
   refresh():ScheduleDecision[]{return this.store.listActive();}

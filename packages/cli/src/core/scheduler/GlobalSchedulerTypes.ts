@@ -4,7 +4,7 @@ import type { DistributedEventLog } from '../comms/a2a/EamilosDistributedEventLo
 import type { MissionControlPlane } from '../mission-control/MissionControl.js';
 import type { TaskNode, TaskPriority } from '../mission/types.js';
 
-export type SchedulerDecisionState = 'scheduled' | 'dispatched' | 'completed' | 'failed' | 'cancelled' | 'rejected';
+export type SchedulerDecisionState = 'scheduled' | 'dispatched' | 'completed' | 'failed' | 'cancelled' | 'rejected' | 'rescheduled';
 
 export interface SchedulingConstraints {
   maxGlobalExecutions?: number;
