@@ -69,13 +69,13 @@ export class EamilosPtyManager implements PtyManagerContract {
       createdAt: now(),
     });
 
-    this.sessions.set(request.sessionId, {
+    const backend = await Promise.resolve(this.backend.create(request));
+    const managed: ManagedSession = {
       session: created,
-      backend: await Promise.resolve(this.backend.create(request)),
+      backend,
       disposers: [],
-    });
-
-    const managed = this.sessions.get(request.sessionId)!;
+    };
+    this.sessions.set(request.sessionId, managed);
     managed.session = withState(managed.session, 'starting');
     this.emit('created', managed.session);
 
@@ -93,38 +93,20 @@ export class EamilosPtyManager implements PtyManagerContract {
 
   async attach(sessionId: string): Promise<PtySession> {
     this.assertOpen();
-    const existing = this.sessions.get(sessionId);
-
-    if (existing) {
-      existing.session = withState(existing.session, 'attached');
-      this.emit('attached', existing.session);
-      return existing.session;
+    const managed = this.sessions.get(sessionId);
+    if (!managed) {
+      throw new Error(
+        `PTY session is not registered with this manager: ${sessionId}`,
+      );
     }
 
-    const backend = await this.backend.attach(sessionId);
-    const session = Object.freeze({
-      sessionId,
-      executionId: sessionId,
-      missionId: 'unknown',
-      taskId: 'unknown',
-      workerId: 'unknown',
-      agentId: 'unknown',
-      harnessId: 'unknown',
-      cwd: process.cwd(),
-      command: '',
-      args: Object.freeze([] as string[]),
-      state: 'attached' as const,
-      pid: backend.pid,
-      dimensions: Object.freeze({ ...DEFAULT_PTY_DIMENSIONS }),
-      createdAt: now(),
-      startedAt: now(),
+    managed.backend = await this.backend.attach(sessionId);
+    managed.session = withState(managed.session, 'attached', {
+      pid: managed.backend.pid,
     });
-
-    const managed: ManagedSession = { session, backend, disposers: [] };
-    this.sessions.set(sessionId, managed);
     this.bindBackend(sessionId, managed);
-    this.emit('attached', session);
-    return session;
+    this.emit('attached', managed.session);
+    return managed.session;
   }
 
   write(sessionId: string, data: string): void {
