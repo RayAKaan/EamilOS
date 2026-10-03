@@ -61,7 +61,10 @@ export class ApprovalExpiryService {
           ).approval,
         );
       } catch (error) {
-        if (error instanceof ApprovalStoreConflictError) {
+        if (
+          error instanceof ApprovalStoreConflictError ||
+          (error instanceof Error && error.message.startsWith('APPROVAL_NOT_PENDING:'))
+        ) {
           conflicts.push({
             approvalId: approval.approvalId,
             error: String(error.message),
