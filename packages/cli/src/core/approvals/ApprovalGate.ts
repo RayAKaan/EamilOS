@@ -92,7 +92,7 @@ export class ApprovalGate {
       taskId: context.decision.taskId,
       executionId: context.decision.executionId,
       requestId,
-      policyId: this.matchingPolicyId(policy),
+      policyId: this.matchingPolicy(policy),
       scope: this.options.approvalScope ?? 'execution',
       requestedBy,
       reason: policy.reason,
