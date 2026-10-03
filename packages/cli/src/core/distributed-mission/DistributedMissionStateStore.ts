@@ -124,25 +124,6 @@ export class SqliteDistributedMissionStateStore {
       throw new DistributedMissionStateIntegrityError('LATEST_EVENT_STATE_MISSING_OR_INVALID');
     }
 
-    const snapshot = this.db.prepare(
-      'SELECT state_json, state_hash, sequence, graph_version FROM eamilos_distributed_mission_snapshots WHERE mission_id = ?',
-    ).get(missionId) as {
-      state_json: string;
-      state_hash: string;
-      sequence: number;
-      graph_version: number;
-    } | undefined;
-
-    if (snapshot) {
-      const expectedHash = createHash('sha256').update(snapshot.state_json).digest('hex');
-      if (expectedHash !== snapshot.state_hash) {
-        throw new DistributedMissionStateIntegrityError('SNAPSHOT_HASH_MISMATCH');
-      }
-      if (snapshot.sequence !== latest.sequence || snapshot.graph_version !== latest.graphVersion) {
-        throw new DistributedMissionStateIntegrityError('SNAPSHOT_SEQUENCE_MISMATCH');
-      }
-    }
-
     return {
       state: structuredClone(statePayload),
       events: events.map((event) => structuredClone(event)),
