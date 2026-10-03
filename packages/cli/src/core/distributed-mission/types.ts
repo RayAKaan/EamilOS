@@ -31,6 +31,10 @@ export interface DistributedAssignment {
   branch: string;
   createdAt: string;
   updatedAt: string;
+  /** Monotonically increasing ownership generation for stale-worker fencing. */
+  assignmentVersion: number;
+  /** Mission-local fencing token; newer ownership generations supersede older ones. */
+  fencingToken: number;
 }
 
 export interface DistributedMissionEvent {
@@ -91,6 +95,9 @@ export interface DistributedTaskRequirements {
 
 export interface DistributedTaskResult {
   taskId: string;
+  assignmentId: string;
+  attempt: number;
+  fencingToken: number;
   nodeId: string;
   success: boolean;
   state: TaskState;
