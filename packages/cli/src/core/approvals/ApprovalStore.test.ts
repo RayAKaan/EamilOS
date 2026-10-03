@@ -92,7 +92,7 @@ function runStoreContract(factory: () => {
       },
       1,
     ),
-  ).toThrow('cannot transition');
+  ).toThrow('STALE_APPROVAL_REVISION');
 
   expect(() =>
     store.transition(
