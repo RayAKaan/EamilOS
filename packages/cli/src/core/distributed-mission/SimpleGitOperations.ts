@@ -19,7 +19,7 @@ export class SimpleGitOperations implements GitOperations {
     const branches = (await this.git.raw(['branch', '--contains', resolved, '--format=%(refname:short)']))
       .split(/\r?\n/).map(value => value.trim()).filter(Boolean);
 
-    return { branch: branches[0] ?? resolved, files, parent: parent || rest[0] };
+    return { commit: resolved, branch: branches[0] ?? resolved, files, parent: parent || rest[0] };
   }
 
   async merge(baseRef: string, commit: string): Promise<{ commit: string }> {
