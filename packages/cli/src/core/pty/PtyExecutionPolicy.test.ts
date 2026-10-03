@@ -60,7 +60,7 @@ describe('DefaultPtyExecutionPolicy', () => {
     })).not.toThrow();
 
     expect(() => policy.authorize({
-      request: { ...request, env: { A: '1', B: '2' } },
+      request: { ...request, args: [], env: { A: '1', B: '2' } },
     })).toThrow('PTY environment exceeds execution policy limit');
   });
 });
