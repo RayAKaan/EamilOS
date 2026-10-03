@@ -33,6 +33,7 @@ export interface MissionEventReplicationHandlers {
   onSnapshot?: (snapshot: DistributedMissionPersistenceSnapshot, sourceNodeId: string) => void;
   getEvents?: (missionId: string, fromSequence: number, toSequence?: number) => DistributedMissionEvent[];
   getSnapshot?: (missionId: string) => DistributedMissionPersistenceSnapshot | undefined;
+  listMissions?: () => string[];
   maxReplayBatch?: number;
 }
 
@@ -196,8 +197,8 @@ export class MissionEventReplicator {
   }
 
   private onPeerConnected(peerId: string): void {
-    if (!this.handlers.getEvents) return;
-    for (const missionId of this.missionIds()) {
+    if (!this.handlers.getEvents || !this.handlers.listMissions) return;
+    for (const missionId of this.handlers.listMissions()) {
       const cursor = this.contiguous.get(this.key(peerId, missionId)) ?? 0;
       const latest = this.handlers.getEvents(missionId, cursor + 1);
       if (latest.length > 0) this.sendEvents(peerId, missionId, latest.slice(0, this.handlers.maxReplayBatch));
@@ -246,12 +247,6 @@ export class MissionEventReplicator {
       snapshot,
     }, peerId);
     this.transport.send(peerId, message);
-  }
-
-  private missionIds(): string[] {
-    // A provider may return all events for a mission only; there is intentionally
-    // no transport-level mission registry in 7D.
-    return [];
   }
 
   private key(peerId: string, missionId: string): string {
