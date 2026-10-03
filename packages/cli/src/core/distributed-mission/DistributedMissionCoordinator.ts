@@ -2,7 +2,8 @@ import type { TaskGraph } from '../mission/TaskGraph.js';
 import type { DistributedMissionLedger } from './DistributedMissionLedger.js';
 import type { DistributedNodeView, DistributedTaskResult } from './types.js';
 import { DistributedTaskScheduler } from './DistributedTaskScheduler.js';
-import { GitWorkspaceCoordinator } from './GitWorkspaceCoordinator.js';
+import { GitWorkspaceCoordinator, type GitIntegrationPlan, type GitOperations } from './GitWorkspaceCoordinator.js';
+import type { GitWorkspace } from './types.js';
 
 export class DistributedMissionCoordinator {
   readonly scheduler: DistributedTaskScheduler;
@@ -126,6 +127,56 @@ export class DistributedMissionCoordinator {
       artifacts: result.artifacts ?? [],
       commit: result.commit,
     });
+  }
+
+  async integrateReadyWorkspaces(
+    workspaces: GitWorkspace[],
+    operations: GitOperations,
+  ): Promise<{
+    plan: GitIntegrationPlan;
+    integrated: GitWorkspace[];
+    conflicts: GitIntegrationPlan['conflicts'];
+    failed?: string;
+  }> {
+    const candidates = await this.git.inspectCandidates(workspaces, operations);
+    const plan = this.git.buildIntegrationPlan(candidates);
+    if (plan.conflicts.length > 0) {
+      for (const conflict of plan.conflicts) {
+        this.ledger.append('GIT_CONFLICT_DETECTED', undefined, undefined, {
+          reason: conflict.reason,
+          taskIds: conflict.taskIds,
+          files: conflict.files,
+        });
+      }
+      return { plan, integrated: [], conflicts: plan.conflicts };
+    }
+
+    const result = await this.git.integrate(plan, operations);
+    const integrated: GitWorkspace[] = [];
+    for (const taskId of result.integrated) {
+      const workspace = workspaces.find(item => item.taskId === taskId);
+      if (!workspace) continue;
+      const next = this.git.markIntegrated(workspace);
+      integrated.push(next);
+      this.ledger.append('GIT_INTEGRATED', taskId, workspace.nodeId, {
+        branch: workspace.branch,
+        baseRef: plan.baseRef,
+        commit: plan.candidates.find(item => item.workspace.taskId === taskId)?.commit,
+      });
+    }
+    if (result.failed) {
+      this.ledger.append('GIT_CONFLICT_DETECTED', undefined, undefined, {
+        reason: 'overlapping_files',
+        taskIds: [result.failed],
+        files: result.conflicts.flatMap(conflict => conflict.files),
+      });
+    }
+    return {
+      plan,
+      integrated,
+      conflicts: result.conflicts,
+      failed: result.failed,
+    };
   }
 
   nodeLost(nodeId: string): string[] {

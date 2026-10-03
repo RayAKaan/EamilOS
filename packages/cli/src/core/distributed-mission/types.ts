@@ -52,7 +52,9 @@ export interface DistributedMissionEvent {
     | 'TASK_FAILED'
     | 'NODE_LOST'
     | 'LEASE_EXPIRED'
-    | 'GIT_WORKSPACE_ASSIGNED';
+    | 'GIT_WORKSPACE_ASSIGNED'
+    | 'GIT_CONFLICT_DETECTED'
+    | 'GIT_INTEGRATED';
   taskId?: string;
   nodeId?: string;
   graphVersion: number;
