@@ -97,6 +97,7 @@ export class EamilosA2AServer {
     if (this.ownsResourceLeaseManager) this.leases?.close?.();
     if (this.ownsCheckpointStore) this.checkpoints?.close?.();
     if (this.ownsEventLog) this.eventLog?.close?.();
+    if (this.options.fleetRegistry) this.options.fleetRegistry.unregister(this.options.workerId);
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
