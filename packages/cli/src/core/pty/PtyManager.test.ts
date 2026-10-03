@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SqlitePtySessionStore } from './PtySessionStore.js';
+import { InMemoryPtySessionStore, SqlitePtySessionStore } from './PtySessionStore.js';
 import {
   EamilosPtyManager,
   InMemoryPtyBackend,
@@ -152,7 +152,7 @@ describe('EamilosPtyManager durable recovery', () => {
   });
 
   it('recovers an orphaned session when the backend can still attach', async () => {
-    const store = new InMemoryPtySessionStoreForTest();
+    const store = new InMemoryPtySessionStore();
     const backend = new InMemoryPtyBackend();
     const managerA = new EamilosPtyManager(backend, store);
     await managerA.create(request({ sessionId: 'recover-1' }));
