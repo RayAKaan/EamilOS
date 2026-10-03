@@ -159,7 +159,7 @@ export class DistributedMissionLedger {
     return [...this.assignments.values()].find(
       (assignment) =>
         assignment.taskId === taskId &&
-        !['COMPLETED', 'FAILED', 'REJECTED'].includes(assignment.state),
+        !['COMPLETED', 'FAILED', 'REJECTED', 'REQUEUED'].includes(assignment.state),
     );
   }
 
