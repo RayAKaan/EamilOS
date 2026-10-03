@@ -123,23 +123,17 @@ export function assertApprovalTransition(
   current: ApprovalRecord,
   transition: ApprovalTransition,
 ): void {
-  if (isApprovalTerminal(current.status)) {
-    throw new Error(
-      `Approval ${current.approvalId} is already terminal: ${current.status}`,
-    );
+  if (transition.status === 'consumed') {
+    if (current.status !== 'approved') {
+      throw new Error('Only an approved approval can be consumed');
+    }
+    return;
   }
 
   if (current.status !== 'pending') {
     throw new Error(
       `Approval ${current.approvalId} cannot transition from ${current.status}`,
     );
-  }
-
-  if (transition.status === 'consumed') {
-    if (!current || current.status !== 'approved') {
-      throw new Error('Only an approved approval can be consumed');
-    }
-    return;
   }
 
   if (
