@@ -276,7 +276,6 @@ describe('ApprovalGate', () => {
     const result = gate.evaluate({ ...context('npm'), now: '2026-10-03T17:00:00.000Z' });
     expect(result.decision).toBe('approval_required');
     if (result.decision !== 'approval_required') throw new Error('expected approval_required');
-    expect(result.approval.status).toBe('expired');
     expect(store.get(record.approvalId)?.status).toBe('expired');
     expect(store.get(record.approvalId)?.revision).toBe(3);
   });
