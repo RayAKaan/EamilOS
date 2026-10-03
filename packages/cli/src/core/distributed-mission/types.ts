@@ -53,6 +53,8 @@ export interface DistributedMissionEvent {
   graphVersion: number;
   timestamp: string;
   data: Record<string, unknown>;
+  previousHash?: string;
+  hash?: string;
 }
 
 export interface DistributedMissionSnapshot {
