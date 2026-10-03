@@ -17,6 +17,7 @@ interface ManagedSession {
   session: PtySession;
   backend: PtyBackendSession;
   disposers: Array<() => void>;
+  terminationRequested: boolean;
 }
 
 function now(): string {
@@ -74,6 +75,7 @@ export class EamilosPtyManager implements PtyManagerContract {
       session: created,
       backend,
       disposers: [],
+      terminationRequested: false,
     };
     this.sessions.set(request.sessionId, managed);
     managed.session = withState(managed.session, 'starting');
@@ -127,6 +129,7 @@ export class EamilosPtyManager implements PtyManagerContract {
 
   terminate(sessionId: string, signal?: string): void {
     const managed = this.requireSession(sessionId);
+    managed.terminationRequested = true;
     managed.backend.terminate(signal);
   }
 
@@ -187,8 +190,11 @@ export class EamilosPtyManager implements PtyManagerContract {
         const current = this.sessions.get(sessionId);
         if (!current) return;
 
-        const terminalState: PtySessionState =
-          exitCode === 0 ? 'completed' : 'failed';
+        const terminalState: PtySessionState = managed.terminationRequested
+          ? 'terminated'
+          : exitCode === 0
+            ? 'completed'
+            : 'failed';
 
         current.session = withState(current.session, terminalState, {
           completedAt: now(),
@@ -196,7 +202,12 @@ export class EamilosPtyManager implements PtyManagerContract {
           signal,
         });
 
-        this.emit(terminalState === 'completed' ? 'completed' : 'failed', {
+        this.emit(
+          terminalState === 'completed'
+            ? 'completed'
+            : terminalState === 'terminated'
+              ? 'terminated'
+              : 'failed', {
           sessionId,
           executionId: current.session.executionId,
           exitCode,
