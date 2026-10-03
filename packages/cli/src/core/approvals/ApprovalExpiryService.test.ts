@@ -83,7 +83,7 @@ describe('ApprovalExpiryService', () => {
       store: second,
       audit,
       now: () => '2026-10-03T11:01:00.000Z',
-    } as never);
+    });
 
     const result = service.expireDue();
     expect(result.expired[0]?.status).toBe('expired');
@@ -96,24 +96,38 @@ describe('ApprovalExpiryService', () => {
     log.close();
   });
 
-  it('reports optimistic-concurrency conflicts without failing the reconciliation pass', () => {
-    const store = new InMemoryApprovalStore();
-    store.create(request({ approvalId: 'conflict' }));
+  it('treats a concurrent human decision as a non-fatal expiry conflict', () => {
+    const inner = new InMemoryApprovalStore();
+    const created = inner.create(request({ approvalId: 'conflict' }));
+    let firstList = true;
+
+    const store = {
+      create: inner.create.bind(inner),
+      get: inner.get.bind(inner),
+      list(query?: Parameters<InMemoryApprovalStore['list']>[0]) {
+        const rows = inner.list(query);
+        if (firstList) {
+          firstList = false;
+          inner.transition('conflict', {
+            status: 'approved',
+            decisionBy: 'human-1',
+            decisionAt: '2026-10-03T10:59:00.000Z',
+          }, created.revision);
+        }
+        return rows;
+      },
+      transition: inner.transition.bind(inner),
+      delete: inner.delete.bind(inner),
+    };
+
     const service = new ApprovalExpiryService({
       store,
       now: () => '2026-10-03T11:00:00.000Z',
     });
 
-    const current = store.get('conflict');
-    if (!current) throw new Error('missing approval');
-    store.transition('conflict', {
-      status: 'approved',
-      decisionBy: 'human-1',
-      decisionAt: '2026-10-03T10:59:00.000Z',
-    }, current.revision);
-
     const result = service.expireDue();
     expect(result.expired).toEqual([]);
-    expect(result.conflicts).toEqual([]);
+    expect(result.conflicts).toHaveLength(1);
+    expect(store.get('conflict')?.status).toBe('approved');
   });
 });
