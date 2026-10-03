@@ -38,7 +38,7 @@ export class ApprovalController {
     expectedRevision?: number,
   ): ApprovalDecisionResult {
     this.assertActor(actor);
-    const current = this.requirePending(approvalId);
+    const current = this.requireExpirable(approvalId);
     const approval = this.store.transition(
       approvalId,
       {
@@ -118,6 +118,15 @@ export class ApprovalController {
     if (!approval) throw new Error('APPROVAL_NOT_FOUND');
     if (approval.status !== 'pending') {
       throw new Error(`APPROVAL_NOT_PENDING:${approval.status}`);
+    }
+    return approval;
+  }
+
+  private requireExpirable(approvalId: string): ApprovalRecord {
+    const approval = this.store.get(approvalId);
+    if (!approval) throw new Error('APPROVAL_NOT_FOUND');
+    if (approval.status !== 'pending' && approval.status !== 'approved') {
+      throw new Error(`APPROVAL_NOT_EXPIRABLE:${approval.status}`);
     }
     return approval;
   }
