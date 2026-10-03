@@ -14,11 +14,14 @@ export class GlobalScheduler {
   private readonly missionControl:MissionControlPlane; private readonly fleet:FleetRegistry; private readonly leases:ResourceLeaseManager;
   private readonly eventLog?:DistributedEventLog; private readonly dispatcher?:SchedulerDispatcher;
   private readonly constraints:Required<Pick<NonNullable<GlobalSchedulerOptions['constraints']>,'maxGlobalExecutions'|'maxPerWorker'|'allowStaleWorkers'>>;
+  private readonly leaseTtlMs:number; private readonly leaseRenewalThresholdMs:number;
   private readonly ownedStore:boolean;
 
   constructor(options:GlobalSchedulerOptions){
     this.missionControl=options.missionControl;this.fleet=options.fleet;this.leases=options.leases;this.eventLog=options.eventLog;this.dispatcher=options.dispatcher;
     const c=options.constraints??{};this.constraints={maxGlobalExecutions:c.maxGlobalExecutions??Number.MAX_SAFE_INTEGER,maxPerWorker:c.maxPerWorker??Number.MAX_SAFE_INTEGER,allowStaleWorkers:c.allowStaleWorkers??false};
+    this.leaseTtlMs=Math.max(1000,Math.floor(c.leaseTtlMs??300_000));
+    this.leaseRenewalThresholdMs=Math.min(this.leaseTtlMs-1,Math.max(100,Math.floor(c.leaseRenewalThresholdMs??Math.floor(this.leaseTtlMs/3))));
     this.ownedStore=!options.store;this.store=options.store??new InMemorySchedulerStore();this.recover();
   }
 
@@ -34,7 +37,7 @@ export class GlobalScheduler {
       const workers=this.fleet.find(candidate.requiredCapabilities,{includeStale:this.constraints.allowStaleWorkers});
       const worker=workers.find(w=>(workerReservations.get(w.workerId)??0)<Math.min(w.capacity,this.constraints.maxPerWorker));if(!worker)continue;
       const executionId=`execution_${randomUUID()}`;let lease;
-      try{lease=this.leases.acquire({executionId,ownerId:`scheduler:${executionId}`,resources:candidate.resources,ttlMs:300_000});}
+      try{lease=this.leases.acquire({executionId,ownerId:`scheduler:${executionId}`,resources:candidate.resources,ttlMs:this.leaseTtlMs});}
       catch(error){this.emit('scheduler.resource_conflict',candidate,{error:String(error)});continue;}
       const now=new Date().toISOString();const revision=this.store.nextRevision();
       const decision:ScheduleDecision={decisionId:`decision_${randomUUID()}`,idempotencyKey,schedulerRevision:revision,missionId:candidate.missionId,taskId:candidate.taskId,executionId,workerId:worker.workerId,agentId:worker.agentId,harnessId:worker.harnessId,priority:candidate.task.priority,fencingToken:lease.fencingToken,leaseId:lease.leaseId,state:'scheduled',createdAt:now,updatedAt:now};
@@ -57,6 +60,27 @@ export class GlobalScheduler {
     if(['completed','failed','cancelled','rejected','rescheduled'].includes(decision.state))return decision;
     try{this.leases.release(decision.leaseId,`scheduler:${executionId}`,decision.fencingToken);}catch(error){if(this.leases.get(decision.leaseId))throw error;}
     const updated=this.store.updateDecision(decision.decisionId,{state});this.emit(`scheduler.execution.${state}`,this.candidate(decision.missionId,decision.taskId),{decision:updated});return updated;
+  }
+
+  renewLeases(now=Date.now()):ScheduleDecision[]{
+    this.fleet.refreshStatuses(now);
+    const renewed:ScheduleDecision[]=[];
+    for(const decision of this.store.listActive()){
+      const lease=this.leases.get(decision.leaseId,now);
+      if(!lease)continue;
+      if(Date.parse(lease.expiresAt)-now>this.leaseRenewalThresholdMs)continue;
+      const worker=this.fleet.get(decision.workerId);
+      const unavailable=!worker||worker.status==='offline'||(!this.constraints.allowStaleWorkers&&worker.status==='stale');
+      if(unavailable)continue;
+      try{
+        const next=this.leases.renew(decision.leaseId,'scheduler:'+decision.executionId,decision.fencingToken,this.leaseTtlMs,now);
+        renewed.push(decision);
+        this.emit('scheduler.lease.renewed',this.candidate(decision.missionId,decision.taskId),{decision,expiresAt:next.expiresAt});
+      }catch(error){
+        this.emit('scheduler.lease.renewal_failed',this.candidate(decision.missionId,decision.taskId),{decisionId:decision.decisionId,error:String(error)});
+      }
+    }
+    return renewed;
   }
 
   reconcile():ScheduleDecision[]{

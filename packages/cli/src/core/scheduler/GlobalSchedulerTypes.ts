@@ -10,6 +10,8 @@ export interface SchedulingConstraints {
   maxGlobalExecutions?: number;
   maxPerWorker?: number;
   allowStaleWorkers?: boolean;
+  leaseTtlMs?: number;
+  leaseRenewalThresholdMs?: number;
 }
 
 export interface SchedulingCandidate {
