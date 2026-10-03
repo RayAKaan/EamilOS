@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MissionEngine } from '../mission/MissionEngine.js';
 import { MissionStore } from '../mission/MissionStore.js';
-import { MissionControlPlane } from './MissionControlPlane.js';
-import { InMemoryMissionControlPlaneStore, MissionControlPlaneConflictError, SqliteMissionControlPlaneStore } from './MissionControlPlaneStore.js';
+import { MissionControlPlane } from './MissionControl.js';
+import { InMemoryMissionControlPlaneStore, MissionControlPlaneConflictError, SqliteMissionControlPlaneStore } from './MissionControlStore.js';
 
 function engine(){return new MissionEngine(new MissionStore(mkdtempSync(join(tmpdir(),'eamilos-mission-'))));}
 describe('MissionControlPlane',()=>{
