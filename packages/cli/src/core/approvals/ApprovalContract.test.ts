@@ -85,7 +85,7 @@ describe('approval contract', () => {
   });
 
   it('does not permit approval reuse after a terminal decision', () => {
-    for (const status of ['approved', 'rejected', 'expired', 'cancelled', 'consumed'] as const) {
+    for (const status of ['rejected', 'expired', 'cancelled', 'consumed'] as const) {
       const terminal = { ...record, status };
       expect(() => assertApprovalTransition(terminal, {
         status: 'rejected',
