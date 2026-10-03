@@ -6,6 +6,7 @@ import { EamilosA2ASqliteTaskStore } from './EamilosA2ASqliteTaskStore.js';
 import { EamilosSqliteResourceLeaseManager, ResourceConflictError, type ResourceLeaseManager } from './EamilosResourceLeaseManager.js';
 import { assertCheckpointFresh, checkpointResumeId, EamilosSqliteCheckpointStore, type CheckpointStore, type ExecutionCheckpoint, type SaveCheckpointInput } from './EamilosCheckpointStore.js';
 import { EamilosSqliteDistributedEventLog, type DistributedEventLog } from './EamilosDistributedEventLog.js';
+import type { FleetRegistry } from './EamilosFleetRegistry.js';
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -29,6 +30,7 @@ export interface EamilosA2AServerOptions {
   currentContextVersion?: () => number;
   eventLog?: DistributedEventLog;
   eventLogFilename?: string;
+  fleetRegistry?: FleetRegistry;
 }
 
 export class EamilosA2AServer {
@@ -41,6 +43,7 @@ export class EamilosA2AServer {
   private readonly checkpoints?: CheckpointStore;
   private readonly ownsEventLog: boolean;
   private readonly eventLog?: DistributedEventLog;
+  private heartbeatSequence = 0;
 
   constructor(private readonly options: EamilosA2AServerOptions) {
     AgentCardSchema.parse(options.card);
@@ -64,6 +67,17 @@ export class EamilosA2AServer {
 
   async start(host = '127.0.0.1', port = 0): Promise<{ host: string; port: number }> {
     if (this.server) throw new Error('EamilOS A2A server already started');
+    if (this.options.fleetRegistry) {
+      this.options.fleetRegistry.register(this.options.card, {
+        kind: 'capability.advertisement', protocolVersion: 1,
+        workerId: this.options.card.workerId, agentId: this.options.card.agentId,
+        harnessId: this.options.card.harnessId, capabilities: this.options.card.capabilities,
+        maxConcurrency: this.options.card.maxConcurrency,
+        activeExecutions: this.options.activeExecutions?.() ?? 0,
+        metadata: this.options.card.metadata, advertisedAt: new Date().toISOString(),
+      });
+      this.heartbeatSequence = 0;
+    }
     this.server = createServer((req, res) => void this.handle(req, res));
     await new Promise<void>((resolve, reject) => {
       this.server!.once('error', reject);
@@ -83,6 +97,7 @@ export class EamilosA2AServer {
     if (this.ownsResourceLeaseManager) this.leases?.close?.();
     if (this.ownsCheckpointStore) this.checkpoints?.close?.();
     if (this.ownsEventLog) this.eventLog?.close?.();
+    if (this.options.fleetRegistry) this.options.fleetRegistry.unregister(this.options.workerId);
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -114,8 +129,9 @@ export class EamilosA2AServer {
           timestamp: new Date().toISOString(),
           activeExecutions: this.options.activeExecutions?.() ?? 0,
           capacity: this.options.capacity?.() ?? this.options.card.maxConcurrency,
-          sequence: Date.now(),
+          sequence: ++this.heartbeatSequence,
         };
+        if (this.options.fleetRegistry) this.options.fleetRegistry.heartbeat(heartbeat);
         return this.send(res, 200, heartbeat);
       }
       if (req.method === 'POST' && path === '/eamilos/a2a/tasks') {

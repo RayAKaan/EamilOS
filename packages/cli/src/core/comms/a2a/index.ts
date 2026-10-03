@@ -18,3 +18,5 @@ export * from './EamilosResourceLeaseManager.js';
 export * from './EamilosCheckpointStore.js';
 
 export * from './EamilosDistributedEventLog.js';
+
+export * from './EamilosFleetRegistry.js';
