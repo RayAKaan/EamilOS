@@ -67,6 +67,33 @@ describe('ApprovalExpiryService', () => {
     expect(store.get('race')?.status).toBe('approved');
   });
 
+  it('expires an already-approved authorization once its validity window closes', () => {
+    const store = new InMemoryApprovalStore();
+    const created = store.create(request({
+      approvalId: 'approved-expiry',
+      expiresAt: '2026-10-03T11:00:00.000Z',
+    }));
+    store.transition('approved-expiry', {
+      status: 'approved',
+      decisionBy: 'human-1',
+      decisionAt: '2026-10-03T10:30:00.000Z',
+    }, created.revision);
+
+    const service = new ApprovalExpiryService({
+      store,
+      now: () => '2026-10-03T11:00:00.000Z',
+    });
+
+    const result = service.expireDue();
+    expect(result.expired.map((approval) => approval.approvalId)).toEqual(['approved-expiry']);
+    expect(result.expired[0]?.status).toBe('expired');
+    expect(result.expired[0]?.revision).toBe(3);
+    expect(store.get('approved-expiry')?.status).toBe('expired');
+
+    const second = service.expireDue();
+    expect(second.expired).toEqual([]);
+  });
+
   it('persists expiry across SQLite restart and records the audit event', () => {
     const filename = join(tmpdir(), `eamilos-approval-expiry-${randomUUID()}.sqlite`);
     const first = new SqliteApprovalStore({ filename });
