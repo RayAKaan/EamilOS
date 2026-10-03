@@ -23,7 +23,7 @@ export class SimpleGitOperations implements GitOperations {
   }
 
   async merge(baseRef: string, commit: string): Promise<{ commit: string }> {
-    await this.git.raw(['checkout', '--detach', baseRef]);
+    await this.git.raw(['checkout', baseRef]);
     await this.git.raw(['merge', '--no-ff', '--no-edit', commit]);
     const resolved = (await this.git.revparse(['HEAD'])).trim();
     return { commit: resolved };
