@@ -103,7 +103,7 @@ export class NodePtyBackend implements PtyBackend {
       ...(request.env ?? {}),
     } as Record<string, string>;
 
-    const process = this.pty.spawn(request.command, request.args, {
+    const ptyProcess = this.pty.spawn(request.command, request.args, {
       name: 'xterm-256color',
       cols: dimensions.cols,
       rows: dimensions.rows,
@@ -111,8 +111,8 @@ export class NodePtyBackend implements PtyBackend {
       env,
     });
 
-    this.sessions.set(request.sessionId, process);
-    return new NodePtyBackendSession(process, request.sessionId);
+    this.sessions.set(request.sessionId, ptyProcess);
+    return new NodePtyBackendSession(ptyProcess, request.sessionId);
   }
 
   async attach(sessionId: string): Promise<PtyBackendSession> {
