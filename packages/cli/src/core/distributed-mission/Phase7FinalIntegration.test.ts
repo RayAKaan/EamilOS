@@ -7,7 +7,7 @@ import { GitWorkspaceCoordinator, type GitOperations } from './GitWorkspaceCoord
 function makeOperations(): GitOperations {
   return {
     async inspectCommit(commit) {
-      return { branch: commit, files: [commit + '.ts'], parent: 'base' };
+      return { commit, branch: commit, files: [commit + '.ts'], parent: 'base' };
     },
     async merge(_base, commit) { return { commit: 'merged-' + commit }; },
     async abortMerge() {},
@@ -83,7 +83,7 @@ describe('Phase 7 final distributed mission path', () => {
       [makeWorkspace(second.id, 'b'), makeWorkspace(first.id, 'a')],
       {
         ...makeOperations(),
-        async inspectCommit(commit) { return { branch: commit, files: ['shared.ts'] }; },
+        async inspectCommit(commit) { return { commit, branch: commit, files: ['shared.ts'] }; },
       },
     );
 
