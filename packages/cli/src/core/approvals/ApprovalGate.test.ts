@@ -15,7 +15,7 @@ const decision: ScheduleDecision = {
   workerId: 'worker-1',
   agentId: 'agent-1',
   harnessId: 'harness-1',
-  priority: 'high',
+  priority: 'HIGH',
   fencingToken: 1,
   leaseId: 'lease-1',
   state: 'scheduled',
@@ -125,6 +125,7 @@ describe('ApprovalGate', () => {
     expect(second.decision).toBe('approval_required');
     expect(store.list()).toHaveLength(1);
     expect(store.list()[0]?.status).toBe('pending');
+    if (first.decision !== 'approval_required' || second.decision !== 'approval_required') throw new Error('expected approval_required');
     expect(first.approval.approvalId).toBe(second.approval.approvalId);
   });
 
