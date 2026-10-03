@@ -41,6 +41,7 @@ export interface DistributedMissionEvent {
     | 'MISSION_SYNCED'
     | 'TASK_OFFERED'
     | 'TASK_ASSIGNED'
+    | 'ASSIGNMENT_UPDATED'
     | 'TASK_REQUEUED'
     | 'TASK_CHECKPOINTED'
     | 'TASK_COMPLETED'
@@ -53,6 +54,8 @@ export interface DistributedMissionEvent {
   graphVersion: number;
   timestamp: string;
   data: Record<string, unknown>;
+  previousHash?: string;
+  hash?: string;
 }
 
 export interface DistributedMissionSnapshot {
