@@ -1,4 +1,4 @@
-import type { ApprovalRequest } from './ApprovalTypes.js';
+import type { ApprovalRecord, ApprovalRequest } from './ApprovalTypes.js';
 import type {
   PolicyEvaluationContext,
   PolicyEvaluation,
@@ -13,7 +13,7 @@ import type { SchedulingCandidate } from '../scheduler/GlobalSchedulerTypes.js';
 import type { FleetWorker } from '../comms/a2a/EamilosFleetRegistry.js';
 
 export type ApprovalGateDecision =
-  | { readonly decision: 'allow'; readonly policy: PolicyEvaluation; readonly approval?: ApprovalRequest }
+  | { readonly decision: 'allow'; readonly policy: PolicyEvaluation; readonly approval?: ApprovalRecord }
   | { readonly decision: 'deny'; readonly policy: PolicyEvaluation }
   | {
       readonly decision: 'approval_required';
@@ -101,7 +101,7 @@ export class ApprovalGate {
         return {
           decision: 'allow',
           policy,
-          approval: this.toRequest(matching),
+          approval: matching,
         };
       }
 
