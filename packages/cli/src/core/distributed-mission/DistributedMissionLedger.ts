@@ -133,7 +133,7 @@ export class DistributedMissionLedger {
       ...current,
       ...patch,
       state,
-      assignmentVersion: current.assignmentVersion + 1,
+      assignmentVersion: (current.assignmentVersion ?? 1) + 1,
       updatedAt: new Date().toISOString(),
     };
     this.assignments.set(assignmentId, next);
