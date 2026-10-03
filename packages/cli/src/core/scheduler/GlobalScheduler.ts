@@ -33,12 +33,12 @@ export class GlobalScheduler {
       const idempotencyKey=decisionKey(candidate);if(this.store.getByIdempotencyKey(idempotencyKey))continue;
       const workers=this.fleet.find(candidate.requiredCapabilities,{includeStale:this.constraints.allowStaleWorkers});
       const worker=workers.find(w=>(workerReservations.get(w.workerId)??0)<Math.min(w.capacity,this.constraints.maxPerWorker));if(!worker)continue;
-      const executionId=\`execution_\${randomUUID()}\`;let lease;
-      try{lease=this.leases.acquire({executionId,ownerId:\`scheduler:\${executionId}\`,resources:candidate.resources,ttlMs:300_000});}
+      const executionId=`execution_${randomUUID()}`;let lease;
+      try{lease=this.leases.acquire({executionId,ownerId:`scheduler:${executionId}`,resources:candidate.resources,ttlMs:300_000});}
       catch(error){this.emit('scheduler.resource_conflict',candidate,{error:String(error)});continue;}
       const now=new Date().toISOString();const revision=this.store.nextRevision();
-      const decision:ScheduleDecision={decisionId:\`decision_\${randomUUID()}\`,idempotencyKey,schedulerRevision:revision,missionId:candidate.missionId,taskId:candidate.taskId,executionId,workerId:worker.workerId,agentId:worker.agentId,harnessId:worker.harnessId,priority:candidate.task.priority,fencingToken:lease.fencingToken,leaseId:lease.leaseId,state:'scheduled',createdAt:now,updatedAt:now};
-      try{this.store.saveDecision(decision);}catch(error){try{this.leases.release(lease.leaseId,\`scheduler:\${executionId}\`,lease.fencingToken);}catch{/* cleanup */}this.emit('scheduler.decision.rejected',candidate,{reason:String(error)});continue;}
+      const decision:ScheduleDecision={decisionId:`decision_${randomUUID()}`,idempotencyKey,schedulerRevision:revision,missionId:candidate.missionId,taskId:candidate.taskId,executionId,workerId:worker.workerId,agentId:worker.agentId,harnessId:worker.harnessId,priority:candidate.task.priority,fencingToken:lease.fencingToken,leaseId:lease.leaseId,state:'scheduled',createdAt:now,updatedAt:now};
+      try{this.store.saveDecision(decision);}catch(error){try{this.leases.release(lease.leaseId,`scheduler:${executionId}`,lease.fencingToken);}catch{/* cleanup */}this.emit('scheduler.decision.rejected',candidate,{reason:String(error)});continue;}
       workerReservations.set(worker.workerId,(workerReservations.get(worker.workerId)??0)+1);selected.push(decision);this.emit('scheduler.decision.created',candidate,{decision});
     }
     this.emit('scheduler.cycle.completed',undefined,{selected:selected.length});return selected;
@@ -55,8 +55,8 @@ export class GlobalScheduler {
   complete(executionId:string,state:'completed'|'failed'|'cancelled'='completed'):ScheduleDecision{
     const decision=this.store.snapshot().decisions.find(d=>d.executionId===executionId);if(!decision)throw new Error('SCHEDULER_EXECUTION_NOT_FOUND');
     if(['completed','failed','cancelled','rejected'].includes(decision.state))return decision;
-    try{this.leases.release(decision.leaseId,\`scheduler:\${executionId}\`,decision.fencingToken);}catch(error){if(this.leases.get(decision.leaseId))throw error;}
-    const updated=this.store.updateDecision(decision.decisionId,{state});this.emit(\`scheduler.execution.\${state}\`,this.candidate(decision.missionId,decision.taskId),{decision:updated});return updated;
+    try{this.leases.release(decision.leaseId,`scheduler:${executionId}`,decision.fencingToken);}catch(error){if(this.leases.get(decision.leaseId))throw error;}
+    const updated=this.store.updateDecision(decision.decisionId,{state});this.emit(`scheduler.execution.${state}`,this.candidate(decision.missionId,decision.taskId),{decision:updated});return updated;
   }
 
   refresh():ScheduleDecision[]{return this.store.listActive();}
@@ -64,14 +64,14 @@ export class GlobalScheduler {
   close(){if(this.ownedStore)this.store?.close?.();}
 
   private recover():void{for(const decision of this.store.listActive()){if(!this.leases.get(decision.leaseId))this.store.updateDecision(decision.decisionId,{state:'rejected',reason:'SCHEDULER_LEASE_MISSING_AFTER_RECOVERY'});}}
-  private releaseAndReject(decision:ScheduleDecision,reason:string):void{try{this.leases.release(decision.leaseId,\`scheduler:\${decision.executionId}\`,decision.fencingToken);}catch{/* cleanup */}this.store.updateDecision(decision.decisionId,{state:'rejected',reason});}
+  private releaseAndReject(decision:ScheduleDecision,reason:string):void{try{this.leases.release(decision.leaseId,`scheduler:${decision.executionId}`,decision.fencingToken);}catch{/* cleanup */}this.store.updateDecision(decision.decisionId,{state:'rejected',reason});}
   private candidates():SchedulingCandidate[]{const out:SchedulingCandidate[]=[];for(const mission of this.missionControl.list({status:'active'}))for(const task of this.missionControl.readyTasks(mission.missionId))out.push(this.makeCandidate(mission.missionId,task,mission.createdAt));return out;}
   private candidate(missionId:string,taskId:string):SchedulingCandidate|undefined{const mission=this.missionControl.get(missionId);if(!mission)return undefined;const task=this.missionControl.snapshot(missionId).tasks.find(t=>t.id===taskId);return task?this.makeCandidate(missionId,task,mission.createdAt):undefined;}
   private makeCandidate(missionId:string,task:TaskNode,createdAt:string):SchedulingCandidate{return{missionId,taskId:task.id,task,missionCreatedAt:createdAt,priorityRank:PRIORITY[task.priority],requiredCapabilities:[...task.requiredCapabilities].sort(),resources:resourcesFromTask(task)};}
-  private emit(type:string,candidate:SchedulingCandidate|undefined,payload:Record<string,unknown>){if(!this.eventLog)return;const d=payload.decision as ScheduleDecision|undefined;const stable=d?.decisionId??\`\${type}:\${candidate?.missionId??''}:\${candidate?.taskId??''}\`;const id=createHash('sha256').update(stable).digest('hex');this.eventLog.append({eventId:id,eventType:type,missionId:candidate?.missionId,taskId:candidate?.taskId,executionId:d?.executionId,workerId:(payload.workerId as string|undefined),occurredAt:new Date().toISOString(),payload});}
+  private emit(type:string,candidate:SchedulingCandidate|undefined,payload:Record<string,unknown>){if(!this.eventLog)return;const d=payload.decision as ScheduleDecision|undefined;const stable=d?.decisionId??`${type}:${candidate?.missionId??''}:${candidate?.taskId??''}`;const id=createHash('sha256').update(stable).digest('hex');this.eventLog.append({eventId:id,eventType:type,missionId:candidate?.missionId,taskId:candidate?.taskId,executionId:d?.executionId,workerId:(payload.workerId as string|undefined),occurredAt:new Date().toISOString(),payload});}
 }
 
 function compareCandidates(a:SchedulingCandidate,b:SchedulingCandidate):number{return a.priorityRank-b.priorityRank||a.task.createdAt.localeCompare(b.task.createdAt)||a.missionCreatedAt.localeCompare(b.missionCreatedAt)||a.missionId.localeCompare(b.missionId)||a.taskId.localeCompare(b.taskId);}
-function decisionKey(c:SchedulingCandidate):string{return createHash('sha256').update(\`\${c.missionId}:\${c.taskId}:\${c.task.updatedAt}:\${c.task.attempt}\`).digest('hex');}
+function decisionKey(c:SchedulingCandidate):string{return createHash('sha256').update(`${c.missionId}:${c.taskId}:${c.task.updatedAt}:${c.task.attempt}`).digest('hex');}
 function resourcesFromTask(task:TaskNode):{readSet:string[];writeSet:string[]}{const value=task.inputs.resources;if(!value||typeof value!=='object')return{readSet:[],writeSet:[]};const r=value as Record<string,unknown>;return{readSet:strings(r.readSet),writeSet:strings(r.writeSet)};}
 function strings(v:unknown):string[]{return Array.isArray(v)?v.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim()).sort():[];}
