@@ -9,6 +9,13 @@ export type ApprovalAuditEventType =
   | 'approval.cancelled'
   | 'approval.consumed';
 
+export interface ApprovalAuditReconciliationResult {
+  readonly approvalId: string;
+  readonly checked: number;
+  readonly present: number;
+  readonly repaired: string[];
+}
+
 export interface ApprovalAuditRecorderOptions {
   readonly eventLog: DistributedEventLog;
   readonly maxReasonLength?: number;
@@ -32,6 +39,30 @@ export class ApprovalAuditRecorder {
     });
   }
 
+  reconcile(approval: ApprovalRecord): ApprovalAuditReconciliationResult {
+    const expected = this.expectedLifecycle(approval);
+    const repaired: string[] = [];
+    let present = 0;
+
+    for (const item of expected) {
+      const existing = this.eventLog.get(item.eventId);
+      if (existing) {
+        this.assertEventMatches(item, existing);
+        present += 1;
+        continue;
+      }
+      this.append(item.eventType, item.approval, item.payload, new Date().toISOString());
+      repaired.push(item.eventId);
+    }
+
+    return {
+      approvalId: approval.approvalId,
+      checked: expected.length,
+      present,
+      repaired,
+    };
+  }
+
   recordTransition(previous: ApprovalRecord, next: ApprovalRecord): EamilosEvent {
     this.assertTransition(previous, next);
     const eventType = this.eventTypeFor(next.status);
@@ -42,7 +73,7 @@ export class ApprovalAuditRecorder {
     });
   }
 
-  private append(eventType: ApprovalAuditEventType, approval: ApprovalRecord, payload: Record<string, unknown>): EamilosEvent {
+  private append(eventType: ApprovalAuditEventType, approval: ApprovalRecord, payload: Record<string, unknown>, occurredAt?: string): EamilosEvent {
     return this.eventLog.append({
       eventId: 'approval:' + approval.approvalId + ':' + approval.revision + ':' + eventType,
       eventType,
@@ -50,6 +81,7 @@ export class ApprovalAuditRecorder {
       taskId: approval.taskId,
       executionId: approval.executionId,
       requestId: approval.requestId,
+      ...(occurredAt ? { occurredAt } : {}),
       payload: {
         approvalId: approval.approvalId,
         policyId: approval.policyId,
@@ -59,6 +91,89 @@ export class ApprovalAuditRecorder {
         ...payload,
       },
     });
+  }
+
+  private expectedLifecycle(approval: ApprovalRecord): Array<{
+    eventId: string;
+    eventType: ApprovalAuditEventType;
+    approval: ApprovalRecord;
+    payload: Record<string, unknown>;
+  }> {
+    if (approval.revision < 1 || approval.revision > 3) {
+      throw new Error(`APPROVAL_AUDIT_UNSUPPORTED_REVISION:${approval.revision}`);
+    }
+
+    const requested = { ...approval, status: 'pending' as const, revision: 1 };
+    const events: Array<{
+      eventId: string;
+      eventType: ApprovalAuditEventType;
+      approval: ApprovalRecord;
+      payload: Record<string, unknown>;
+    }> = [{
+      eventId: `approval:${approval.approvalId}:1:approval.requested`,
+      eventType: 'approval.requested',
+      approval: requested,
+      payload: {
+        requestedBy: approval.requestedBy,
+        reason: this.sanitize(approval.reason),
+        evidence: this.evidenceSummary(approval),
+      },
+    }];
+
+    if (approval.revision >= 2) {
+      const decisionStatus = approval.status === 'consumed' ? 'approved' : approval.status;
+      const decided = { ...approval, status: decisionStatus as ApprovalRecord['status'], revision: 2 };
+      const decisionEventType = this.eventTypeFor(decisionStatus);
+      events.push({
+        eventId: `approval:${approval.approvalId}:2:${decisionEventType}`,
+        eventType: decisionEventType,
+        approval: decided,
+        payload: {
+          decisionBy: decided.decisionBy,
+          decisionReason: decided.decisionReason ? this.sanitize(decided.decisionReason) : undefined,
+        },
+      });
+    }
+
+    if (approval.status === 'consumed') {
+      events.push({
+        eventId: `approval:${approval.approvalId}:3:approval.consumed`,
+        eventType: 'approval.consumed',
+        approval,
+        payload: { consumedAt: approval.consumedAt },
+      });
+    }
+
+    return events;
+  }
+
+  private assertEventMatches(
+    expected: { eventId: string; eventType: ApprovalAuditEventType; approval: ApprovalRecord; payload: Record<string, unknown> },
+    actual: EamilosEvent,
+  ): void {
+    if (
+      actual.eventId !== expected.eventId ||
+      actual.eventType !== expected.eventType ||
+      actual.missionId !== expected.approval.missionId ||
+      actual.taskId !== expected.approval.taskId ||
+      actual.executionId !== expected.approval.executionId ||
+      actual.requestId !== expected.approval.requestId
+    ) {
+      throw new Error(`APPROVAL_AUDIT_CORRUPTION:${expected.eventId}`);
+    }
+
+    for (const [key, value] of Object.entries({
+      approvalId: expected.approval.approvalId,
+      policyId: expected.approval.policyId,
+      scope: expected.approval.scope,
+      status: expected.approval.status,
+      revision: expected.approval.revision,
+      ...expected.payload,
+    })) {
+      if (JSON.stringify(actual.payload[key]) !== JSON.stringify(value)) {
+        throw new Error(`APPROVAL_AUDIT_CORRUPTION:${expected.eventId}:${key}`);
+      }
+    }
   }
 
   private assertTransition(previous: ApprovalRecord, next: ApprovalRecord): void {

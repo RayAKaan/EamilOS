@@ -6,6 +6,20 @@ const decision=(id:string):ScheduleDecision=>({decisionId:id,idempotencyKey:id,s
 function fake(){const calls:string[]=[];const scheduler={renewLeases:()=>[decision('r-lease')],reconcile:()=>[decision('r')],cycle:()=>[decision('s1'),decision('s2')],dispatch:async(id:string)=>{calls.push(id);return decision(id)}} as any;return{scheduler,calls};}
 describe('SchedulerControlLoop',()=>{
  it('reconciles, schedules and dispatches in one tick',async()=>{const f=fake();const report=await new SchedulerControlLoop({scheduler:f.scheduler}).tick();expect(report.renewed).toHaveLength(1);expect(report.rescheduled).toHaveLength(1);expect(report.scheduled).toHaveLength(2);expect(report.dispatched.map(d=>d.decisionId)).toEqual(['s1','s2']);expect(f.calls).toEqual(['s1','s2']);});
+ it('reconciles approval audit gaps before scheduler work',async()=>{
+  const f=fake();
+  let reconciled=0;
+  const approvalAuditReconciliation={reconcileAll:()=>{
+    reconciled+=1;
+    return {scanned:1,repaired:[{approvalId:'approval-1',checked:2,present:1,repaired:['approval:event']}]};
+  }};
+  const report=await new SchedulerControlLoop({
+    scheduler:f.scheduler,
+    approvalAuditReconciliation:approvalAuditReconciliation as any,
+  }).tick();
+  expect(reconciled).toBe(1);
+  expect(report.reconciledApprovals).toEqual(['approval:event']);
+});
  it('expires due approvals before scheduler reconciliation',async()=>{
   const f=fake();
   let called=0;
