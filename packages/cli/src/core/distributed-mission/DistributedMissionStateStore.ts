@@ -16,7 +16,9 @@ export interface DistributedMissionPersistenceSnapshot {
   events: DistributedMissionEvent[];
 }
 
-const SCHEMA_VERSION = 1;\n\nexport interface DistributedMissionStateStoreOptions {
+const SCHEMA_VERSION = 1;
+
+export interface DistributedMissionStateStoreOptions {
   filename: string;
   busyTimeoutMs?: number;
 }
