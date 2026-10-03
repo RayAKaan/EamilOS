@@ -32,7 +32,7 @@ export interface GitIntegrationPlan {
 }
 
 export interface GitOperations {
-  inspectCommit(commit: string): Promise<{ branch: string; files: string[]; parent?: string }>;
+  inspectCommit(commit: string): Promise<{ commit: string; branch: string; files: string[]; parent?: string }>;
   merge(baseRef: string, commit: string): Promise<{ commit: string }>;
   abortMerge(): Promise<void>;
   removeWorktree(path: string): Promise<void>;
