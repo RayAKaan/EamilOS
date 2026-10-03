@@ -16,3 +16,5 @@ export * from './EamilosA2ASqliteTaskStore.js';
 export * from './EamilosResourceLeaseManager.js';
 
 export * from './EamilosCheckpointStore.js';
+
+export * from './EamilosDistributedEventLog.js';
