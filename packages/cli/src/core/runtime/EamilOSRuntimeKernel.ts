@@ -15,6 +15,7 @@ import { CompositionRuntime } from './CompositionRuntime.js';
 import { PluginRuntime } from './PluginRuntime.js';
 import { installExecutionCapabilities, type ExecutionCapabilities } from './ExecutionCapabilities.js';
 import { capabilityKey } from './CapabilityRegistry.js';
+import { DistributedMissionAuthority } from '../distributed-mission/DistributedMissionAuthority.js';
 import type { RuntimeInspector } from './RuntimeInspector.js';
 
 export const SCHEDULER_RUNTIME = capabilityKey<SchedulerRuntime>('runtime.scheduler', 'Mission-independent scheduled background work');
@@ -27,6 +28,7 @@ export const MISSION_REPLAY = capabilityKey<MissionReplay>('runtime.mission-repl
 export const MISSION_RECOVERY = capabilityKey<MissionRecovery>('runtime.mission-recovery', 'Mission integrity and recovery');
 export const HARNESS_REGISTRY = capabilityKey<HarnessRegistry>('runtime.harnesses', 'Installed harness registry');
 export const DIFFERENTIATION_RUNTIME = capabilityKey<PhaseFDifferentiationRuntime>('runtime.differentiation', 'EamilOS mission differentiation services');
+export const DISTRIBUTED_MISSION_AUTHORITY = capabilityKey<DistributedMissionAuthority>('runtime.distributed-mission-authority', 'Durable distributed mission authority');
 export const MISSION_CONTROL = capabilityKey<MissionControl>('runtime.mission-control', 'Mission control plane');
 export const SDK_RUNTIME = capabilityKey<EamilOSSDK>('runtime.sdk', 'Programmatic EamilOS SDK');
 export const COMPOSITION_RUNTIME = capabilityKey<CompositionRuntime>('runtime.composition', 'Profiles, bundles, plugins and runtime inspection');
@@ -34,6 +36,8 @@ export const COMPOSITION_RUNTIME = capabilityKey<CompositionRuntime>('runtime.co
 export interface EamilOSRuntimeOptions {
   readonly missionControl?: MissionControl;
   readonly missionEventRoot?: string;
+  readonly distributedMissionRoot?: string;
+  readonly distributedMissionFilename?: string;
   readonly autoRegisterCliHarnesses?: boolean;
 }
 
@@ -45,6 +49,7 @@ export class EamilOSRuntimeKernel {
   readonly missionEvents: MissionEventStore;
   readonly missionReplay: MissionReplay;
   readonly missionRecovery: MissionRecovery;
+  readonly distributedMissionAuthority: DistributedMissionAuthority;
   readonly scheduler: SchedulerRuntime;
   readonly skills: SkillRuntime;
   readonly web: WebRuntime;
@@ -65,6 +70,10 @@ export class EamilOSRuntimeKernel {
     this.missionEvents = new MissionEventStore({ root: options.missionEventRoot });
     this.missionReplay = new MissionReplay(this.missionEvents);
     this.missionRecovery = new MissionRecovery(this.missionEvents);
+    this.distributedMissionAuthority = new DistributedMissionAuthority({
+      root: options.distributedMissionRoot,
+      filename: options.distributedMissionFilename,
+    });
     this.scheduler = new SchedulerRuntime();
     this.skills = new SkillRuntime();
     this.web = new WebRuntime();
@@ -101,6 +110,7 @@ export class EamilOSRuntimeKernel {
       [MISSION_EVENTS, this.missionEvents],
       [MISSION_REPLAY, this.missionReplay],
       [MISSION_RECOVERY, this.missionRecovery],
+      [DISTRIBUTED_MISSION_AUTHORITY, this.distributedMissionAuthority],
       [HARNESS_REGISTRY, this.harnesses],
       [DIFFERENTIATION_RUNTIME, this.differentiation],
       [MISSION_CONTROL, this.missionControl],
@@ -127,6 +137,7 @@ export class EamilOSRuntimeKernel {
     this.disposed = true;
     this.scheduler.dispose();
     this.execution.terminal.stopAll();
+    this.distributedMissionAuthority.close();
     await this.execution.mcp.disconnect();
     await this.plugins.dispose();
   }

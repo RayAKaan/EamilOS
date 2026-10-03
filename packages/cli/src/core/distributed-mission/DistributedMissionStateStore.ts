@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import type { TaskNode } from '../mission/types.js';
 import type { DistributedAssignment, DistributedMissionEvent } from './types.js';
 
@@ -35,6 +37,7 @@ export class SqliteDistributedMissionStateStore {
   ) => DistributedMissionEvent;
 
   constructor(options: DistributedMissionStateStoreOptions) {
+    if (options.filename !== ':memory:') mkdirSync(dirname(options.filename), { recursive: true });
     this.db = new Database(options.filename);
     this.db.pragma(`busy_timeout = ${Math.max(0, Math.floor(options.busyTimeoutMs ?? 5000))}`);
     this.db.pragma('foreign_keys = ON');
@@ -136,6 +139,20 @@ export class SqliteDistributedMissionStateStore {
     const events = this.listEvents(missionId);
     this.verifyEvents(missionId, events);
     return { valid: true, count: events.length, lastHash: events.at(-1)?.hash };
+  }
+
+  has(missionId: string): boolean {
+    const row = this.db.prepare(
+      'SELECT 1 AS present FROM eamilos_distributed_mission_events WHERE mission_id = ? LIMIT 1',
+    ).get(missionId) as { present?: number } | undefined;
+    return row?.present === 1;
+  }
+
+  listMissionIds(): string[] {
+    const rows = this.db.prepare(
+      'SELECT DISTINCT mission_id FROM eamilos_distributed_mission_events ORDER BY mission_id ASC',
+    ).all() as Array<{ mission_id: string }>;
+    return rows.map((row) => row.mission_id);
   }
 
   listEvents(missionId: string): DistributedMissionEvent[] {
