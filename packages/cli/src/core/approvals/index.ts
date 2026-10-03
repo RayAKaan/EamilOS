@@ -4,3 +4,6 @@ export * from './ApprovalStore.js';
 export * from './PolicyEngine.js';
 
 export * from './ApprovalGate.js';
+
+export * from './ApprovalController.js';
+export * from './ApprovalProjection.js';
