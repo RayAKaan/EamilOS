@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import type { TaskGraph } from '../mission/TaskGraph.js';
 import type { DistributedMissionLedger } from './DistributedMissionLedger.js';
 import type { DistributedNodeView, DistributedTaskResult } from './types.js';
@@ -36,23 +35,29 @@ export class DistributedMissionCoordinator {
 
   claim(assignmentId: string, leaseId: string, leaseExpiresAt: string): void {
     const assignment = this.ledger.getAssignment(assignmentId);
-    if (!assignment) throw new Error(`Assignment not found: ${assignmentId}`);
-    if (assignment.state !== 'OFFERED') throw new Error(`Assignment is not claimable: ${assignment.state}`);
-    this.ledger.updateAssignment(assignmentId, 'LEASED', { leaseId, leaseExpiresAt });
+    if (!assignment) throw new Error('Assignment not found: ' + assignmentId);
+    if (assignment.state !== 'OFFERED') throw new Error('Assignment is not claimable: ' + assignment.state);
+
     const task = this.scheduler.graph.get(assignment.taskId);
     if (task) {
       task.owner = assignment.nodeId;
       task.leaseId = leaseId;
       task.leaseExpiresAt = leaseExpiresAt;
-      if (task.state === 'READY' || task.state === 'RECOVERABLE') this.scheduler.graph.transition(task.id, 'CLAIMED');
+      if (task.state === 'READY' || task.state === 'RECOVERABLE') {
+        this.scheduler.graph.transition(task.id, 'CLAIMED');
+      }
     }
+
+    this.ledger.updateAssignment(assignmentId, 'LEASED', { leaseId, leaseExpiresAt });
   }
 
   start(assignmentId: string): void {
     const assignment = this.requireActive(assignmentId);
-    this.ledger.updateAssignment(assignmentId, 'RUNNING');
     const task = this.scheduler.graph.get(assignment.taskId);
-    if (task?.state === 'CLAIMED') this.scheduler.graph.transition(task.id, 'RUNNING');
+    if (task?.state === 'CLAIMED') {
+      this.scheduler.graph.transition(task.id, 'RUNNING');
+    }
+    this.ledger.updateAssignment(assignmentId, 'RUNNING');
     this.ledger.append('TASK_ASSIGNED', assignment.taskId, assignment.nodeId, {
       assignmentId,
       state: 'RUNNING',
@@ -68,20 +73,26 @@ export class DistributedMissionCoordinator {
   complete(result: DistributedTaskResult): void {
     const assignment = this.ledger.getTaskAssignment(result.taskId);
     if (!assignment || assignment.nodeId !== result.nodeId) {
-      throw new Error(`No active assignment for task ${result.taskId} on node ${result.nodeId}`);
+      throw new Error('No active assignment for task ' + result.taskId + ' on node ' + result.nodeId);
     }
+
+    const task = this.scheduler.graph.get(result.taskId);
+
     if (!result.success) {
-        this.ledger.updateAssignment(assignment.assignmentId, 'FAILED', { updatedAt: new Date().toISOString() });
-      const task = this.scheduler.graph.get(result.taskId);
-      if (task && ['RUNNING', 'CHECKPOINTED', 'VALIDATING'].includes(task.state)) this.scheduler.graph.transition(task.id, 'RECOVERABLE');
+      if (task && ['RUNNING', 'CHECKPOINTED', 'VALIDATING'].includes(task.state)) {
+        this.scheduler.graph.transition(task.id, 'RECOVERABLE');
+      }
+      this.ledger.updateAssignment(assignment.assignmentId, 'FAILED', { updatedAt: new Date().toISOString() });
       this.ledger.append('TASK_FAILED', result.taskId, result.nodeId, { error: result.error });
       return;
+    }
+
+    if (task && ['RUNNING', 'CHECKPOINTED'].includes(task.state)) {
+      this.scheduler.graph.transition(task.id, 'VALIDATING');
     }
     this.ledger.updateAssignment(assignment.assignmentId, 'COMPLETED', {
       updatedAt: new Date().toISOString(),
     });
-    const task = this.scheduler.graph.get(result.taskId);
-    if (task && ['RUNNING', 'CHECKPOINTED'].includes(task.state)) this.scheduler.graph.transition(task.id, 'VALIDATING');
     this.ledger.append('TASK_COMPLETED', result.taskId, result.nodeId, {
       artifacts: result.artifacts ?? [],
       commit: result.commit,
@@ -90,18 +101,23 @@ export class DistributedMissionCoordinator {
 
   nodeLost(nodeId: string): string[] {
     const affected = this.ledger.listAssignments().filter(
-      (assignment) => assignment.nodeId === nodeId &&
+      (assignment) =>
+        assignment.nodeId === nodeId &&
         !['COMPLETED', 'FAILED', 'REJECTED'].includes(assignment.state),
     );
+
     for (const assignment of affected) {
-      this.ledger.updateAssignment(assignment.assignmentId, 'REQUEUED');
       const task = this.scheduler.graph.get(assignment.taskId);
       if (task) {
         task.owner = undefined;
         task.leaseId = undefined;
         task.leaseExpiresAt = undefined;
-        if (['CLAIMED', 'RUNNING', 'CHECKPOINTED'].includes(task.state)) this.scheduler.graph.transition(task.id, 'RECOVERABLE');
+        if (['CLAIMED', 'RUNNING', 'CHECKPOINTED'].includes(task.state)) {
+          this.scheduler.graph.transition(task.id, 'RECOVERABLE');
+        }
       }
+
+      this.ledger.updateAssignment(assignment.assignmentId, 'REQUEUED');
       this.ledger.append('NODE_LOST', assignment.taskId, nodeId, {
         assignmentId: assignment.assignmentId,
       });
@@ -119,6 +135,7 @@ export class DistributedMissionCoordinator {
         Date.parse(assignment.leaseExpiresAt) <= now &&
         !['COMPLETED', 'FAILED', 'REJECTED', 'REQUEUED'].includes(assignment.state),
     );
+
     for (const assignment of expired) {
       this.ledger.updateAssignment(assignment.assignmentId, 'REQUEUED');
       this.ledger.append('LEASE_EXPIRED', assignment.taskId, assignment.nodeId, {
@@ -133,9 +150,9 @@ export class DistributedMissionCoordinator {
 
   private requireActive(assignmentId: string) {
     const assignment = this.ledger.getAssignment(assignmentId);
-    if (!assignment) throw new Error(`Assignment not found: ${assignmentId}`);
+    if (!assignment) throw new Error('Assignment not found: ' + assignmentId);
     if (!['LEASED', 'RUNNING', 'CHECKPOINTED'].includes(assignment.state)) {
-      throw new Error(`Assignment is not active: ${assignment.state}`);
+      throw new Error('Assignment is not active: ' + assignment.state);
     }
     return assignment;
   }
