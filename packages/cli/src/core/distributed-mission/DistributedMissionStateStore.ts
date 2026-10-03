@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import type { TaskNode } from '../mission/types.js';
 import type { DistributedAssignment, DistributedMissionEvent } from './types.js';
 
