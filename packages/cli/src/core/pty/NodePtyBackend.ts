@@ -126,3 +126,7 @@ export class NodePtyBackend implements PtyBackend {
     return new NodePtyBackendSession(process, sessionId);
   }
 }
+
+export function createNodePtyBackend(): NodePtyBackend {
+  return new NodePtyBackend();
+}
