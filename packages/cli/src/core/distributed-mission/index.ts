@@ -7,5 +7,6 @@ export {
   SqliteDistributedMissionStateStore,
   DistributedMissionStateIntegrityError,
 } from './DistributedMissionStateStore.js';
+export { DistributedMissionAuthority } from './DistributedMissionAuthority.js';
 
 export { MissionEventReplicator } from './MissionEventReplicator.js';
