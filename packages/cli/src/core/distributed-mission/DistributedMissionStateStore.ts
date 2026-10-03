@@ -50,14 +50,18 @@ export class SqliteDistributedMissionStateStore {
         );
       }
 
+      const stateValue = normalizeState(state);
       const persistedEvent: DistributedMissionEvent = {
         ...event,
         previousHash: expectedPreviousHash ?? undefined,
+        data: {
+          ...event.data,
+          state: stateValue,
+        },
       };
-      const hash = hashEvent(persistedEvent);
-      persistedEvent.hash = hash;
+      persistedEvent.hash = hashEvent(persistedEvent);
 
-      const stateJson = JSON.stringify(normalizeState(state));
+      const stateJson = JSON.stringify(stateValue);
       const stateHash = createHash('sha256').update(stateJson).digest('hex');
 
       this.db.prepare(
@@ -73,10 +77,7 @@ export class SqliteDistributedMissionStateStore {
         persistedEvent.nodeId ?? null,
         persistedEvent.graphVersion,
         persistedEvent.timestamp,
-        JSON.stringify({
-          ...persistedEvent.data,
-          state: normalizeState(state),
-        }),
+        JSON.stringify(persistedEvent.data),
         persistedEvent.previousHash ?? null,
         persistedEvent.hash,
       );
