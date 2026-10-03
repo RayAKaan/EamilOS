@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { InMemoryPtySessionStore, SqlitePtySessionStore } from './PtySessionStore.js';
 import {
   EamilosPtyManager,
   InMemoryPtyBackend,
@@ -123,3 +127,59 @@ describe('EamilosPtyManager', () => {
     expect(manager.list()).toEqual([]);
   });
 });
+
+
+describe('EamilosPtyManager durable recovery', () => {
+  it('persists active sessions as orphaned across manager restart', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'eamilos-pty-'));
+    const filename = join(dir, 'pty.db');
+
+    try {
+      const storeA = new SqlitePtySessionStore({ filename });
+      const backendA = new InMemoryPtyBackend();
+      const managerA = new EamilosPtyManager(backendA, storeA);
+      await managerA.create(request({ sessionId: 'restart-1' }));
+      managerA.close();
+
+      const storeB = new SqlitePtySessionStore({ filename });
+      const managerB = new EamilosPtyManager(new InMemoryPtyBackend(), storeB);
+
+      expect(managerB.get('restart-1')?.state).toBe('orphaned');
+      managerB.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('recovers an orphaned session when the backend can still attach', async () => {
+    const store = new InMemoryPtySessionStore();
+    const backend = new InMemoryPtyBackend();
+    const managerA = new EamilosPtyManager(backend, store);
+    await managerA.create(request({ sessionId: 'recover-1' }));
+
+    // Simulate a manager restart while the backend process remains available.
+    managerA.close();
+
+    const managerB = new EamilosPtyManager(backend, store);
+    const recovered = await managerB.recover('recover-1');
+
+    expect(recovered.state).toBe('attached');
+    expect(recovered.pid).toBe(0);
+    managerB.close();
+  });
+
+  it('marks an orphaned session lost when the backend cannot attach', async () => {
+    const store = new InMemoryPtySessionStoreForTest();
+    const backendA = new InMemoryPtyBackend();
+    const managerA = new EamilosPtyManager(backendA, store);
+    await managerA.create(request({ sessionId: 'lost-1' }));
+    managerA.close();
+
+    const managerB = new EamilosPtyManager(new InMemoryPtyBackend(), store);
+    await expect(managerB.recover('lost-1')).rejects.toThrow('PTY backend session not found');
+    expect(managerB.get('lost-1')?.state).toBe('lost');
+    managerB.close();
+  });
+});
+
+class InMemoryPtySessionStoreForTest extends (await import('./PtySessionStore.js')).InMemoryPtySessionStore {}

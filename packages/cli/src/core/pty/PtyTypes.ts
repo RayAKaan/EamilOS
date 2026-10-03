@@ -4,6 +4,8 @@ export type PtySessionState =
   | 'running'
   | 'idle'
   | 'attached'
+  | 'orphaned'
+  | 'lost'
   | 'completed'
   | 'failed'
   | 'terminated';
@@ -91,6 +93,8 @@ export interface PtyManagerEvents {
   failed: PtyExitEvent;
   terminated: PtyExitEvent;
   detached: PtySession;
+  orphaned: PtySession;
+  lost: PtySession;
 }
 
 export interface PtyManager {
@@ -100,6 +104,7 @@ export interface PtyManager {
   resize(sessionId: string, dimensions: PtyDimensions): void;
   terminate(sessionId: string, signal?: string): void;
   detach(sessionId: string): void;
+  recover(sessionId: string): Promise<PtySession>;
   get(sessionId: string): PtySession | undefined;
   list(): PtySession[];
   on<K extends keyof PtyManagerEvents>(

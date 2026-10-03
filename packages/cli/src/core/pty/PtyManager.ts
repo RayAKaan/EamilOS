@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { InMemoryPtySessionStore, isActivePtyState, type PtySessionStore } from './PtySessionStore.js';
 import {
   assertPtyDimensions,
   assertPtySessionRequest,
@@ -15,7 +16,7 @@ import {
 
 interface ManagedSession {
   session: PtySession;
-  backend: PtyBackendSession;
+  backend?: PtyBackendSession;
   disposers: Array<() => void>;
   terminationRequested: boolean;
 }
@@ -43,7 +44,25 @@ export class EamilosPtyManager implements PtyManagerContract {
   private readonly events = new EventEmitter();
   private closed = false;
 
-  constructor(private readonly backend: PtyBackend) {}
+  constructor(
+    private readonly backend: PtyBackend,
+    private readonly store: PtySessionStore = new InMemoryPtySessionStore(),
+  ) {
+    for (const persisted of this.store.list()) {
+      const session = isActivePtyState(persisted.state)
+        ? withState(persisted, 'orphaned')
+        : persisted;
+      this.sessions.set(session.sessionId, {
+        session,
+        disposers: [],
+        terminationRequested: false,
+      });
+      if (session.state !== persisted.state) {
+        this.store.save(session);
+        this.emit('orphaned', session);
+      }
+    }
+  }
 
   async create(request: PtySessionRequest): Promise<PtySession> {
     this.assertOpen();
@@ -78,6 +97,7 @@ export class EamilosPtyManager implements PtyManagerContract {
       terminationRequested: false,
     };
     this.sessions.set(request.sessionId, managed);
+    this.store.save(managed.session);
     managed.session = withState(managed.session, 'starting');
     this.emit('created', managed.session);
 
@@ -86,8 +106,9 @@ export class EamilosPtyManager implements PtyManagerContract {
     managed.session = withState(
       managed.session,
       'running',
-      { pid: managed.backend.pid, startedAt: now() },
+      { pid: managed.backend!.pid, startedAt: now() },
     );
+    this.store.save(managed.session);
     this.emit('started', managed.session);
 
     return managed.session;
@@ -106,6 +127,7 @@ export class EamilosPtyManager implements PtyManagerContract {
     managed.session = withState(managed.session, 'attached', {
       pid: managed.backend.pid,
     });
+    this.store.save(managed.session);
     this.bindBackend(sessionId, managed);
     this.emit('attached', managed.session);
     return managed.session;
@@ -114,12 +136,14 @@ export class EamilosPtyManager implements PtyManagerContract {
   write(sessionId: string, data: string): void {
     const managed = this.requireSession(sessionId);
     if (typeof data !== 'string') throw new Error('PTY input must be a string');
+    if (!managed.backend) throw new Error(`PTY session is not attached: ${sessionId}`);
     managed.backend.write(data);
   }
 
   resize(sessionId: string, dimensions: PtyDimensions): void {
     const managed = this.requireSession(sessionId);
     assertPtyDimensions(dimensions);
+    if (!managed.backend) throw new Error(`PTY session is not attached: ${sessionId}`);
     managed.backend.resize(dimensions);
     managed.session = withState(managed.session, managed.session.state, {
       dimensions: Object.freeze({ ...dimensions }),
@@ -130,6 +154,7 @@ export class EamilosPtyManager implements PtyManagerContract {
   terminate(sessionId: string, signal?: string): void {
     const managed = this.requireSession(sessionId);
     managed.terminationRequested = true;
+    if (!managed.backend) throw new Error(`PTY session is not attached: ${sessionId}`);
     managed.backend.terminate(signal);
   }
 
@@ -137,7 +162,35 @@ export class EamilosPtyManager implements PtyManagerContract {
     const managed = this.requireSession(sessionId);
     this.disposeBindings(managed);
     managed.session = withState(managed.session, 'idle');
+    this.store.save(managed.session);
     this.emit('detached', managed.session);
+  }
+
+  async recover(sessionId: string): Promise<PtySession> {
+    this.assertOpen();
+    const managed = this.sessions.get(sessionId);
+    if (!managed) throw new Error(`PTY session not found: ${sessionId}`);
+    if (managed.session.state !== 'orphaned') {
+      throw new Error(`PTY session is not orphaned: ${sessionId}`);
+    }
+
+    try {
+      managed.backend = await this.backend.attach(sessionId);
+      managed.session = withState(managed.session, 'attached', {
+        pid: managed.backend.pid,
+      });
+      this.bindBackend(sessionId, managed);
+      this.store.save(managed.session);
+      this.emit('attached', managed.session);
+      return managed.session;
+    } catch (error) {
+      managed.session = withState(managed.session, 'lost', {
+        completedAt: now(),
+      });
+      this.store.save(managed.session);
+      this.emit('lost', managed.session);
+      throw error;
+    }
   }
 
   get(sessionId: string): PtySession | undefined {
@@ -161,10 +214,15 @@ export class EamilosPtyManager implements PtyManagerContract {
     this.closed = true;
 
     for (const managed of this.sessions.values()) {
+      if (managed.backend && isActivePtyState(managed.session.state)) {
+        managed.session = withState(managed.session, 'orphaned');
+        this.store.save(managed.session);
+      }
       this.disposeBindings(managed);
-      managed.backend.dispose();
+      managed.backend?.dispose();
     }
     this.sessions.clear();
+    this.store.close();
     this.events.removeAllListeners();
   }
 
@@ -172,7 +230,7 @@ export class EamilosPtyManager implements PtyManagerContract {
     this.disposeBindings(managed);
 
     managed.disposers.push(
-      managed.backend.onData((stream, data) => {
+      managed.backend!.onData((stream, data) => {
         const session = this.sessions.get(sessionId)?.session;
         if (!session) return;
         this.emit('data', {
@@ -186,7 +244,7 @@ export class EamilosPtyManager implements PtyManagerContract {
     );
 
     managed.disposers.push(
-      managed.backend.onExit((exitCode, signal) => {
+      managed.backend!.onExit((exitCode, signal) => {
         const current = this.sessions.get(sessionId);
         if (!current) return;
 
@@ -201,6 +259,8 @@ export class EamilosPtyManager implements PtyManagerContract {
           exitCode,
           signal,
         });
+
+        this.store.save(current.session);
 
         this.emit(
           terminalState === 'completed'
