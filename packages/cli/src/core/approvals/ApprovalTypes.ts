@@ -130,6 +130,15 @@ export function assertApprovalTransition(
     return;
   }
 
+  if (transition.status === 'expired') {
+    if (current.status !== 'pending' && current.status !== 'approved') {
+      throw new Error(
+        `Approval ${current.approvalId} cannot expire from ${current.status}`,
+      );
+    }
+    return;
+  }
+
   if (current.status !== 'pending') {
     throw new Error(
       `Approval ${current.approvalId} cannot transition from ${current.status}`,
