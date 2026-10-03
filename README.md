@@ -1,528 +1,521 @@
 # EamilOS
 
-## One coding harness for every AI coding agent.
+> **One mission. Many agents. One control plane.**
 
-**Claude Code. Codex. OpenCode. Gemini CLI. Aider. Goose. Custom agents. Different models. Different machines. One mission.**
+EamilOS is a **mission-oriented AI software-engineering orchestration platform**.
 
-EamilOS is a **mission-oriented orchestration layer for AI software engineering**. It sits above coding agents and execution resources so a developer can coordinate software work as one mission instead of manually managing disconnected agent sessions.
+Instead of running every coding agent as an isolated session, EamilOS gives your work a durable mission, task graph, execution state, agent fleet, approvals, recovery, validation, and Git delivery layer.
 
-> **Stop switching between coding agents. Start running software missions.**
+**Agents do the work. EamilOS coordinates the work.**
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/Node.js-20%2B-green?logo=node.js)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
 ---
 
-## The product
+## What EamilOS is
 
-EamilOS does not try to replace the coding tools you already use.
+EamilOS sits **above AI coding agents and execution environments**.
 
-It gives them a common mission layer.
+You define the outcome. EamilOS turns that outcome into coordinated work.
 
-```mermaid
-flowchart LR
-    DEV["Developer"] --> M["EamilOS Mission"]
-
-    M --> CONTROL["Mission Control"]
-    CONTROL --> GRAPH["Cognitive Graph"]
-    CONTROL --> LOOP["Execution Loop"]
-    CONTROL --> FABRIC["Execution Fabric"]
-
-    FABRIC --> CLAUDE["Claude Code"]
-    FABRIC --> CODEX["Codex"]
-    FABRIC --> OPEN["OpenCode"]
-    FABRIC --> GEMINI["Gemini CLI"]
-    FABRIC --> AIDER["Aider"]
-    FABRIC --> GOOSE["Goose"]
-    FABRIC --> CUSTOM["Custom Agents / Harnesses"]
-
-    CLAUDE --> V["Validation & Evidence"]
-    CODEX --> V
-    OPEN --> V
-    GEMINI --> V
-    AIDER --> V
-    GOOSE --> V
-    CUSTOM --> V
-
-    V --> RESULT["Mission Result"]
+```text
+Developer
+   │
+   ▼
+Mission
+   │
+   ├── Intent
+   ├── Task Graph
+   ├── Decisions
+   ├── Approvals
+   │
+   ▼
+Execution Fabric
+   │
+   ├── Claude Code
+   ├── Codex CLI
+   ├── OpenCode
+   ├── Gemini CLI
+   ├── Aider
+   ├── Goose
+   ├── DeepSeek Harness
+   └── Universal Agent Catalog
+   │
+   ▼
+Validation + Evidence
+   │
+   ▼
+Git Workspaces → Commits → Integration
+   │
+   ▼
+Mission Outcome
 ```
 
-The core distinction is:
-
-**Agents execute. EamilOS coordinates the mission.**
+The abstraction is the **mission**, not the model, agent, terminal session, or machine.
 
 ---
 
-# Why EamilOS?
+## Why it exists
 
-AI coding agents are powerful, but developers increasingly end up operating several of them independently.
+AI coding tools are becoming extremely capable. The next problem is coordination.
 
-A project may involve:
+A real software project can require:
 
-- Claude Code for implementation
-- Codex for another task
-- OpenCode for a different execution path
-- Gemini CLI for another workflow
-- Aider for Git-heavy work
-- Goose for automation
-- custom agents for specialized tasks
-- local models for private workloads
-- cloud providers when remote inference is useful
-- multiple machines or worker nodes
+- different agents for different tasks
+- different models and providers
+- multiple concurrent executions
+- local and remote workers
+- human approval for sensitive operations
+- recovery after worker or agent failure
+- persistent state across sessions
+- deterministic task ownership
+- isolated Git workspaces
+- validation before declaring work complete
+- an auditable history of what happened
 
-Each tool can have its own context, session, commands, permissions, state, and history.
+EamilOS is built around that problem.
 
-EamilOS changes the primary question from:
-
-> **Which agent should I use?**
-
-to:
-
-> **What do I want built?**
-
-The mission becomes the stable abstraction. Agents become execution capabilities.
+> **Stop switching between AI coding sessions. Start running software missions.**
 
 ---
 
-# Mission first
+# Core capabilities
 
-A conventional coding-agent workflow is centered on a session.
+### Mission Control
 
-EamilOS is centered on a **software mission**.
+Persistent mission lifecycle with:
 
-```mermaid
-flowchart TB
-    INTENT["Developer Intent"] --> MISSION["Mission"]
-    MISSION --> PLAN["Plan"]
-    PLAN --> TASKS["Tasks"]
-    TASKS --> EXEC["Execution"]
-    EXEC --> VALIDATE["Validation"]
-    VALIDATE --> DELIVERY["Delivery"]
+- mission creation and inspection
+- task decomposition
+- task state
+- execution state
+- mission history
+- mission recovery
+- deterministic coordination
+- durable state
 
-    EXEC --> AGENTS["Agents & Harnesses"]
-    AGENTS --> CLAUDE["Claude Code"]
-    AGENTS --> CODEX["Codex"]
-    AGENTS --> OPEN["OpenCode"]
-    AGENTS --> GEMINI["Gemini CLI"]
-    AGENTS --> AIDER["Aider"]
-    AGENTS --> GOOSE["Goose"]
-    AGENTS --> CUSTOM["Custom"]
+### Cognitive Execution Graph
 
-    DELIVERY --> GIT["Git / GitHub"]
-    DELIVERY --> EVIDENCE["Evidence"]
+A graph connecting:
+
+```text
+Mission
+  └── Task
+       ├── Decision
+       ├── Execution
+       │    ├── Agent
+       │    └── Worker
+       ├── Artifact
+       ├── Validation
+       └── Git Change
 ```
 
-A mission can therefore contain multiple tasks, executions, agents, decisions, artifacts, validations, and delivery events without requiring the developer to manually stitch those sessions together.
+The graph is used to understand dependencies, ownership, execution, and why a mission reached its current state.
 
----
+### Multi-agent execution
 
-# Bring the agents you already use
+EamilOS can coordinate heterogeneous coding agents instead of forcing every task through one provider.
 
-The current repository contains agent implementations for:
+Agents are selected and scheduled around capabilities, availability, execution state, and mission requirements.
 
-| Agent / harness | Current repository status |
-|---|---|
-| **Claude Code** | Agent implementation present |
-| **Codex CLI** | Agent implementation present |
-| **OpenCode** | Agent implementation present |
-| **Gemini CLI** | Agent implementation present |
-| **Aider** | Agent implementation present |
-| **Goose** | Agent implementation present |
-| **Custom agents** | Base-agent abstraction available |
+### Distributed execution
 
-These integrations live under the CLI's multi-agent layer.
+The runtime includes a distributed mission layer with:
 
-An adapter being present does **not** mean the corresponding external tool is automatically installed, authenticated, or equally available on every machine. EamilOS works with the execution resources actually available in the environment.
+- durable mission authority
+- SQLite-backed state
+- event history
+- sequence numbers
+- integrity verification
+- assignment versions
+- fencing tokens
+- leases
+- worker/node state
+- stale-worker protection
+- task requeueing
+- checkpoint/recovery primitives
+- event replication
+- ACKs
+- replay requests
+- gap detection
+- snapshot recovery
 
-That distinction is intentional.
+### Git-aware execution
 
----
+Every distributed task can have a deterministic workspace identity:
 
-# DeepSeek Harness integration
-
-EamilOS now treats **DeepSeek Harness as a harness**, not merely as another model provider.
-
-The integration adds:
-
-- **DeepSeek Harness adapter** — EamilOS can discover and invoke `dsh --profile headless --json`.
-- **Harness-of-harnesses routing** — DeepSeek Harness joins Claude Code, Codex, OpenCode, Gemini CLI, Aider, Goose, and custom execution engines as a first-class execution resource.
-- **Provider-neutral stream boundary** — model/harness output is normalized before it reaches mission state.
-- **Event-sourced runtime sessions** — mission lifecycle facts are appended to JSONL and can be reconstructed instead of relying only on mutable snapshots.
-- **Scoped agent capabilities** — per-agent capability scopes prevent global runtime registrations from becoming accidental cross-agent state.
-- **Composable plugin runtime** — runtime services can be mounted, observed, and disposed independently.
-- **Tool execution pipeline** — pre-execution policy, monotonic guards, execution wrappers, post-processing, cancellation, and timeouts are explicit seams.
-- **Runtime invariants** — important lifecycle relationships can be checked and attributed to their owning subsystem.
-
-These ideas are inspired by the architecture of DeepSeek Harness, whose design makes the session log, agent loop, tools, model adapters, and other capabilities replaceable plugins rather than privileged hard-coded subsystems.
-
-The architectural difference remains important:
-
-> **DeepSeek Harness is one harness. EamilOS is the layer that coordinates multiple harnesses.**
-
-So EamilOS does not become a DeepSeek clone. It adopts the composability and durability practices that make DSH extensible while preserving mission-level orchestration as its primary abstraction.
-
----
-
-# Models and providers
-
-Agents and models are separate concepts in EamilOS.
-
-The current CLI includes provider detection/setup paths for:
-
-- Ollama
-- OpenAI
-- Anthropic
-
-This lets the execution environment combine different agent and provider configurations without making the model itself the mission abstraction.
-
-```mermaid
-flowchart LR
-    M["EamilOS Mission"]
-
-    M --> H["Agent / Harness"]
-    M --> P["Model Provider"]
-
-    H --> LOCAL["Local Runtime"]
-    H --> CLOUD["Cloud Runtime"]
-
-    P --> OLLAMA["Ollama"]
-    P --> OPENAI["OpenAI"]
-    P --> ANTHROPIC["Anthropic"]
-
-    LOCAL --> WORK["Execution"]
-    CLOUD --> WORK
-    OLLAMA --> WORK
-    OPENAI --> WORK
-    ANTHROPIC --> WORK
-
-    WORK --> STATE["Mission State"]
+```text
+eamilos/mission/<mission>/task/<task>/attempt-<n>
 ```
 
-The product boundary is therefore not a particular model.
+EamilOS can:
 
-**The product boundary is the mission.**
+- allocate isolated task workspaces
+- track task attempts
+- inspect commit evidence
+- detect overlapping file changes
+- build deterministic integration plans
+- integrate compatible changes
+- record Git integration events
+- retain conflict evidence
+- clean up completed workspaces safely
 
----
+### Approvals and human control
 
-# What a mission knows
+EamilOS treats human control as part of the runtime.
 
-EamilOS's mission architecture brings together:
+The approval system supports scoped approvals with exact binding across execution context, including mission/task/execution identity and relevant command/runtime information.
 
-| Layer | Purpose |
-|---|---|
-| **Objective** | What the developer wants accomplished |
-| **Tasks** | Work required to reach the objective |
-| **Execution** | What is currently running |
-| **Agents** | Which execution engines are performing work |
-| **Fleet** | Devices and worker resources |
-| **Graph** | Relationships between mission entities |
-| **Loop** | Observe → Interpret → Plan → Execute → Measure → Validate → Adapt |
-| **Decisions** | Actions and their provenance |
-| **Approvals** | Human-controlled actions |
-| **Artifacts** | Outputs produced during execution |
-| **Validation** | Evidence supporting completion |
-| **History** | Events and checkpoints |
-| **Git** | Changes and delivery state |
+The runtime also supports lifecycle control such as pause, resume, stop, retry, and reassignment.
 
-The result is a persistent representation of the software work rather than a transient conversation.
+### Validation and evidence
 
----
+A successful agent response is not automatically a successful mission.
 
-# Cognitive Execution Graph
+EamilOS keeps execution, validation, artifacts, and Git state separate so completion can be backed by evidence.
 
-The graph connects the things that matter to a mission.
+### Mission TUI
 
-Tasks connect to executions.
+A full-screen terminal interface for operating the mission runtime.
 
-Executions connect to agents and devices.
+The TUI is designed around the mission rather than around a single chat session.
 
-Executions produce artifacts.
+It provides surfaces for:
 
-Artifacts become commits.
-
-Commits can become pull requests.
-
-Decisions explain changes.
-
-Validation provides evidence.
-
-```mermaid
-flowchart LR
-    M["Mission"] --> T["Task"]
-    T --> E["Execution"]
-    E --> A["Agent"]
-    A --> D["Device"]
-
-    E --> ART["Artifact"]
-    ART --> C["Commit"]
-    C --> PR["Pull Request"]
-
-    T --> V["Validation"]
-    V --> PR
-
-    DEC["Decision"] --> T
-    DEC --> E
-    DEC --> A
-```
-
-The graph is more than a visualization. It gives the runtime a persistent model of **what exists, what depends on what, what happened, and how execution relates to the resulting software**.
-
----
-
-# Autonomous execution
-
-EamilOS's loop architecture is built around:
-
-**Observe → Interpret → Plan → Execute → Measure → Validate → Adapt**
-
-This is the layer that turns the system from a simple multi-agent launcher into a mission runtime.
-
-The loop can react to actual runtime state rather than assuming the original plan will always succeed.
-
-The project also contains decision, plan, and approval models so autonomous behavior can remain observable and controllable.
-
----
-
-# Recovery is part of the mission
-
-Real execution fails.
-
-Workers disappear. Agents crash. Devices disconnect. Providers become unavailable. Validation fails.
-
-EamilOS treats recovery as part of mission execution.
-
-```mermaid
-flowchart LR
-    TASK["Running Task"] --> FAILURE["Failure / Disconnect"]
-    FAILURE --> CHECKPOINT["Recover Checkpoint"]
-    CHECKPOINT --> CAP["Required Capabilities"]
-    CAP --> MATCH["Compatible Resource"]
-    MATCH --> RESUME["Resume / Retry"]
-    RESUME --> VALIDATE["Validate"]
-    VALIDATE --> CONTINUE["Mission Continues"]
-```
-
-The goal is not to claim that agents never fail.
-
-The goal is to make mission state **recoverable when execution fails**.
-
----
-
-# Decisions, approvals, and human control
-
-Autonomy does not remove human authority.
-
-EamilOS includes first-class concepts for:
-
+- mission state
+- tasks
+- live execution
+- agents
+- fleet/workers
+- graph
+- loop state
 - decisions
-- plans
-- decision providers
 - approvals
-- approval risk
-- approval scope
-- approval resolution
-- pause
-- resume
-- stop
-- retry
-- reassign
-- replan
+- artifacts
+- sessions
+- logs
+- Git/GitHub
+- chat and commands
 
-The architecture also includes bounded intelligence-provider concepts such as **Jev** and **Laya**, while keeping deterministic mission state, execution, and validation separate from model judgment.
+The TUI is a client of the runtime; it does not own mission state.
 
 ---
 
-# Validation and evidence
+# Agents
 
-Generated code is not automatically a completed mission.
+EamilOS has a **universal agent catalog** containing **35 agent/harness definitions**.
 
-EamilOS treats validation as part of the lifecycle.
+The catalog records capabilities, protocols, platforms, installation information, authentication methods, execution mode, and integration status.
 
-Depending on the mission, validation can include:
+## First-class agent adapters
 
-- tests
-- type checking
-- static checks
-- repository state
-- task completion
-- execution evidence
-- Git state
-- mission consistency
+These have dedicated EamilOS agent implementations:
 
-The important distinction is:
+| Agent | Provider | Role |
+|---|---|---|
+| **OpenCode** | OpenCode | Coding agent |
+| **Claude Code** | Anthropic | Coding agent |
+| **Codex CLI** | OpenAI | Coding agent |
+| **Gemini CLI** | Google | Coding agent |
+| **Aider** | Aider | Coding agent |
+| **Goose** | Block | Agentic coding/runtime |
+| **DeepSeek Harness** | DeepSeek | Harness / execution runtime |
 
-**work happened**
+## Universal agent catalog
 
-versus
+EamilOS currently knows about:
 
-**the mission has evidence that the required work is complete.**
+| Agent | Status |
+|---|---|
+| OpenCode | Production |
+| Claude Code | Production |
+| Codex CLI | Production |
+| Gemini CLI | Production |
+| Aider | Supported |
+| Goose | Supported |
+| DeepSeek Harness | Supported |
+| Qwen Code | Supported |
+| Kimi Code | Supported |
+| Mistral Vibe | Supported |
+| Cline CLI | Supported |
+| Kilo Code | Supported |
+| OpenHands | Experimental |
+| Pi | Supported |
+| Hermes Agent | Supported |
+| Deep Agents Code | Supported |
+| Crush | Supported |
+| Grok Build | Experimental |
+| Open Interpreter | Supported |
+| Trae Agent | Supported |
+| ForgeCode | Experimental |
+| Letta Code | Supported |
+| Continue CLI | Supported |
+| SWE-agent | Supported |
+| Plandex | Supported |
+| OpenSquilla | Experimental |
+| gptme | Supported |
+| Kode CLI | Experimental |
+| Codebuff | Supported |
+| Amazon Q Developer CLI | Supported |
+| GitHub Copilot CLI | Experimental |
+| Cursor CLI | Experimental |
+| Kiro CLI | Experimental |
+| Auggie | Experimental |
+| Amp | Supported |
+
+**Important:** catalog support does not mean the external tool is installed or authenticated on your machine. EamilOS discovers, validates, and works with the execution resources actually available in the environment.
 
 ---
 
-# Git-aware delivery
+# Intelligence layer
 
-Software work ultimately becomes repository state.
+Agents execute tasks. Intelligence providers can help reason about what should happen next.
 
-EamilOS connects mission work with Git-aware execution and delivery:
+EamilOS separates these concerns.
 
-**Objective → Tasks → Code Changes → Commits → Validation → Pull Request**
+The architecture includes bounded decision-provider concepts such as:
 
-The goal is to keep the final software artifact connected to the mission that produced it.
+- **Jev** — strategic/high-level decision reasoning
+- **Laya** — major-task planning and task breakdown
+
+The mission runtime remains authoritative. Model output proposes or informs actions; durable mission state records what actually happened.
 
 ---
 
-# The Mission TUI
+# The execution loop
 
-EamilOS includes a full-screen terminal UI designed around the mission rather than a single agent conversation.
+EamilOS is built around a continuous mission loop:
 
-Current TUI views include:
+```text
+Observe
+   ↓
+Interpret
+   ↓
+Plan
+   ↓
+Execute
+   ↓
+Measure
+   ↓
+Validate
+   ↓
+Adapt
+   ↺
+```
 
-- Mission
-- Live Execution
-- Tasks
-- Artifacts
-- Sessions
-- GitHub
-- Fleet
-- Graph
-- Loop
-- Decisions
-- Approvals
-- Chat
-- Logs
+This lets execution respond to actual mission state instead of treating the original prompt as a fixed script.
 
-The TUI also includes:
+---
 
+# Distributed mission architecture
+
+The distributed runtime is built around a durable control plane.
+
+```text
+                 Mission Authority
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+   Task Scheduler   Mission Ledger   Event Log
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+                  Worker / Fleet
+                        │
+             ┌──────────┼──────────┐
+             ▼          ▼          ▼
+           Agent      Agent      Agent
+             │          │          │
+             └──────────┼──────────┘
+                        ▼
+                  Git Workspace
+                        │
+                        ▼
+                 Validation/Evidence
+                        │
+                        ▼
+                    Integration
+```
+
+### Ownership and fencing
+
+Distributed tasks use:
+
+- assignment versions
+- fencing tokens
+- attempts
+- leases
+- ownership validation
+- stale-result rejection
+
+This prevents an old worker from completing a task after ownership has moved to a newer execution.
+
+### Event replication
+
+Mission events can be replicated through the authenticated fabric with:
+
+- contiguous sequence tracking
+- event-ID deduplication
+- out-of-order buffering
+- ACKs
+- bounded replay
+- gap detection
+- reconnect replay
+- snapshot fallback
+
+The goal is durable, recoverable mission state rather than best-effort message passing.
+
+---
+
+# Git delivery
+
+EamilOS connects execution to repository state.
+
+```text
+Mission
+  ↓
+Task
+  ↓
+Assignment
+  ↓
+Isolated Workspace
+  ↓
+Agent Execution
+  ↓
+Commit Evidence
+  ↓
+Integration Plan
+  ↓
+Conflict Detection
+  ↓
+Git Integration
+  ↓
+Validated Repository State
+```
+
+Integration is deterministic: candidate workspaces are ordered consistently, changed files are normalized, and overlapping changes are surfaced before integration.
+
+---
+
+# TUI
+
+The EamilOS TUI is designed as a **mission control surface**.
+
+Core concepts include:
+
+- Mission HUD
+- mission timeline
+- task/graph state
+- live execution
+- agent cards
+- worker/fleet visibility
 - command palette
 - slash commands
-- centralized keymap
-- responsive layouts
-- mouse input parsing
-- TTY-safe rendering
-- reduced-motion support
-- ASCII fallback
+- prompt composer
+- steering/control
+- approvals
+- evidence
+- logs
+- Git/GitHub state
 - contextual notifications
+
+Terminal behavior includes:
+
+- centralized keymap
+- shortcut conflict detection
+- mouse input parsing
+- responsive layouts
 - terminal resize handling
-
-The runtime remains the source of truth. The TUI is a client for observing and controlling it.
+- TTY-safe rendering
+- ASCII fallback
+- reduced-motion support
 
 ---
 
-# Current architecture status
+# Persistence and recovery
 
-EamilOS is an active implementation. The README intentionally distinguishes what exists today from what depends on external environments and what remains a direction.
+Mission state is not just an in-memory object.
 
-## Implemented in the current repository
+The distributed mission authority uses a SQLite-backed state store with:
 
-- Mission runtime and MissionControl
-- Persistent mission creation, listing, inspection, and lifecycle
-- Task coordination
-- Project execution
-- Multi-agent execution layer
-- Claude Code integration
-- Codex CLI integration
-- OpenCode integration
-- Gemini CLI integration
-- Aider integration
-- Goose integration
-- Base-agent abstraction
-- Agent/provider detection
-- Single, fallback, swarm, and manual execution strategies
-- Fleet/device state
-- Cognitive Execution Graph
-- Loop state and lifecycle
-- Decisions
-- Plans
-- Approvals
-- Artifacts
-- Sessions
-- GitHub state integration
-- Full-screen TUI
-- Mission-oriented navigation
-- Command registry
-- Command palette
-- Slash-command handling
-- Central keymap and conflict detection
-- Responsive terminal layout
-- Mouse input parsing
-- TTY-safe terminal handling
-- Reduced-motion and ASCII fallback modes
-- Plugin management
-- Worker/connect infrastructure
-- Validation and test infrastructure
+- durable events
+- materialized snapshots
+- atomic persistence
+- event hash chaining
+- integrity verification
+- replay-based recovery
+- migration support
+- corruption-tolerant snapshot recovery
 
-## Evolving / provider-dependent
+The event history remains the recovery boundary.
 
-- External agents require their respective tools, authentication, and environment configuration.
-- Model availability depends on configured providers and credentials.
-- Distributed execution depends on worker/network configuration.
-- Cross-agent behavior depends on the capabilities and behavior exposed by each adapter.
-- The unified mission experience is still evolving as runtime and integrations mature.
+---
 
-## Direction
+# Safety and control
 
-The longer-term goal is a single durable mission abstraction across:
+EamilOS is designed for autonomous execution without removing operator control.
 
-- interactive TUI use
-- CLI automation
-- machine-readable interfaces
-- heterogeneous agents
-- model providers
-- distributed execution
-- autonomous recovery
+The runtime provides explicit boundaries for:
+
+- approvals
+- scoped authorization
+- command execution
+- lifecycle control
+- cancellation
+- retries
+- leases
+- worker fencing
 - validation
-- Git delivery
+- evidence
 
-The distinction matters:
+The principle is simple:
 
-> **EamilOS is ambitious about where the architecture is going without pretending every part of that architecture is finished today.**
+> **Autonomy should be observable, recoverable, and controllable.**
 
 ---
 
-# Architecture
+# Architecture at a glance
 
-The system can be understood as five cooperating layers.
-
-```mermaid
-flowchart TB
-    EXPERIENCE["CLI · Mission TUI · Machine Interface"]
-
-    CONTROL["Mission Runtime<br/>Tasks · Decisions · Approvals · Lifecycle"]
-
-    INTELLIGENCE["Intelligence<br/>Decision Providers · Model Providers"]
-
-    EXECUTION["Execution Fabric<br/>Agents · Harnesses · Devices · Workers"]
-
-    STATE["Persistent State<br/>Missions · Graph · Events · Checkpoints · Artifacts"]
-
-    EXPERIENCE --> CONTROL
-    CONTROL <--> INTELLIGENCE
-    CONTROL <--> EXECUTION
-    CONTROL <--> STATE
-
-    EXECUTION --> EXTERNAL["Coding Tools / Runtimes"]
-    INTELLIGENCE --> PROVIDERS["Model Providers"]
-    STATE --> GIT["Git / GitHub"]
+```text
+┌────────────────────────────────────────────────────────────┐
+│                     EamilOS Interfaces                     │
+│              CLI · TUI · Commands · APIs                  │
+└─────────────────────────────┬──────────────────────────────┘
+                              │
+┌─────────────────────────────▼──────────────────────────────┐
+│                     Mission Control                        │
+│   Missions · Tasks · Graph · Decisions · Approvals        │
+└─────────────────────────────┬──────────────────────────────┘
+                              │
+┌─────────────────────────────▼──────────────────────────────┐
+│                    Execution Fabric                        │
+│   Agents · Harnesses · Workers · Fleet · Leases           │
+└─────────────────────────────┬──────────────────────────────┘
+                              │
+┌─────────────────────────────▼──────────────────────────────┐
+│                  Durable Mission State                     │
+│   Ledger · Events · Snapshots · Replication · Recovery    │
+└─────────────────────────────┬──────────────────────────────┘
+                              │
+┌─────────────────────────────▼──────────────────────────────┐
+│                    Delivery Layer                           │
+│       Git · Workspaces · Validation · Evidence             │
+└────────────────────────────────────────────────────────────┘
 ```
-
-The TUI and CLI are interfaces to the runtime.
-
-The runtime owns mission state.
-
-Execution resources perform work.
-
-The graph and event history preserve what happened.
-
-Validation and Git state provide evidence around the resulting software.
 
 ---
 
 # CLI
 
-The repository currently exposes two related command layers: the established project/agent CLI and the newer persistent mission/control-plane CLI.
+Install the published CLI:
 
-They are both real today, so they are documented separately rather than being presented as a future unified command surface.
+```bash
+npm install -g @eamilos/cli
+```
 
-## Core execution
-
-Launch the TUI:
+Launch EamilOS:
 
 ```bash
 eamilos
@@ -534,90 +527,24 @@ Run a goal:
 eamilos run "Build a production-ready REST API"
 ```
 
-Inspect project state:
+Inspect the environment:
 
 ```bash
-eamilos status
-eamilos list
-```
-
-Control a project:
-
-```bash
-eamilos pause <project>
-eamilos resume <project>
-eamilos cancel <project>
-eamilos retry <project>
-```
-
-Inspect runtime information:
-
-```bash
+eamilos doctor
 eamilos agents
-eamilos cost
-eamilos decisions <project-id>
-eamilos history <project-id>
+eamilos status
 ```
 
-## Persistent missions
-
-Create a mission:
+Persistent missions:
 
 ```bash
 eamilos mission create "Build a production-ready authentication system"
-```
-
-Run a mission:
-
-```bash
 eamilos mission run "Build a production-ready authentication system"
-```
-
-Inspect missions:
-
-```bash
 eamilos mission list
 eamilos mission show <mission-id>
 ```
 
-The mission command family also provides lifecycle operations for starting, controlling, and reporting on persistent missions.
-
-## Cognitive graph
-
-```bash
-eamilos graph show <mission-id>
-eamilos graph verify <mission-id>
-eamilos graph why <mission-id> <task-id>
-```
-
-## Runtime and infrastructure
-
-```bash
-eamilos doctor
-eamilos setup
-eamilos validate
-eamilos connect
-eamilos worker
-eamilos plugins
-```
-
----
-
-# Installation
-
-Install the published CLI:
-
-```bash
-npm install -g @eamilos/cli
-```
-
-Launch:
-
-```bash
-eamilos
-```
-
-For development:
+Development:
 
 ```bash
 git clone https://github.com/RayAKaan/EamilOS.git
@@ -625,133 +552,82 @@ cd EamilOS
 npm install
 npm run build
 npm test
-```
-
-Type-check:
-
-```bash
 npm run typecheck
 ```
 
-The root project currently targets Node.js 20+.
-
----
-
-# Configuration
-
-Interactive setup:
-
-```bash
-eamilos setup
-```
-
-Explicit provider/model configuration:
-
-```bash
-eamilos setup --provider ollama --model <model>
-```
-
-Diagnostics:
-
-```bash
-eamilos doctor
-```
-
-Provider and execution availability depends on what is installed and configured on the machine.
+Requires **Node.js 20+**.
 
 ---
 
 # Repository structure
 
-EamilOS is a TypeScript monorepo centered around the CLI.
-
-| Area | Purpose |
-|---|---|
-| `packages/cli/src/core` | Core runtime and mission systems |
-| `packages/cli/src/commands` | CLI command implementations |
-| `packages/cli/src/multi-agent` | Agent abstractions, adapters, orchestration, and graph support |
-| `packages/cli/src/tui` | Full-screen terminal UI |
-| `packages/cli/src/terminal` | Terminal input, rendering, and surface handling |
-| `packages/cli/src/detection` | Provider/environment detection |
-| `packages/cli/src/__tests__` | Tests |
-
-The CLI package also exposes core and multi-agent modules through package exports.
+```text
+packages/cli/src/
+├── core/
+│   ├── mission/              # Mission + task graph
+│   ├── distributed-mission/  # Authority, scheduling, replication, Git
+│   ├── agents/               # Universal agent platform
+│   ├── cognitive-graph/      # Cognitive execution graph
+│   ├── approvals/            # Approval and authorization
+│   ├── decisions/            # Decision layer
+│   ├── loop/                 # Execution loop
+│   ├── fleet/                # Workers / execution resources
+│   └── ...
+├── multi-agent/              # Agent adapters and orchestration
+├── commands/                 # CLI commands
+├── tui/                      # Full-screen terminal UI
+├── terminal/                 # Terminal primitives
+└── detection/                # Environment/provider detection
+```
 
 ---
 
 # Technology
 
-Current implementation includes:
+EamilOS is currently built with:
 
 - **TypeScript**
-- **Node.js**
+- **Node.js 20+**
 - **SQLite / better-sqlite3**
 - **Commander**
 - **Zod**
 - **WebSockets**
 - **simple-git**
-- **YAML**
+- **node-pty**
 - **esbuild**
 - **Vitest**
 - terminal-native rendering
-- plugin infrastructure
-
----
-
-# Extensibility
-
-EamilOS is built around replaceable execution capabilities.
-
-Extension points include:
-
-- agent adapters
-- custom agents
-- execution providers
-- model providers
-- decision providers
-- validation providers
-- Git integrations
-- plugins
-- worker nodes
-- mission commands
-
-A new execution engine should become another capability the mission runtime can coordinate, rather than becoming a second mission runtime.
 
 ---
 
 # Design principles
 
 ### Mission first
-
-The developer thinks about the outcome, not which process happens to execute the next command.
+The unit of work is a mission, not a chat session.
 
 ### Agents are capabilities
+Agents and harnesses are interchangeable execution resources.
 
-Claude Code, Codex, OpenCode, Gemini CLI, Aider, Goose, and custom agents are execution resources.
+### Durable state
+Important mission state survives process boundaries and can be reconstructed.
 
-### Observable autonomy
+### Deterministic coordination
+Scheduling, ownership, assignment, and Git integration should have predictable behavior.
 
-Autonomous behavior should leave understandable state, events, decisions, and evidence.
-
-### Recovery over fragility
-
-Execution failure should be recoverable whenever mission state and available capabilities permit it.
-
-### Human control
-
-Automation should not make intervention an afterthought.
-
-### Runtime/UI separation
-
-The TUI observes and controls the runtime; it does not own mission execution.
+### Recovery by design
+Failure, disconnects, lease expiry, and stale workers are normal runtime conditions.
 
 ### Evidence over assertion
+A task is not complete merely because an agent says it is complete.
 
-Completion should be supported by validation and recorded state, not only by an agent's claim.
+### Human authority
+Autonomy and operator control coexist.
+
+### Runtime/UI separation
+The TUI observes and controls the runtime; it is not the source of truth.
 
 ### Extensible execution
-
-New agents, models, providers, and runtimes should participate through the mission abstraction.
+New agents, harnesses, models, workers, and providers should plug into the same mission abstraction.
 
 ---
 
@@ -759,64 +635,32 @@ New agents, models, providers, and runtimes should participate through the missi
 
 EamilOS is not:
 
-- a replacement for Claude Code
-- a replacement for Codex
 - another single-model coding assistant
-- a chat wrapper around one LLM
+- a wrapper around one LLM
+- a replacement for Claude Code, Codex, OpenCode, Gemini CLI, or other coding agents
+- a terminal UI that exists independently of an execution runtime
 - a requirement that every task use the same agent
-- a UI that owns the execution runtime
 
-It is the layer that coordinates those systems around a larger unit of work.
-
----
-
-# The bigger idea
-
-The first generation of AI coding tools made individual agents dramatically more capable.
-
-The next problem is coordination.
-
-What happens when a project needs:
-
-- one agent for architecture
-- another for implementation
-- another for testing
-- another for review
-- a local model for private work
-- a cloud provider for another workload
-- another machine when a worker becomes unavailable
-- approval before a sensitive action
-- persistent state across the project
-- evidence connecting execution to the final repository change
-
-That is the problem EamilOS is built to explore.
-
-Not:
-
-> **Which AI agent is the best?**
-
-But:
-
-> **How do we make many capable AI systems behave like one coherent software-engineering environment?**
+EamilOS is the **coordination layer around the work**.
 
 ---
 
-# EamilOS in one sentence
+# The idea
 
-> **EamilOS is a mission-oriented orchestration layer that brings AI coding agents, harnesses, models, execution resources, validation, and Git delivery into one coherent software-engineering system.**
+The first generation of AI coding tools made individual agents powerful.
 
----
+EamilOS focuses on the next layer:
 
-## One mission. Many agents. One control plane.
+> **How do many capable AI systems, workers, models, and tools behave like one coherent software-engineering environment?**
 
-**Bring the coding tools you already use.**
+That means:
 
-**Define the outcome.**
-
-**Let EamilOS coordinate the work.**
+**one mission → many tasks → many agents → coordinated execution → durable state → validated software.**
 
 ---
 
-## License
+## EamilOS
 
-MIT
+**One mission. Many agents. One control plane.**
+
+MIT License.
