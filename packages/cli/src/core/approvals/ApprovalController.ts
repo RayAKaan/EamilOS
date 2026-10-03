@@ -72,6 +72,25 @@ export class ApprovalController {
     return { approval };
   }
 
+  consume(approvalId: string, expectedRevision?: number): ApprovalDecisionResult {
+    const current = this.get(approvalId);
+    if (!current) throw new Error('APPROVAL_NOT_FOUND');
+    if (current.status !== 'approved') {
+      throw new Error(`APPROVAL_NOT_APPROVED:${current.status}`);
+    }
+
+    const approval = this.store.transition(
+      approvalId,
+      {
+        status: 'consumed',
+        consumedAt: this.now(),
+      },
+      expectedRevision ?? current.revision,
+    );
+    this.audit?.recordTransition(current, approval);
+    return { approval };
+  }
+
   reject(
     approvalId: string,
     actor: string,
