@@ -38,17 +38,32 @@ export class DistributedMissionCoordinator {
     if (!assignment) throw new Error('Assignment not found: ' + assignmentId);
     if (assignment.state !== 'OFFERED') throw new Error('Assignment is not claimable: ' + assignment.state);
 
-    const task = this.scheduler.graph.get(assignment.taskId);
-    if (task) {
-      task.owner = assignment.nodeId;
-      task.leaseId = leaseId;
-      task.leaseExpiresAt = leaseExpiresAt;
-      if (task.state === 'READY' || task.state === 'RECOVERABLE') {
-        this.scheduler.graph.transition(task.id, 'CLAIMED');
-      }
+    if (Date.parse(leaseExpiresAt) <= Date.now()) {
+      throw new Error('Lease is already expired');
     }
 
-    this.ledger.updateAssignment(assignmentId, 'LEASED', { leaseId, leaseExpiresAt });
+    const task = this.scheduler.graph.get(assignment.taskId);
+    if (!task) throw new Error('Task not found: ' + assignment.taskId);
+    if (task.state !== 'READY' && task.state !== 'RECOVERABLE') {
+      throw new Error('Task is no longer claimable: ' + task.state);
+    }
+    if (task.attempt + 1 !== assignment.attempt) {
+      throw new Error('STALE_TASK_ATTEMPT:' + assignment.taskId);
+    }
+
+    this.scheduler.graph.setOwner(task.id, assignment.nodeId);
+    if (task.attempt !== assignment.attempt) {
+      throw new Error('TASK_ATTEMPT_FENCE_MISMATCH:' + assignment.taskId);
+    }
+    task.leaseId = leaseId;
+    task.leaseExpiresAt = leaseExpiresAt;
+    this.scheduler.graph.transition(task.id, 'CLAIMED');
+
+    this.ledger.updateAssignment(assignmentId, 'LEASED', {
+      leaseId,
+      leaseExpiresAt,
+      fencingToken: assignment.fencingToken,
+    });
   }
 
   start(assignmentId: string): void {
@@ -71,9 +86,23 @@ export class DistributedMissionCoordinator {
   }
 
   complete(result: DistributedTaskResult): void {
-    const assignment = this.ledger.getTaskAssignment(result.taskId);
-    if (!assignment || assignment.nodeId !== result.nodeId) {
-      throw new Error('No active assignment for task ' + result.taskId + ' on node ' + result.nodeId);
+    const assignment = this.ledger.getAssignment(result.assignmentId);
+    if (
+      !assignment ||
+      assignment.taskId !== result.taskId ||
+      assignment.nodeId !== result.nodeId ||
+      assignment.state === 'REQUEUED' ||
+      assignment.state === 'FAILED' ||
+      assignment.state === 'COMPLETED' ||
+      assignment.attempt !== result.attempt ||
+      assignment.fencingToken !== result.fencingToken
+    ) {
+      throw new Error('STALE_TASK_RESULT:' + result.taskId);
+    }
+
+    const active = this.ledger.getTaskAssignment(result.taskId);
+    if (!active || active.assignmentId !== assignment.assignmentId) {
+      throw new Error('STALE_TASK_OWNERSHIP:' + result.taskId);
     }
 
     const task = this.scheduler.graph.get(result.taskId);
@@ -137,6 +166,15 @@ export class DistributedMissionCoordinator {
     );
 
     for (const assignment of expired) {
+      const task = this.scheduler.graph.get(assignment.taskId);
+      if (task) {
+        task.owner = undefined;
+        task.leaseId = undefined;
+        task.leaseExpiresAt = undefined;
+        if (['CLAIMED', 'RUNNING', 'CHECKPOINTED', 'VALIDATING'].includes(task.state)) {
+          this.scheduler.graph.transition(task.id, 'RECOVERABLE');
+        }
+      }
       this.ledger.updateAssignment(assignment.assignmentId, 'REQUEUED');
       this.ledger.append('LEASE_EXPIRED', assignment.taskId, assignment.nodeId, {
         assignmentId: assignment.assignmentId,
