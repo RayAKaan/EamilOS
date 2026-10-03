@@ -93,6 +93,21 @@ describe('EamilosPtyManager', () => {
     expect(detached).toEqual(['pty-1']);
   });
 
+  it('distinguishes an explicit termination from a failed exit', async () => {
+    const backend = new InMemoryPtyBackend();
+    const manager = new EamilosPtyManager(backend);
+    const terminated: string[] = [];
+
+    manager.on('terminated', (event) => terminated.push(event.sessionId));
+    await manager.create(request());
+    manager.terminate('pty-1', 'SIGTERM');
+    backend.exit('pty-1', null, 'SIGTERM');
+
+    expect(manager.get('pty-1')?.state).toBe('terminated');
+    expect(terminated).toEqual(['pty-1']);
+    manager.close();
+  });
+
   it('propagates failed exits and cleans backend subscriptions', async () => {
     const backend = new InMemoryPtyBackend();
     const manager = new EamilosPtyManager(backend);
