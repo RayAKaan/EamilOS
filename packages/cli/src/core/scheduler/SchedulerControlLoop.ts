@@ -8,6 +8,7 @@ export interface SchedulerControlLoopOptions {
 }
 
 export interface SchedulerControlLoopTick {
+  renewed: ScheduleDecision[];
   rescheduled: ScheduleDecision[];
   scheduled: ScheduleDecision[];
   dispatched: ScheduleDecision[];
@@ -28,9 +29,10 @@ export class SchedulerControlLoop {
   }
 
   async tick(): Promise<SchedulerControlLoopTick> {
-    if(this.ticking) return {rescheduled:[],scheduled:[],dispatched:[],failedDispatches:[]};
+    if(this.ticking) return {renewed:[],rescheduled:[],scheduled:[],dispatched:[],failedDispatches:[]};
     this.ticking=true;
     try {
+      const renewed=this.scheduler.renewLeases();
       const rescheduled=this.scheduler.reconcile();
       const scheduled=this.scheduler.cycle();
       const dispatched:ScheduleDecision[]=[];
@@ -39,7 +41,7 @@ export class SchedulerControlLoop {
         try{dispatched.push(await this.scheduler.dispatch(decision.decisionId));}
         catch(error){failedDispatches.push({decisionId:decision.decisionId,error:String(error)});}
       }
-      return {rescheduled,scheduled,dispatched,failedDispatches};
+      return {renewed,rescheduled,scheduled,dispatched,failedDispatches};
     } finally { this.ticking=false; }
   }
 
