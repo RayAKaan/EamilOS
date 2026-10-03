@@ -116,8 +116,8 @@ describe('ApprovalAuditRecorder reconciliation', () => {
 describe('ApprovalAuditReconciliationService', () => {
   it('reconciles every persisted approval without owning lifecycle state', () => {
     const store = new InMemoryApprovalStore();
-    store.create(request({ approvalId: 'a' }));
-    store.create(request({ approvalId: 'b' }));
+    store.create({ ...request, approvalId: 'a' });
+    store.create({ ...request, approvalId: 'b' });
 
     const log = new EamilosSqliteDistributedEventLog({ filename: ':memory:' });
     const audit = new ApprovalAuditRecorder({ eventLog: log });
