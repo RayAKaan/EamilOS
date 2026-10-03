@@ -85,8 +85,8 @@ describe('Phase 7 distributed mission fabric', () => {
     const { graph, ledger, nodes, first } = setup();
     const coordinator = new DistributedMissionCoordinator(ledger, graph, () => nodes);
     const [assignmentId] = coordinator.scheduleReady();
-    coordinator.claim(assignmentId, 'lease-1', new Date(Date.now() - 1).toISOString());
-    expect(coordinator.expireLeases()).toEqual([first.id]);
+    coordinator.claim(assignmentId, 'lease-1', new Date(Date.now() + 60_000).toISOString());
+    expect(coordinator.expireLeases(Date.now() + 61_000)).toEqual([first.id]);
     expect(ledger.getAssignment(assignmentId)?.state).toBe('REQUEUED');
   });
 
@@ -114,4 +114,63 @@ describe('Phase 7 distributed mission fabric', () => {
       updatedAt: new Date().toISOString(),
     }, version)).toThrow(/Stale distributed mission version/);
   });
+  it('fences stale worker results after a task is requeued and reassigned', () => {
+    const { graph, ledger, nodes, first } = setup();
+    const coordinator = new DistributedMissionCoordinator(ledger, graph, () => nodes);
+
+    const [firstAssignmentId] = coordinator.scheduleReady();
+    const firstAssignment = ledger.getAssignment(firstAssignmentId)!;
+    coordinator.claim(firstAssignmentId, 'lease-1', new Date(Date.now() + 60_000).toISOString());
+    coordinator.start(firstAssignmentId);
+    expect(graph.get(first.id)?.attempt).toBe(firstAssignment.attempt);
+
+    coordinator.nodeLost(firstAssignment.nodeId);
+    const [secondAssignmentId] = coordinator.scheduleReady();
+    const secondAssignment = ledger.getAssignment(secondAssignmentId)!;
+    expect(secondAssignment.assignmentId).not.toBe(firstAssignment.assignmentId);
+    expect(secondAssignment.attempt).toBe(firstAssignment.attempt + 1);
+    expect(secondAssignment.fencingToken).toBeGreaterThan(firstAssignment.fencingToken ?? 0);
+
+    coordinator.claim(secondAssignmentId, 'lease-2', new Date(Date.now() + 60_000).toISOString());
+    coordinator.start(secondAssignmentId);
+
+    expect(() => coordinator.complete({
+      taskId: first.id,
+      assignmentId: firstAssignment.assignmentId,
+      nodeId: firstAssignment.nodeId,
+      attempt: firstAssignment.attempt,
+      fencingToken: firstAssignment.fencingToken!,
+      success: true,
+      state: 'COMPLETED',
+    })).toThrow('STALE_TASK_RESULT');
+
+    coordinator.complete({
+      taskId: first.id,
+      assignmentId: secondAssignment.assignmentId,
+      nodeId: secondAssignment.nodeId,
+      attempt: secondAssignment.attempt,
+      fencingToken: secondAssignment.fencingToken!,
+      success: true,
+      state: 'COMPLETED',
+    });
+
+    expect(ledger.getAssignment(secondAssignmentId)?.state).toBe('COMPLETED');
+  });
+
+  it('invalidates task ownership when its lease expires', () => {
+    const { graph, ledger, nodes, first } = setup();
+    const coordinator = new DistributedMissionCoordinator(ledger, graph, () => nodes);
+    const [assignmentId] = coordinator.scheduleReady();
+    const assignment = ledger.getAssignment(assignmentId)!;
+
+    coordinator.claim(assignmentId, 'lease-expired', new Date(Date.now() + 60_000).toISOString());
+    coordinator.start(assignmentId);
+
+    expect(coordinator.expireLeases(Date.now() + 61_000)).toEqual([first.id]);
+    expect(graph.get(first.id)?.state).toBe('RECOVERABLE');
+    expect(graph.get(first.id)?.owner).toBeUndefined();
+    expect(graph.get(first.id)?.leaseId).toBeUndefined();
+    expect(ledger.getAssignment(assignmentId)?.state).toBe('REQUEUED');
+  });
+
 });
