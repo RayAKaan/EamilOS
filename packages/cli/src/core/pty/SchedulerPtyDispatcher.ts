@@ -82,10 +82,10 @@ export class SchedulerPtyDispatcher implements SchedulerDispatcher {
   ) {
     this.resolver = options.resolver ?? DEFAULT_RESOLVER;
     this.disposers = [
-      options.pty.on('completed', session => this.handleTerminal(session, 'completed')),
-      options.pty.on('failed', session => this.handleTerminal(session, 'failed')),
-      options.pty.on('terminated', session => this.handleTerminal(session, 'cancelled')),
-      options.pty.on('lost', session => this.handleTerminal(session, 'failed')),
+      options.pty.on('completed', event => this.handleTerminal(event.executionId, 'completed')),
+      options.pty.on('failed', event => this.handleTerminal(event.executionId, 'failed')),
+      options.pty.on('terminated', event => this.handleTerminal(event.executionId, 'cancelled')),
+      options.pty.on('lost', session => this.handleTerminal(session.executionId, 'failed')),
     ];
   }
 
@@ -103,7 +103,7 @@ export class SchedulerPtyDispatcher implements SchedulerDispatcher {
       workerId: decision.workerId,
       agentId: decision.agentId,
       harnessId: decision.harnessId,
-      cwd: input.cwd ?? worker.metadata.workingDir as string ?? process.cwd(),
+      cwd: input.cwd ?? (typeof worker.metadata.workingDir === 'string' ? worker.metadata.workingDir : process.cwd()),
       command: input.command,
       args: input.args ?? [],
       env: input.env,
@@ -120,16 +120,18 @@ export class SchedulerPtyDispatcher implements SchedulerDispatcher {
   }
 
   private handleTerminal(
-    session: PtySession,
+    executionId: string,
     state: 'completed' | 'failed' | 'cancelled',
   ): void {
-    const decision = this.decisions.get(session.executionId);
+    const decision = this.decisions.get(executionId);
     if (!decision) return;
 
     try {
-      this.completeExecution(session.executionId, state);
+      const session = this.options.pty.get(sessionIdFor(executionId));
+      if (!session) throw new Error('PTY_SESSION_NOT_FOUND_FOR_EXECUTION');
+      this.completeExecution(executionId, state);
       this.options.onTerminal?.(session, decision);
-      this.decisions.delete(session.executionId);
+      this.decisions.delete(executionId);
     } catch (error) {
       this.options.onError?.(error, decision);
     }
