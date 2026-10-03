@@ -34,7 +34,11 @@ export class DistributedMissionLedger {
       this.version = restored.state.graphVersion;
       this.sequence = restored.state.sequence;
       for (const assignment of restored.state.assignments) {
-        this.assignments.set(assignment.assignmentId, { ...assignment });
+        this.assignments.set(assignment.assignmentId, {
+          ...assignment,
+          assignmentVersion: assignment.assignmentVersion ?? 1,
+          fencingToken: assignment.fencingToken ?? 0,
+        });
       }
       this.events.push(...restored.events.map((event) => ({
         ...event,
@@ -61,6 +65,14 @@ export class DistributedMissionLedger {
     return this.version;
   }
 
+  nextFencingToken(): number {
+    const max = [...this.assignments.values()].reduce(
+      (value, assignment) => Math.max(value, assignment.fencingToken ?? 0),
+      0,
+    );
+    return Math.max(max + 1, this.sequence + 1);
+  }
+
   snapshot(nodes: DistributedNodeView[] = []): DistributedMissionSnapshot {
     return {
       missionId: this.missionId,
@@ -84,7 +96,11 @@ export class DistributedMissionLedger {
       throw new Error('Assignment already exists: ' + assignment.assignmentId);
     }
 
-    this.assignments.set(assignment.assignmentId, { ...assignment });
+    this.assignments.set(assignment.assignmentId, {
+      ...assignment,
+      assignmentVersion: assignment.assignmentVersion ?? 1,
+      fencingToken: assignment.fencingToken ?? this.nextFencingToken(),
+    });
     const previousVersion = this.version;
     this.version += 1;
 
@@ -113,7 +129,13 @@ export class DistributedMissionLedger {
     patch: Partial<DistributedAssignment> = {},
   ): DistributedAssignment {
     const current = this.requireAssignment(assignmentId);
-    const next = { ...current, ...patch, state, updatedAt: new Date().toISOString() };
+    const next = {
+      ...current,
+      ...patch,
+      state,
+      assignmentVersion: current.assignmentVersion + 1,
+      updatedAt: new Date().toISOString(),
+    };
     this.assignments.set(assignmentId, next);
 
     try {
