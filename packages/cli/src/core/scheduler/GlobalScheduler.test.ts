@@ -23,7 +23,7 @@ describe('GlobalScheduler',()=>{
     const s=new GlobalScheduler({missionControl:control([task('t')]),fleet:asFleet(new FakeFleet([worker('w1')])),leases:asLeases(leases),constraints:{leaseTtlMs:1000,leaseRenewalThresholdMs:500}});
     const d=s.cycle()[0];
     const before=leases.leases.get(d.leaseId)!.expiresAt;
-    const now=Date.parse(leases.leases.get(d.leaseId)!.expiresAt)-600;
+    const now=Date.parse(leases.leases.get(d.leaseId)!.expiresAt)-400;
     const renewed=s.renewLeases(now);
     expect(renewed.map(x=>x.executionId)).toEqual([d.executionId]);
     expect(Date.parse(leases.leases.get(d.leaseId)!.expiresAt)).toBe(now+1000);
