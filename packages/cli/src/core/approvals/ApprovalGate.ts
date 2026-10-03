@@ -6,12 +6,14 @@ import type {
 } from './PolicyEngine.js';
 import type { ApprovalStore } from './ApprovalStore.js';
 import type { ApprovalAuditRecorder } from './ApprovalAudit.js';
+import { ApprovalController } from './ApprovalController.js';
+import { assertApprovalBinding } from './ApprovalBinding.js';
 import type { ScheduleDecision } from '../scheduler/GlobalSchedulerTypes.js';
 import type { SchedulingCandidate } from '../scheduler/GlobalSchedulerTypes.js';
 import type { FleetWorker } from '../comms/a2a/EamilosFleetRegistry.js';
 
 export type ApprovalGateDecision =
-  | { readonly decision: 'allow'; readonly policy: PolicyEvaluation }
+  | { readonly decision: 'allow'; readonly policy: PolicyEvaluation; readonly approval?: ApprovalRequest }
   | { readonly decision: 'deny'; readonly policy: PolicyEvaluation }
   | {
       readonly decision: 'approval_required';
@@ -38,13 +40,18 @@ export interface ApprovalGateOptions {
   readonly approvalScope?: ApprovalRequest['scope'];
   readonly approvalExpiresAt?: (now: string) => string | undefined;
   readonly audit?: ApprovalAuditRecorder;
+  readonly controller?: ApprovalController;
 }
 
 export class ApprovalGate {
   private readonly options: ApprovalGateOptions;
+  private readonly controller: ApprovalController;
 
   constructor(options: ApprovalGateOptions) {
     this.options = options;
+    this.controller =
+      options.controller ??
+      new ApprovalController({ store: options.approvalStore, audit: options.audit });
   }
 
   evaluate(context: ApprovalGateContext): ApprovalGateDecision {
@@ -81,9 +88,21 @@ export class ApprovalGate {
     );
 
     if (matching) {
-      // Terminal approvals are never resurrected. In particular, an expired
-      // approval remains non-authorizing until a future explicit re-request
-      // policy creates a new approval identity.
+      if (matching.status === 'approved') {
+        assertApprovalBinding({
+          approval: matching,
+          policyId: this.matchingPolicy(policy),
+          policyContext: context.policyContext,
+        });
+        return {
+          decision: 'allow',
+          policy,
+          approval: this.toRequest(matching),
+        };
+      }
+
+      // Terminal approvals are never resurrected. An expired, rejected,
+      // cancelled, or consumed approval cannot authorize a later dispatch.
       return {
         decision: 'approval_required',
         policy,
@@ -145,6 +164,10 @@ export class ApprovalGate {
   private toRequest(record: ApprovalRequest): ApprovalRequest {
     return record;
   }
+
+  private gateController(): ApprovalController {
+    return (this.gate as unknown as { controller: ApprovalController }).controller;
+  }
 }
 
 export interface ApprovalGateDispatcherOptions {
@@ -171,6 +194,12 @@ export class ApprovalGateDispatcher {
     const result = this.gate.evaluate(context);
 
     if (result.decision === 'allow') {
+      if (result.approval) {
+        this.gateController().consume(
+          result.approval.approvalId,
+          result.approval.revision,
+        );
+      }
       this.dispatch(context.decision, context.candidate, context.worker);
     }
 
