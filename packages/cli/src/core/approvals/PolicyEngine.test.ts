@@ -42,12 +42,12 @@ describe('DeterministicPolicyEngine', () => {
 
   it('requires approval for a protected production resource', () => {
     const result = engine({
-        policyId: 'production-publish',
-        effect: 'approval_required',
-        reason: 'protected registry write',
-        commands: ['npm'],
-        protectedResources: ['registry'],
-      }).evaluate(context);
+      policyId: 'production-publish',
+      effect: 'approval_required',
+      reason: 'protected registry write',
+      commands: ['npm'],
+      protectedResources: ['registry'],
+    }).evaluate(context);
 
     expect(result.decision).toBe('approval_required');
     expect(result.matchedPolicies.map((match) => match.policyId)).toEqual([
@@ -57,12 +57,11 @@ describe('DeterministicPolicyEngine', () => {
 
   it('denies when a deny policy matches', () => {
     const result = engine({
-        policyId: 'blocked-publish',
-        effect: 'deny',
-        reason: 'publishing is disabled',
-        commandPrefixes: ['npm'],
-      },
-    } as never).evaluate(context);
+      policyId: 'blocked-publish',
+      effect: 'deny',
+      reason: 'publishing is disabled',
+      commandPrefixes: ['npm'],
+    }).evaluate(context);
 
     expect(result.decision).toBe('deny');
   });
