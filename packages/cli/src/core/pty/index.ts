@@ -6,3 +6,5 @@ export * from './NodePtyBackend.js';
 export * from './PtySessionStore.js';
 
 export * from './SchedulerPtyDispatcher.js';
+
+export * from './MultiTerminalProjection.js';
