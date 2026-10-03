@@ -138,6 +138,20 @@ export class SqliteDistributedMissionStateStore {
     return { valid: true, count: events.length, lastHash: events.at(-1)?.hash };
   }
 
+  has(missionId: string): boolean {
+    const row = this.db.prepare(
+      'SELECT 1 AS present FROM eamilos_distributed_mission_events WHERE mission_id = ? LIMIT 1',
+    ).get(missionId) as { present?: number } | undefined;
+    return row?.present === 1;
+  }
+
+  listMissionIds(): string[] {
+    const rows = this.db.prepare(
+      'SELECT DISTINCT mission_id FROM eamilos_distributed_mission_events ORDER BY mission_id ASC',
+    ).all() as Array<{ mission_id: string }>;
+    return rows.map((row) => row.mission_id);
+  }
+
   listEvents(missionId: string): DistributedMissionEvent[] {
     const rows = this.db.prepare(
       `SELECT * FROM eamilos_distributed_mission_events
