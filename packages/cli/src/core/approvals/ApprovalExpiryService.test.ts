@@ -50,7 +50,7 @@ describe('ApprovalExpiryService', () => {
 
   it('does not overwrite human decisions', () => {
     const store = new InMemoryApprovalStore();
-    const created = store.create(request({ approvalId: 'race' }));
+    const created = store.create(request({ approvalId: 'race', expiresAt: '2026-10-03T12:00:00.000Z' }));
     store.transition('race', {
       status: 'approved',
       decisionBy: 'human-1',
