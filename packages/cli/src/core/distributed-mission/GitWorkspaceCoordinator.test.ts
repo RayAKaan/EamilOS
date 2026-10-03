@@ -4,7 +4,7 @@ import { GitWorkspaceCoordinator, type GitOperations } from './GitWorkspaceCoord
 const ops = (filesByCommit: Record<string, string[]>): GitOperations => ({
   async inspectCommit(commit) {
     if (!filesByCommit[commit]) throw new Error('missing');
-    return { branch: 'eamilos/test', files: filesByCommit[commit], parent: 'base' };
+    return { commit, branch: 'eamilos/test', files: filesByCommit[commit], parent: 'base' };
   },
   async merge(_base, commit) { return { commit: 'integrated-' + commit }; },
   async abortMerge() {},
