@@ -322,7 +322,7 @@ export class EamilosA2AServer {
 
   private emitEvent(eventType: string, message: EamilosA2AMessage): void {
     if (!this.eventLog || !('executionId' in message)) return;
-    this.eventLog.append({ eventId: `${message.requestId}:${eventType}:${message.timestamp}`, eventType, missionId: message.missionId, taskId: message.taskId, executionId: message.executionId, requestId: message.requestId, workerId: 'workerId' in message ? message.workerId : undefined, payload: message as unknown as Record<string, unknown> });
+    this.eventLog.append({ eventId: `${message.requestId}:${eventType}:${createHash('sha256').update(JSON.stringify(message)).digest('hex')}`, eventType, missionId: message.missionId, taskId: message.taskId, executionId: message.executionId, requestId: message.requestId, workerId: 'workerId' in message ? message.workerId : undefined, payload: message as unknown as Record<string, unknown> });
   }
 
   private async parseBody(req: IncomingMessage): Promise<unknown> {
