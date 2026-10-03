@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { FleetWorker } from '../comms/a2a/EamilosFleetRegistry.js';
 import type { ScheduleDecision, SchedulingCandidate, SchedulerDispatcher } from '../scheduler/GlobalSchedulerTypes.js';
-import type { PtyManager, PtySessionRequest } from './PtyTypes.js';
-import type { PtySession } from './PtyTypes.js';
+import type { PtyManager, PtySession } from './PtyTypes.js';
 
 export interface PtyDispatchInput {
   command: string;
@@ -13,7 +12,11 @@ export interface PtyDispatchInput {
 }
 
 export interface PtyDispatchInputResolver {
-  resolve(decision: ScheduleDecision, candidate: SchedulingCandidate, worker: FleetWorker): PtyDispatchInput;
+  resolve(
+    decision: ScheduleDecision,
+    candidate: SchedulingCandidate,
+    worker: FleetWorker,
+  ): PtyDispatchInput;
 }
 
 export interface SchedulerPtyDispatcherOptions {
@@ -26,7 +29,7 @@ export interface SchedulerPtyDispatcherOptions {
 
 const DEFAULT_RESOLVER: PtyDispatchInputResolver = {
   resolve(_decision, candidate) {
-    const input = candidate.task.inputs as Record<string, unknown>;
+    const input = candidate.task.inputs;
     const command = input.command;
     if (typeof command !== 'string' || command.trim().length === 0) {
       throw new Error('PTY_DISPATCH_COMMAND_MISSING');
@@ -60,22 +63,30 @@ function sessionIdFor(executionId: string): string {
 }
 
 /**
- * Bridges the scheduler's dispatch contract to the authoritative PTY manager.
+ * Scheduler -> PTY bridge.
  *
- * The scheduler still owns execution decisions and resource leases. The PTY
- * manager owns terminal lifecycle. Terminal exit is translated back into a
- * scheduler terminal state through the supplied completion callback.
+ * The scheduler remains authoritative for execution decisions and leases.
+ * The PTY manager remains authoritative for terminal lifecycle.
  */
 export class SchedulerPtyDispatcher implements SchedulerDispatcher {
   private readonly resolver: PtyDispatchInputResolver;
-  private readonly terminalBindings = new Map<string, () => void>();
+  private readonly decisions = new Map<string, ScheduleDecision>();
+  private readonly disposers: Array<() => void>;
 
   constructor(
     private readonly options: SchedulerPtyDispatcherOptions,
-    private readonly completeExecution: (executionId: string, state: 'completed' | 'failed' | 'cancelled') => void,
+    private readonly completeExecution: (
+      executionId: string,
+      state: 'completed' | 'failed' | 'cancelled',
+    ) => void,
   ) {
     this.resolver = options.resolver ?? DEFAULT_RESOLVER;
-    this.bindTerminalEvents();
+    this.disposers = [
+      options.pty.on('completed', session => this.handleTerminal(session, 'completed')),
+      options.pty.on('failed', session => this.handleTerminal(session, 'failed')),
+      options.pty.on('terminated', session => this.handleTerminal(session, 'cancelled')),
+      options.pty.on('lost', session => this.handleTerminal(session, 'failed')),
+    ];
   }
 
   async dispatch(
@@ -84,76 +95,47 @@ export class SchedulerPtyDispatcher implements SchedulerDispatcher {
     worker: FleetWorker,
   ): Promise<void> {
     const input = this.resolver.resolve(decision, candidate, worker);
-    const mission = candidate.task.missionId;
-
     const session = await this.options.pty.create({
       sessionId: sessionIdFor(decision.executionId),
       executionId: decision.executionId,
-      missionId: mission,
-      taskId: candidate.taskId,
+      missionId: decision.missionId,
+      taskId: decision.taskId,
       workerId: decision.workerId,
       agentId: decision.agentId,
       harnessId: decision.harnessId,
-      cwd: input.cwd ?? worker.metadata?.workingDir as string ?? process.cwd(),
+      cwd: input.cwd ?? worker.metadata.workingDir as string ?? process.cwd(),
       command: input.command,
       args: input.args ?? [],
       env: input.env,
       dimensions: input.dimensions,
     });
 
+    this.decisions.set(decision.executionId, decision);
     this.options.onStarted?.(session, decision);
   }
 
   close(): void {
-    for (const dispose of this.terminalBindings.values()) dispose();
-    this.terminalBindings.clear();
+    for (const dispose of this.disposers.splice(0)) dispose();
+    this.decisions.clear();
   }
 
-  private bindTerminalEvents(): void {
-    const events = [
-      this.options.pty.on('completed', event => this.handleTerminal(event.executionId, 'completed')),
-      this.options.pty.on('failed', event => this.handleTerminal(event.executionId, 'failed')),
-      this.options.pty.on('terminated', event => this.handleTerminal(event.executionId, 'cancelled')),
-      this.options.pty.on('orphaned', session => this.options.onTerminal?.(session, this.decisionFor(session.executionId))),
-      this.options.pty.on('lost', session => this.options.onTerminal?.(session, this.decisionFor(session.executionId))),
-    ];
+  private handleTerminal(
+    session: PtySession,
+    state: 'completed' | 'failed' | 'cancelled',
+  ): void {
+    const decision = this.decisions.get(session.executionId);
+    if (!decision) return;
 
-    this.terminalBindings.set('events', () => {
-      for (const dispose of events) dispose();
-    });
-  }
-
-  private handleTerminal(executionId: string, state: 'completed' | 'failed' | 'cancelled'): void {
-    const decision = this.decisionFor(executionId);
     try {
-      this.completeExecution(executionId, state);
-      const session = this.options.pty.get(sessionIdFor(executionId));
-      if (session) this.options.onTerminal?.(session, decision);
+      this.completeExecution(session.executionId, state);
+      this.options.onTerminal?.(session, decision);
+      this.decisions.delete(session.executionId);
     } catch (error) {
       this.options.onError?.(error, decision);
     }
   }
+}
 
-  private decisionFor(executionId: string): ScheduleDecision {
-    // Completion callers can supply richer correlation externally. The dispatcher
-    // only requires executionId for scheduler completion, so this placeholder
-    // preserves the callback boundary without making the PTY manager scheduler-aware.
-    return {
-      decisionId: executionId,
-      idempotencyKey: executionId,
-      schedulerRevision: 0,
-      missionId: '',
-      taskId: '',
-      executionId,
-      workerId: '',
-      agentId: '',
-      harnessId: '',
-      priority: 'MEDIUM',
-      fencingToken: 0,
-      leaseId: '',
-      state: 'dispatched',
-      createdAt: '',
-      updatedAt: '',
-    };
-  }
+export function ptySessionIdForExecution(executionId: string): string {
+  return sessionIdFor(executionId);
 }
