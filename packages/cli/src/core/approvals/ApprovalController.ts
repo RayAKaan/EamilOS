@@ -1,5 +1,6 @@
 import type { ApprovalRecord } from './ApprovalTypes.js';
 import type { ApprovalStore } from './ApprovalStore.js';
+import type { ApprovalAuditRecorder } from './ApprovalAudit.js';
 
 export interface ApprovalDecisionResult {
   readonly approval: ApprovalRecord;
@@ -8,15 +9,18 @@ export interface ApprovalDecisionResult {
 export interface ApprovalControllerOptions {
   readonly store: ApprovalStore;
   readonly now?: () => string;
+  readonly audit?: ApprovalAuditRecorder;
 }
 
 export class ApprovalController {
   private readonly store: ApprovalStore;
   private readonly now: () => string;
+  private readonly audit?: ApprovalAuditRecorder;
 
   constructor(options: ApprovalControllerOptions) {
     this.store = options.store;
     this.now = options.now ?? (() => new Date().toISOString());
+    this.audit = options.audit;
   }
 
   get(approvalId: string): ApprovalRecord | undefined {
@@ -45,6 +49,7 @@ export class ApprovalController {
       },
       expectedRevision ?? current.revision,
     );
+    this.audit?.recordTransition(current, approval);
     return { approval };
   }
 
@@ -66,6 +71,7 @@ export class ApprovalController {
       },
       expectedRevision ?? current.revision,
     );
+    this.audit?.recordTransition(current, approval);
     return { approval };
   }
 
