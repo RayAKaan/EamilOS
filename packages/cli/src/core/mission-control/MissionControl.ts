@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { DistributedEventLog } from '../comms/a2a/EamilosDistributedEventLog.js';
 import type { MissionEngine } from '../mission/MissionEngine.js';
 import type { Mission, MissionStatus, MissionSnapshot } from '../mission/types.js';
-import { InMemoryMissionControlPlaneStore, type MissionControlPlaneRecord, type MissionControlPlaneStore, SqliteMissionControlPlaneStore } from './MissionControlPlaneStore.js';
+import { InMemoryMissionControlPlaneStore, type MissionControlPlaneRecord, type MissionControlPlaneStore, SqliteMissionControlPlaneStore } from './MissionControlStore.js';
 
 export interface MissionControlPlaneOptions {
   store?:MissionControlPlaneStore;
