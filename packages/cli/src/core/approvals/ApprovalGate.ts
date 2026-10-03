@@ -92,6 +92,23 @@ export class ApprovalGate {
     );
 
     if (matching) {
+      if (
+        (matching.status === 'pending' || matching.status === 'approved') &&
+        matching.expiresAt !== undefined &&
+        Date.parse(matching.expiresAt) <= Date.parse(now)
+      ) {
+        const expired = this.controller.expire(
+          matching.approvalId,
+          'APPROVAL_EXPIRED_AT_AUTHORIZATION',
+          matching.revision,
+        ).approval;
+        return {
+          decision: 'approval_required',
+          policy,
+          approval: this.toRequest(expired),
+        };
+      }
+
       if (matching.status === 'approved') {
         assertApprovalBinding({
           approval: matching,
